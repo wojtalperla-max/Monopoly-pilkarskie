@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<script>/*RL-STORAGE-SHIM*/(function(){function mem(){var d={};return{getItem:function(k){return Object.prototype.hasOwnProperty.call(d,k)?d[k]:null},setItem:function(k,v){d[k]=String(v)},removeItem:function(k){delete d[k]},clear:function(){d={}},key:function(i){return Object.keys(d)[i]||null},get length(){return Object.keys(d).length}}}
+['localStorage','sessionStorage'].forEach(function(n){var ok=true;try{var s=window[n];s.getItem('x')}catch(e){ok=false}
+if(!ok){try{Object.defineProperty(window,n,{value:mem(),configurable:true})}catch(e){}}})})();</script>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Real life</title>
+<style>
+  html,body{margin:0;height:100%;overflow:hidden;background:#87ceeb;font-family:system-ui,sans-serif}
+  canvas{display:block;touch-action:none}
+  #saveBtn{display:block;width:100%;margin:0 0 8px;padding:11px 16px;border:0;border-radius:8px;background:#287a4b;color:#fff;font-size:15px;font-weight:700;cursor:pointer}
+  #saveBtn:disabled{opacity:.65;cursor:wait}
+  #mpBtn{display:block;width:100%;margin-top:10px;border:0;border-radius:8px;padding:10px 20px;background:#3d4654;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+  #mpBtn.on{background:rgba(46,125,50,.9)}
+  #mpPanel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(340px,calc(100vw - 28px));max-height:75vh;overflow:auto;background:rgba(20,24,30,.97);color:#fff;border-radius:14px;padding:16px;display:none;z-index:110;box-sizing:border-box}
+  #mpPanel h3{margin:0 0 8px}
+  #mpPanel input{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.1);color:#fff;font-size:18px;letter-spacing:.3em;text-transform:uppercase;text-align:center;margin:8px 0}
+  #mpPanel button{background:#3a7bd5;color:#fff;border:0;border-radius:6px;padding:8px 12px;cursor:pointer;margin:2px 4px 2px 0}
+  #mpPanel button.no{background:#b3402f}
+  #mpServers{display:grid;gap:6px;margin:10px 0}
+  #mpServers .srv{background:rgba(255,255,255,.09);padding:7px 10px;border-radius:8px;display:flex;align-items:center;gap:8px;font-size:14px}
+  #mpServers .srv span{flex:1}
+  #mpServers .srv small{opacity:.7}
+  #mpServers .srv button{margin:0}
+  .mpSub{font-size:12px;opacity:.7;margin:10px 0 0}
+  #mpMsg{min-height:1.3em;font-size:13px;color:#ffb199;margin:6px 0}
+  #mpList{display:grid;gap:6px;margin:10px 0}
+  #mpList div{background:rgba(255,255,255,.09);padding:7px 10px;border-radius:8px;display:flex;align-items:center;gap:8px;font-size:14px}
+  #mpList i{width:14px;height:14px;border-radius:50%;display:inline-block;border:1px solid rgba(255,255,255,.5)}
+  #hud{position:fixed;left:12px;top:12px;color:#fff;background:rgba(0,0,0,.35);padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.5;pointer-events:none}
+  #hud b{font-size:16px}
+  #stick{position:fixed;right:24px;bottom:84px;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.2);display:none}
+  #invBtn{position:fixed;right:14px;bottom:14px;width:52px;height:52px;border-radius:50%;border:0;background:rgba(0,0,0,.45);font-size:26px;cursor:pointer}
+  .actBtn{position:fixed;bottom:14px;width:52px;height:52px;border-radius:50%;border:0;background:rgba(0,0,0,.45);color:#fff;font-size:24px;display:none;touch-action:none;user-select:none;-webkit-user-select:none;z-index:11}
+  .actBtn.on{background:rgba(255,213,74,.75)}
+  #inv{position:fixed;right:14px;bottom:78px;width:min(320px,calc(100vw - 28px));background:rgba(20,24,30,.88);color:#fff;border-radius:12px;padding:12px;display:none;box-sizing:border-box}
+  #inv h3{margin:0 0 8px;font-size:15px}
+  #grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px}
+  .slot{aspect-ratio:1;background:rgba(255,255,255,.1);border:2px solid transparent;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:26px;position:relative;cursor:pointer;user-select:none}
+  .slot.sel{border-color:#ffd54a}
+  .slot .n{position:absolute;right:4px;bottom:1px;font-size:11px}
+  .slot .inventory-coin{width:1.35em;height:1.35em;vertical-align:middle;filter:drop-shadow(0 2px 2px rgba(0,0,0,.35))}
+  .slot .eq{position:absolute;left:4px;top:1px;font-size:11px;color:#7dff9a}
+  #info{min-height:20px;margin:10px 0 6px;font-size:13px}
+  #inv button{background:#3a7bd5;color:#fff;border:0;border-radius:6px;padding:6px 12px;margin-right:6px;cursor:pointer}
+  #inv button:disabled{opacity:.4;cursor:default}
+  #toast{position:fixed;left:50%;top:70px;transform:translateX(-50%);background:rgba(0,0,0,.6);color:#fff;padding:8px 14px;border-radius:8px;font-size:14px;opacity:0;transition:opacity .3s;pointer-events:none}
+  #prompt{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:rgba(0,0,0,.65);color:#fff;padding:9px 16px;border-radius:8px;display:none;cursor:pointer;font-size:14px;z-index:12}
+  #shop{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(20,24,30,.95);color:#fff;border-radius:12px;padding:16px;width:min(320px,calc(100vw - 28px));display:none;z-index:15;box-sizing:border-box}
+  #shop h3{margin:0 0 12px;font-size:16px}
+  .shopitem{display:grid;grid-template-columns:1fr 4.6em 4.2em;align-items:center;gap:8px;background:rgba(255,255,255,.08);padding:10px;border-radius:8px}
+  .shopitem > span:nth-child(2){text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;font-weight:600}
+  .shopitem > button{width:100%}
+  #shop button{background:#3a7bd5;color:#fff;border:0;border-radius:6px;padding:6px 12px;cursor:pointer}
+  #shopInfo{margin:10px 0;font-size:13px}
+  .coin{display:inline-block;width:1.15em;height:1.15em;vertical-align:-.22em;background:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Cdefs%3E%3CradialGradient%20id='g'%20cx='35%25'%20cy='30%25'%20r='80%25'%3E%3Cstop%20offset='0'%20stop-color='%23fff1a8'/%3E%3Cstop%20offset='.5'%20stop-color='%23ffc107'/%3E%3Cstop%20offset='1'%20stop-color='%23d18a00'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle%20cx='16'%20cy='16'%20r='14.5'%20fill='url%28%23g%29'%20stroke='%238a5a00'%20stroke-width='2'/%3E%3Ccircle%20cx='16'%20cy='16'%20r='10.5'%20fill='none'%20stroke='%23b57a00'%20stroke-width='1.6'/%3E%3Cpath%20d='M11%2020.5V11.5l5%206%205-6v9'%20fill='none'%20stroke='%238a5a00'%20stroke-width='2.2'%20stroke-linecap='round'%20stroke-linejoin='round'/%3E%3Cpath%20d='M8.5%2011a9%209%200%200%201%206-4.2'%20fill='none'%20stroke='%23fff8d6'%20stroke-width='1.6'%20stroke-linecap='round'%20opacity='.8'/%3E%3C/svg%3E") center/contain no-repeat}
+  #shopInfo .coin{width:1.6em;height:1.6em;vertical-align:-.45em;margin-left:4px}
+  #fridge,#wardrobe{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(340px,calc(100vw - 28px));max-height:75vh;overflow:auto;background:rgba(20,24,30,.97);color:#fff;border-radius:14px;padding:16px;display:none;z-index:25;box-sizing:border-box}
+  #fridge h3,#wardrobe h3{margin:0 0 8px} #fridgeList,#wardrobeList{display:grid;gap:7px;margin:12px 0}
+  #wardrobeList .empty{opacity:.75;font-size:13px;line-height:1.45;background:rgba(255,255,255,.08);padding:14px;border-radius:8px;text-align:center}
+  #wardrobeList .cloth{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.09);padding:9px;border-radius:8px}
+  .foodrow{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.09);padding:9px;border-radius:8px;gap:8px}
+  #fridge button,#wardrobe button{background:#3a7bd5;color:white;border:0;border-radius:6px;padding:7px 10px;cursor:pointer}
+  #computerUI{position:fixed;inset:0;display:none;z-index:180;background:#07111f;color:#fff;font-family:system-ui,sans-serif;}
+  #computerUI.show{display:flex;align-items:center;justify-content:center}
+  #computerBoot{width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#18365a 0%,#07111f 70%);gap:18px}
+  #computerBoot .logo{font-size:clamp(38px,7vw,76px);font-weight:700;letter-spacing:2px;color:#eaf5ff;text-shadow:0 0 28px #4aa3ff}
+  #computerBoot .sub{font-size:14px;color:#b8cce0}
+  #computerBoot .loader{width:min(260px,60vw);height:5px;border-radius:9px;background:#263b51;overflow:hidden}
+  #computerBoot .loader:after{content:"";display:block;width:40%;height:100%;background:#5ab0ff;border-radius:9px;animation:pcLoad 1s ease-in-out infinite alternate}
+  @keyframes pcLoad{from{transform:translateX(0)}to{transform:translateX(150%)}}
+  #computerDesktop{position:absolute;inset:0;display:none;background:linear-gradient(135deg,#1679a8,#164b78 55%,#242b65);}
+  #computerDesktop.active{display:block}
+  #pcIcons{display:grid;grid-template-columns:repeat(1,82px);gap:18px;padding:20px}
+  .pcIcon{width:76px;min-height:72px;border:0;background:transparent;color:#fff;text-shadow:0 1px 4px #000;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;font-size:12px}
+  .pcIcon span{font-size:32px}
+  #pcTaskbar{position:absolute;left:0;right:0;bottom:0;height:42px;background:rgba(10,18,30,.82);display:flex;align-items:center;justify-content:space-between;padding:0 14px;box-sizing:border-box;font-size:13px}
+  #pcPower{border:0;border-radius:7px;padding:6px 12px;background:#293c52;color:#fff;cursor:pointer}
+  #pcInternetWindow{display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(760px,calc(100vw - 32px));height:min(520px,calc(100vh - 90px));background:#f3f5f8;color:#17202b;border-radius:12px;overflow:hidden;box-shadow:0 18px 60px #0008;}
+  #pcInternetWindow.open{display:flex;flex-direction:column}
+  #pcInternetTop{height:46px;flex-shrink:0;background:#e4e9f0;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-weight:650}
+  #pcInternetClose{border:0;border-radius:6px;background:#d5dce5;padding:6px 10px;cursor:pointer}
+  #pcInternetTabs{display:flex;gap:8px;padding:12px 14px;background:#fff;border-bottom:1px solid #dce2e9}
+  .pcInternetTab{border:1px solid #ccd5df;border-radius:8px;background:#f7f9fb;color:#263445;padding:9px 16px;cursor:pointer;font-weight:600}
+  .pcInternetTab.active{background:#dceeff;border-color:#72aee8;color:#12558c}
+  #pcInternetBlank{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;color:#7b8795;background:#f7f9fc;font-size:14px}
+  #pcInstallersPage{display:none;flex:1;overflow:auto;background:#f7f9fc;color:#202124;padding:24px;box-sizing:border-box}
+  #pcInstallersPage h2{margin:0 0 18px;font-size:21px}
+  .pcInstallerCard{max-width:520px;background:#fff;border:1px solid #dce2e9;border-radius:12px;padding:18px;box-shadow:0 2px 8px #00008}
+  .pcInstallerHead{display:flex;align-items:center;gap:14px}
+  .pcInstallerLogo{width:52px;height:52px;border-radius:12px;background:#e8e2ff;display:flex;align-items:center;justify-content:center;font-size:30px}
+  .pcInstallerCard h3{margin:0 0 4px;font-size:17px}
+  .pcInstallerCard p{margin:0;color:#687383;font-size:13px}
+  .pcInstallButton{margin-top:16px;border:0;border-radius:7px;padding:9px 16px;background:#1769c2;color:#fff;font-weight:650;cursor:pointer}
+  .pcInstallButton:disabled{opacity:.55;cursor:default}
+  #pcInstallStatus{margin-top:12px;color:#536273;font-size:13px;min-height:18px}
+  #pcInstallProgress{display:none;margin-top:10px;height:8px;background:#e5eaf0;border-radius:8px;overflow:hidden}
+
+  #pcSixWindow{display:none;position:absolute;inset:0 0 42px 0;background:#1a1033;z-index:5;flex-direction:column}
+  #pcSixWindow.open{display:flex}
+  #pcSixFrame{flex:1;min-height:0;width:100%;border:0;background:#1a1033}
+  .pcInstallerCard+.pcInstallerCard{margin-top:16px}
+
+  #pcPepperWindow{display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(380px,calc(100vw - 32px));background:#1c1f26;color:#fff;border-radius:12px;overflow:hidden;box-shadow:0 18px 60px #0009;z-index:6}
+  #pcPepperWindow.open{display:block}
+  #pcPepperTop{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#12151a;font-weight:650}
+  #pcPepperTop button{border:0;border-radius:6px;background:#2c313b;color:#fff;padding:5px 10px;cursor:pointer}
+  #pcPepperBody{padding:22px 18px;text-align:center}
+  #pcPepperDot{width:74px;height:74px;border-radius:50%;margin:0 auto 14px;background:#e53935;border:5px solid #fff3;cursor:pointer;transition:border-radius .2s,transform .1s}
+  #pcPepperDot:active{transform:scale(.95)}
+  #pcPepperDot.rec{border-radius:16px;animation:pepPulse 1s infinite}
+  @keyframes pepPulse{50%{box-shadow:0 0 0 10px #e5393533}}
+  #pcPepperTime{font-size:28px;font-variant-numeric:tabular-nums;font-weight:700}
+  #pcPepperMsg{margin-top:8px;font-size:13px;color:#aab3c0;min-height:34px}
+  #pcPepperLink{display:none;margin-top:8px;color:#fff;background:#1769c2;text-decoration:none;padding:8px 14px;border-radius:7px;font-size:13px;font-weight:650}
+
+  #pcFilesWindow{display:none;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,calc(100vw - 32px));height:min(420px,calc(100vh - 90px));background:#f3f5f8;color:#17202b;border-radius:12px;overflow:hidden;box-shadow:0 18px 60px #0008;z-index:6;flex-direction:column}
+  #pcFilesWindow.open{display:flex}
+  #pcFilesTop{height:46px;flex-shrink:0;background:#e4e9f0;display:flex;align-items:center;justify-content:space-between;padding:0 14px;font-weight:650}
+  #pcFilesTop button{border:0;border-radius:6px;background:#d5dce5;padding:6px 10px;cursor:pointer}
+  #pcFilesList{flex:1;overflow:auto;padding:12px 14px}
+  .pcFile{display:flex;align-items:center;gap:12px;background:#fff;border:1px solid #dce2e9;border-radius:9px;padding:10px 12px;margin-bottom:8px}
+  .pcFile .ic{font-size:28px}
+  .pcFile .nm{flex:1;min-width:0}
+  .pcFile .nm b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pcFile .nm small{color:#687383;font-size:12px}
+  .pcFile button{border:0;border-radius:6px;padding:6px 10px;cursor:pointer;background:#1769c2;color:#fff;font-size:12px}
+  .pcFile button.del{background:#d9534f}
+  #pcFilesEmpty{color:#7b8795;text-align:center;margin-top:60px;font-size:14px}
+  #pcFilesPlayer{display:none;flex:1;min-height:0;flex-direction:column;background:#000}
+  #pcFilesPlayer video{flex:1;min-height:0;width:100%;background:#000}
+  #pcInstallProgressBar{height:100%;width:0;background:#2478d4;transition:width .15s linear}
+  #pcYoutubePage{display:none;flex:1;overflow:auto;background:#fff;color:#202124;padding:26px;box-sizing:border-box}
+  #pcYoutubePage .yt-brand{font-size:24px;font-weight:800;color:#e62117;margin-bottom:28px}
+  #pcYoutubePage .yt-card{max-width:440px;margin:0 auto;text-align:center}
+  #pcYoutubePage h2{font-size:23px;margin:0 0 10px}
+  #pcYoutubePage p{color:#60656c;font-size:14px;line-height:1.5}
+  #pcYoutubePage input{width:100%;box-sizing:border-box;padding:12px;border:1px solid #c7cbd1;border-radius:7px;font-size:15px;margin:12px 0}
+  #pcYoutubePage button{border:0;border-radius:20px;padding:10px 20px;background:#065fd4;color:#fff;font-weight:650;cursor:pointer}
+  #pcYoutubePage button:disabled{opacity:.45;cursor:default}
+  #pcYoutubeMessage{min-height:20px;color:#b3261e;font-size:13px;margin:4px 0 12px}
+  #pcYoutubeChannel{display:none}
+  #phone{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);width:230px;height:min(440px,calc(100vh - 100px));background:#111;border-radius:30px;padding:10px;box-sizing:border-box;display:none;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.55);z-index:20;color:#fff}
+  #pstatus{display:flex;justify-content:space-between;font-size:11px;padding:2px 12px 6px}
+  #pscreen{flex:1;background:linear-gradient(160deg,#243b6b,#5b2a86);border-radius:18px;overflow:auto;display:flex;flex-direction:column}
+  #pbar{display:flex;justify-content:center;gap:18px;padding-top:8px}
+  #pbar button{width:34px;height:34px;border-radius:50%;border:0;background:#2a2a2e;color:#fff;font-size:16px;cursor:pointer}
+  .apps{display:grid;grid-template-columns:repeat(3,1fr);gap:14px 6px;padding:22px 10px}
+  .app{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:10px;cursor:pointer;text-align:center}
+  .app span{width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:24px}
+  .phead{display:flex;align-items:center;gap:8px;padding:12px;font-weight:600;font-size:15px;background:rgba(0,0,0,.2)}
+  .phead button{background:none;border:0;color:#fff;font-size:20px;cursor:pointer;padding:0 4px}
+  .pbody{padding:14px;font-size:13px}
+  .pbody label{display:block;margin:0 0 4px}
+  .pbody input[type=range]{width:100%;margin-bottom:16px}
+  .lock{text-align:center;padding-top:30px}
+  .lock .big{font-size:52px}
+  .lock button{margin-top:14px;padding:8px 14px;border:0;border-radius:8px;background:#555;color:#aaa}
+  .cam-wrap{padding:10px;display:flex;flex-direction:column;gap:9px;align-items:center}
+  #cameraPreview{width:100%;aspect-ratio:4/3;object-fit:cover;background:#080808;border-radius:12px;transform:scaleX(1)}
+  .cam-controls{display:flex;gap:7px;justify-content:center;flex-wrap:wrap;width:100%}
+  .cam-controls button,.gallery-actions button{border:0;border-radius:9px;padding:8px 10px;background:#ffffff24;color:#fff;font-size:12px;cursor:pointer}
+  .cam-controls .capture{background:#fff;color:#222;font-weight:700}
+  #cameraHint{font-size:11px;opacity:.8;text-align:center;min-height:15px}
+  #galleryGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:10px}
+  .gallery-item{min-width:0;background:#ffffff18;border-radius:9px;overflow:hidden}
+  .gallery-item img,.gallery-item video{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;background:#111}
+  .gallery-item div{padding:5px;font-size:10px;display:flex;justify-content:space-between;gap:4px}
+  .gallery-item button{border:0;background:#ffffff22;color:white;border-radius:5px;font-size:10px;padding:3px 5px}
+  #dlg{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);width:min(460px,calc(100vw - 28px));background:rgba(20,24,30,.95);color:#fff;border-radius:12px;padding:14px;display:none;flex-direction:column;gap:10px;z-index:16;box-sizing:border-box}
+  #dlgName{font-weight:600;color:#ffd54a;font-size:14px}
+  #dlgText{font-size:14px;line-height:1.45}
+  #dlgBtns{display:flex;flex-wrap:wrap;gap:8px}
+  #dlgBtns button{background:#3a7bd5;color:#fff;border:0;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:13px}
+  #basketHud{position:fixed;left:50%;top:50px;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.5);padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.5;display:none;pointer-events:none;text-align:center;z-index:5}
+  #job{position:fixed;right:12px;top:12px;color:#fff;background:rgba(0,0,0,.4);padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.5;display:none;pointer-events:none;max-width:220px}
+  #clock{position:fixed;left:50%;top:12px;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.4);padding:6px 12px;border-radius:8px;font-size:14px;pointer-events:none}
+  #testCoinsBtn{position:fixed;right:14px;top:58px;z-index:30;border:1px dashed rgba(255,213,74,.8);border-radius:8px;padding:8px 12px;background:rgba(20,24,30,.82);color:#ffd54a;font-size:13px;cursor:pointer}
+  #pauseBtn{position:fixed;right:14px;top:14px;z-index:30;border:0;border-radius:8px;padding:9px 13px;background:rgba(20,24,30,.82);color:#fff;font-size:14px;cursor:pointer}
+  #pauseScreen{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.62);color:#fff}
+  #deathScreen{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;align-items:center;justify-content:center;gap:22px;background:rgba(150,0,0,.88);color:#fff;text-align:center;padding:20px}
+  #deathScreen h1{margin:0;font-size:clamp(28px,6vw,56px);text-shadow:0 4px 18px rgba(0,0,0,.6)}
+  #deathCause{font-size:clamp(18px,3.5vw,28px);margin-top:-10px;text-shadow:0 2px 10px rgba(0,0,0,.6)}
+  #deathBtn{border:0;border-radius:8px;padding:11px 24px;background:#fff;color:#900;font-size:16px;font-weight:700;cursor:pointer}
+  #pauseCard{width:min(300px,calc(100vw - 40px));padding:26px 22px;text-align:center;background:#202630;border:1px solid rgba(255,255,255,.16);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.4)}
+  #pauseCard h2{margin:0 0 8px;font-size:25px}
+  #pauseCard p{margin:0 0 18px;color:#cbd2dc;font-size:14px}
+  #resumeBtn{border:0;border-radius:8px;padding:10px 20px;background:#3a7bd5;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+  #stats{position:fixed;left:12px;top:158px;width:190px;background:rgba(0,0,0,.4);padding:8px 10px;border-radius:8px;color:#fff;font-size:12px;pointer-events:none;display:grid;gap:7px}
+  .stat{display:grid;grid-template-columns:22px 1fr 30px;align-items:center;gap:6px}
+  .stat .ic{font-size:15px;text-align:center}
+  .stat .bar{height:11px;background:rgba(255,255,255,.18);border-radius:6px;overflow:hidden}
+  .stat .fill{height:100%;width:100%;border-radius:6px;transition:width .25s linear,background .3s}
+  .stat .val{text-align:right;font-variant-numeric:tabular-nums}
+  .stat.low .bar{animation:statBlink .8s infinite}
+  @keyframes statBlink{50%{box-shadow:0 0 0 2px rgba(255,70,70,.9)}}
+  #placeUI{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:rgba(20,24,30,.93);color:#fff;border-radius:12px;padding:10px 14px;display:none;z-index:18;text-align:center;font-size:13px;width:min(380px,calc(100vw - 28px));box-sizing:border-box}
+  #placeUI .btns{display:flex;gap:8px;justify-content:center;margin-top:8px}
+  #placeUI button{background:#3a7bd5;color:#fff;border:0;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:13px}
+  #placeUI button.no{background:#6b6f76}
+  #placeMsg.bad{color:#ff8a80}
+  .slot.part{opacity:.4}
+  #knob{position:absolute;left:35px;top:35px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.6)}
+  #mapCanvas{position:fixed;left:12px;bottom:12px;width:190px;height:142px;border:2px solid rgba(255,255,255,.75);border-radius:10px;background:rgba(12,20,27,.88);z-index:8;pointer-events:none;box-shadow:0 3px 14px rgba(0,0,0,.35)}
+  #mapOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.78);z-index:150;color:#fff}
+  #mapOverlay.open{display:flex}
+  #mapCard{position:relative;width:min(920px,92vw);padding:18px;background:#18232c;border:1px solid rgba(255,255,255,.22);border-radius:16px;box-shadow:0 15px 55px rgba(0,0,0,.55);box-sizing:border-box}
+  #mapCard h2{margin:0 0 8px;font-size:20px}
+  #mapCard p{margin:8px 0 0;font-size:13px;color:#d7e0e8}
+  #mapBigCanvas{cursor:zoom-in;display:block;width:100%;height:auto;aspect-ratio:4/3;border-radius:10px;border:1px solid rgba(255,255,255,.25);box-sizing:border-box}
+  #mapClose{position:absolute;right:16px;top:14px;border:0;border-radius:7px;padding:7px 11px;background:#3a7bd5;color:white;font-size:14px;cursor:pointer}
+  @media(max-width:600px){#mapCanvas{width:145px;height:109px;left:8px;bottom:8px}#mapCard{padding:12px}#mapCard h2{font-size:17px}#mapClose{right:10px;top:9px;padding:5px 8px}}
+</style>
+</head>
+<body>
+<div id="hud"><b>Real life</b><br>WASD / strzałki – ruch<br>Shift – bieg / wstawanie ze snu / zsiadanie z roweru, Spacja – skok<br>V – kamera pierwszoosobowa / trzecioosobowa<br>Q / E lub przeciągnięcie myszą – obrót kamery<br>Kółko – zoom, I – ekwipunek, M – mapa<br>F – interakcja / rower, P – telefon</div>
+<div id="stats">
+  <div class="stat" id="stHunger"><span class="ic">🍖</span><div class="bar"><div class="fill" id="hungerFill"></div></div><span class="val" id="hungerVal">100</span></div>
+  <div class="stat" id="stEnergy"><span class="ic">⚡</span><div class="bar"><div class="fill" id="energyFill"></div></div><span class="val" id="energyVal">100</span></div>
+</div>
+<div id="placeUI"><div id="placeMsg">Ustawianie biurka: idź tam, gdzie ma stanąć – podgląd jest przed tobą</div>
+  <div class="btns"><button id="pRot">⟳ Obróć (R)</button><button id="pOk">✔ Postaw (F)</button><button id="pNo" class="no">✕ Anuluj (Esc)</button></div></div>
+<div id="mpPanel">
+  <h3>🌐 Multiplayer</h3>
+  <div id="mpOff">
+    <p class="mpSub" style="margin-top:0">Serwery stałe (nigdy się nie usuwają):</p>
+    <div id="mpServers"></div>
+    <p class="mpSub">Albo prywatny pokój (znika, gdy wszyscy wyjdą):</p>
+    <button id="mpCreate" type="button">➕ Stwórz pokój</button>
+    <input id="mpCode" maxlength="4" placeholder="KOD" autocomplete="off">
+    <button id="mpJoin" type="button">➡ Dołącz</button>
+  </div>
+  <div id="mpOn" style="display:none">
+    <div>Pokój: <b id="mpRoomCode" style="font-size:22px;letter-spacing:.2em"></b></div>
+    <div id="mpList"></div>
+    <button id="mpLeave" type="button" class="no">🚪 Opuść pokój</button>
+  </div>
+  <div id="mpMsg"></div>
+  <button id="mpClose" type="button">Zamknij</button>
+</div>
+<div id="toast"></div>
+<div id="clock"></div>
+<button id="pauseBtn" type="button">⏸ Pauza</button>
+<button id="testCoinsBtn" type="button" title="Przycisk testowy">🧪 +100 monet</button>
+<div id="deathScreen"><h1>Koniec gry, umarłeś!</h1><div id="deathCause"></div><button id="deathBtn" type="button">Zagraj od nowa</button></div>
+<div id="pauseScreen">
+  <div id="pauseCard">
+    <h2>⏸ Gra wstrzymana</h2>
+    <p>Czas gry, potrzeby i ruch postaci są zatrzymane. Esc – wznów.</p>
+    <button id="resumeBtn" type="button">▶ Wznów grę</button>
+    <button id="saveBtn" type="button">💾 ZAPISZ</button>
+    <button id="mpBtn" type="button">🌐 Multiplayer</button>
+  </div>
+</div>
+<div id="job"><b>🛵 Dostawca</b><br><span id="jobInfo"></span></div>
+<div id="dlg"><div id="dlgName">👨‍🍳 Marek, kucharz</div><div id="dlgText"></div><div id="dlgBtns"></div></div>
+<button id="invBtn" title="Ekwipunek (I)">🎒</button>
+<div id="inv">
+  <h3>Ekwipunek</h3>
+  <div id="grid"></div>
+  <div id="info">Wybierz przedmiot</div>
+  <button id="useBtn" disabled>Użyj</button><button id="dropBtn" disabled>Wyrzuć</button>
+</div>
+<div id="prompt">F – wejdź do sklepu</div>
+<div id="fridge">
+  <h3>🧊 Lodówka</h3>
+  <div id="fridgeList"></div>
+  <button id="fridgeClose">Zamknij</button>
+</div>
+<div id="wardrobe">
+  <h3>🚪 Szafa</h3>
+  <div id="wardrobeList"></div>
+  <button id="wardrobeClose">Zamknij</button>
+</div>
+<div id="shop">
+  <h3>🛒 Sklep „Real Shop”</h3>
+  <div class="shopitem"><span>📱 Telefon</span><span>5 <i class="coin"></i></span><button id="buyPhone">Kup</button></div>
+  <div class="shopitem" style="margin-top:8px"><span>🚲 Rower</span><span>25 <i class="coin"></i></span><button id="buyBike">Kup</button></div>
+   <div class="shopitem" style="margin-top:8px"><span>🖥️ Komputer</span><span>100 <i class="coin"></i></span><button id="buyComputer">Kup</button></div>
+  <div class="shopitem" style="margin-top:8px"><span>🥤 Cola</span><span>3 <i class="coin"></i></span><button id="buyCola">Kup</button></div>
+  <div class="shopitem" style="margin-top:8px"><span>🔌 Ładowarka do telefonu</span><span>8 <i class="coin"></i></span><button id="buyCharger">Kup</button></div>
+  <div id="shopInfo">Twoje monety: <b id="coinCount">0</b><i class="coin"></i></div>
+  <button id="shopClose">Wyjdź</button>
+</div>
+ <div id="computerUI" aria-hidden="true">
+  <div id="computerBoot"><div class="logo">REAL OS</div><div class="sub">Uruchamianie komputera…</div><div class="loader"></div></div>
+  <div id="computerDesktop"><div id="pcIcons"><button class="pcIcon" id="pcFilesIcon" type="button"><span>📁</span>Pliki</button><button class="pcIcon" id="pcInternetIcon" type="button"><span>🌐</span>Internet</button><button class="pcIcon" type="button"><span>🎵</span>Muzyka</button><button class="pcIcon" id="pcShortcutDesktopIcon" type="button" style="display:none"><span>✂️</span>ShortCut</button><button class="pcIcon" id="pcSixDesktopIcon" type="button" style="display:none"><span>🐮</span>6 bierze!</button><button class="pcIcon" id="pcPepDesktopIcon" type="button" style="display:none"><span>🔴</span>Pepper</button></div><div id="pcSixWindow" aria-hidden="true"><iframe id="pcSixFrame" title="6 bierze!" allow="autoplay; fullscreen"></iframe></div><div id="pcFilesWindow" aria-hidden="true"><div id="pcFilesTop"><span id="pcFilesTitle">📁 Pliki — Nagrania</span><span><button id="pcFilesBack" type="button" style="display:none">← Wróć</button> <button id="pcFilesClose" type="button">✕</button></span></div><div id="pcFilesList"></div><div id="pcFilesPlayer"><video id="pcFilesVideo" controls playsinline></video></div></div><div id="pcPepperWindow" aria-hidden="true"><div id="pcPepperTop"><span>🔴 Pepper — nagrywanie</span><button id="pcPepperClose" type="button">✕</button></div><div id="pcPepperBody"><div id="pcPepperDot" title="Nagraj / zatrzymaj"></div><div id="pcPepperTime">00:00</div><div id="pcPepperMsg">Kliknij czerwony przycisk, aby nagrać ekran komputera.</div><a id="pcPepperLink" href="#">📁 Otwórz w Plikach</a></div></div><div id="pcInternetWindow" aria-hidden="true"><div id="pcInternetTop"><span>🌐 Internet — REAL Browser</span><button id="pcInternetClose" type="button">✕ Zamknij</button></div><div id="pcInternetTabs"><button class="pcInternetTab active" data-page="installers" type="button">📦 Instalatory</button><button class="pcInternetTab" data-page="youtube" type="button">▶ YouTube</button></div><div id="pcInternetBlank" style="display:none">W tej sekcji na razie nic nie ma.</div><div id="pcInstallersPage"><h2>📦 Dostępne instalatory</h2><div class="pcInstallerCard"><div class="pcInstallerHead"><div class="pcInstallerLogo">✂️</div><div><h3>ShortCut</h3><p>Prosty program do tworzenia i edytowania skrótów.</p></div></div><div id="pcInstallProgress"><div id="pcInstallProgressBar"></div></div><div id="pcInstallStatus">Gotowy do instalacji.</div><button class="pcInstallButton" id="pcInstallShortcutBtn" type="button">Zainstaluj</button></div><div class="pcInstallerCard"><div class="pcInstallerHead"><div class="pcInstallerLogo">🐮</div><div><h3>6 bierze!</h3><p>Gra karciana z botami i trybem online. Instalacja trwa 30 s.</p></div></div><div id="pcSixProgress" class="pcInstallProgressX" style="display:none;margin-top:10px;height:8px;background:#e5eaf0;border-radius:8px;overflow:hidden"><div id="pcSixProgressBar" style="height:100%;width:0;background:#2478d4;transition:width .15s linear"></div></div><div id="pcSixStatus" style="margin-top:12px;color:#536273;font-size:13px;min-height:18px">Gotowy do instalacji.</div><button class="pcInstallButton" id="pcInstallSixBtn" type="button">Zainstaluj</button></div><div class="pcInstallerCard"><div class="pcInstallerHead"><div class="pcInstallerLogo" style="background:#ffe0e0">🔴</div><div><h3>Pepper</h3><p>Program do nagrywania ekranu komputera. Instalacja trwa 20 s.</p></div></div><div id="pcPepProgress" style="display:none;margin-top:10px;height:8px;background:#e5eaf0;border-radius:8px;overflow:hidden"><div id="pcPepProgressBar" style="height:100%;width:0;background:#2478d4;transition:width .15s linear"></div></div><div id="pcPepStatus" style="margin-top:12px;color:#536273;font-size:13px;min-height:18px">Gotowy do instalacji.</div><button class="pcInstallButton" id="pcInstallPepBtn" type="button">Zainstaluj</button></div></div><div id="pcYoutubePage"><div class="yt-brand">▶ YouTube</div><div class="yt-card" id="pcYoutubeCreate"><h2>Załóż swój kanał</h2><p>Utwórz kanał, aby rozpocząć swoją przygodę z publikowaniem filmów.</p><input id="pcYoutubeChannelName" type="text" maxlength="40" placeholder="Nazwa kanału"><div id="pcYoutubeMessage"></div><button id="pcYoutubeCreateBtn" type="button">Utwórz kanał</button></div><div class="yt-card" id="pcYoutubeChannel"><h2 id="pcYoutubeChannelTitle"></h2><p>Twój kanał został utworzony.</p></div></div></div><div id="pcTaskbar"><span>🪟 REAL OS</span><span id="pcTime">Gotowy</span><button id="pcPower" type="button">⏻ Wyłącz</button></div></div>
+ </div>
+<div id="phone">
+  <div id="pstatus"><span id="pclock">12:00</span><span id="pbat">📶 🔋 100%</span></div>
+  <div id="pscreen"></div>
+  <div id="pbar"><button id="pHome" title="Ekran główny">⌂</button><button id="pClose" title="Zamknij">✕</button></div>
+</div>
+<canvas id="mapCanvas" width="440" height="330" aria-label="Minimapa"></canvas>
+<div id="mapOverlay"><div id="mapCard"><h2>🗺️ Mapa miasta</h2><button id="mapClose">Zamknij (M / Esc)</button><canvas id="mapBigCanvas" width="880" height="660"></canvas><p>🟡 Ty · Szare budynki · Niebieskie obiekty usługowe · Ulice: Długa i Krótka · Kliknij mapę, aby przybliżyć to miejsce; kliknij ponownie, aby wrócić</p></div></div>
+<div id="stick"><div id="knob"></div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="prawdziwe-zycie.js"></script>
+</body>
+</html>
