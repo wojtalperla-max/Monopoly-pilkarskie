@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Dobble</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@400;600;700&display=swap">
 <link rel="stylesheet" href="dobble.css">
 </head>
 <body>
@@ -13,17 +13,25 @@
 <p class="sub">Znajdź wspólny symbol szybciej niż reszta.</p>
 
 <section class="screen on" id="home">
-  <div class="card">
-    <label for="nm">Twój nick</label>
-    <input id="nm" maxlength="14" placeholder="Wpisz nick" autocomplete="off">
-    <button class="g" id="mk">Stwórz pokój</button>
-    <div class="or">albo</div>
-    <label for="jc">Kod pokoju</label>
-    <input id="jc" class="cd" maxlength="4" placeholder="KOD" autocomplete="off">
-    <button id="jn">Dołącz do pokoju</button>
+  <div class="dh-bg" aria-hidden="true" id="dhBg"></div>
+  <div class="dh-wrap">
+    <div class="dh-logo" role="img" aria-label="Dobble" id="dhLogo"></div>
+    <div class="dh-tiles" aria-hidden="true"><i>🍀</i><i>⚡</i><i>🎯</i><i>🌙</i></div>
+    <p class="dh-sub">Znajdź wspólny symbol szybciej niż reszta.</p>
+    <div class="dh-pane">
+      <label for="nm">Twój nick</label>
+      <input id="nm" maxlength="14" placeholder="Wpisz nick" autocomplete="off">
+      <button class="dh-btn dh-gold" id="mk"><span class="dh-ic">🎲</span><span>Stwórz pokój</span></button>
+    </div>
+    <div class="dh-or">albo</div>
+    <div class="dh-pane">
+      <label for="jc">Kod pokoju</label>
+      <input id="jc" class="cd" maxlength="4" placeholder="KOD" autocomplete="off">
+      <button class="dh-btn dh-white" id="jn"><span class="dh-ic">🚪</span><span>Dołącz do pokoju</span></button>
+    </div>
     <div class="err" id="herr"></div>
+    <p class="dh-net" id="net"></p>
   </div>
-  <p class="sub" id="net"></p>
 </section>
 
 <section class="screen" id="lobby">
@@ -103,6 +111,8 @@ window.__dblJoin=async function(name){
 </script>
 <script>
 const $=s=>document.querySelector(s);
+(function(){const lg=document.getElementById('dhLogo');'DOBBLE!'.split('').forEach((c,i)=>{const b=document.createElement('b');b.style.setProperty('--i',i);b.textContent=c;lg.appendChild(b)});
+const bg=document.getElementById('dhBg');['🍀','⚡','🎯','🌙','🍎','⭐','🎈','🐞','🍀','🔑','🎲','🍕'].forEach((e,i)=>{const s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})})();
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const HEX=/^#[0-9a-f]{6}$/i;
