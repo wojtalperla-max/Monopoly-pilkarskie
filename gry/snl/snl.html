@@ -4,42 +4,51 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Węże i Drabiny</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@400;600;700&display=swap">
 <link rel="stylesheet" href="snl.css">
 </head>
 <body>
 <div id="app">
 
-<section class="screen on" id="home">
-  <h1>🐍 Węże <span>i</span> Drabiny 🪜</h1>
-  <p class="sub">Zagraj ze znajomymi online – stwórz pokój i wyślij im kod!</p>
-  <div class="card">
-    <label for="nm">Twoje imię</label>
-    <input id="nm" maxlength="14" placeholder="np. Kasia" autocomplete="off">
-    <label for="pc">Twój kolor pionka</label>
-    <input id="pc" type="color" value="#2a9df4" style="height:52px;padding:4px 6px;cursor:pointer">
-    <button class="g" id="mk">✨ Utwórz pokój</button>
-    <div class="or">— albo dołącz —</div>
-    <label for="cd">Kod pokoju</label>
-    <input id="cd" maxlength="5" placeholder="ABCDE" autocomplete="off" style="text-transform:uppercase;letter-spacing:6px;text-align:center">
-    <button class="b" id="jn">🚪 Dołącz do pokoju</button>
-    <div class="or">— lub —</div>
-    <button class="w" id="lc">👥 Gra lokalna (jedno urządzenie)</button>
-    <div class="err" id="herr"></div>
+<section class="screen sn on" id="home">
+  <div class="sn-bg" aria-hidden="true"></div>
+  <div class="sn-wrap">
+    <div class="sn-deco" aria-hidden="true"><i>🐍</i><i>🎲</i><i><img src="1fa9c.png" width=60 height=60></i></div>
+    <div class="sn-logo" role="img" aria-label="Węże i Drabiny"><div class="sn-l1" data-t="WĘŻE"></div><div class="sn-l2" data-t="I DRABINY"></div></div>
+    <p class="sn-sub">Zagraj ze znajomymi online – stwórz pokój i wyślij im kod!</p>
+    <div class="sn-panel">
+      <label for="nm">Twoje imię</label>
+      <input id="nm" maxlength="14" placeholder="np. Kasia" autocomplete="off">
+      <label for="pc">Twój kolor pionka</label>
+      <input id="pc" type="color" value="#2a9df4">
+    </div>
+    <div class="sn-main">
+      <button class="sn-btn sn-gold" id="mk"><span class="sn-ic">✨</span><span>Utwórz pokój</span></button>
+      <button class="sn-btn sn-white" id="snJoinBtn" type="button"><span class="sn-ic">🚪</span><span>Dołącz do znajomego</span></button>
+    </div>
+    <div id="snJoinPane" class="sn-pane"><label for="cd" style="text-align:center">Kod pokoju od znajomego</label>
+      <div class="sn-join"><input id="cd" maxlength="5" placeholder="ABCDE" autocomplete="off" style="text-transform:uppercase"><button class="sn-btn sn-green" id="jn">Dołącz</button></div></div>
+    <div class="err sn-err" id="herr" role="alert"></div>
+    <button class="sn-link" id="lc">👥 Gra lokalna (jedno urządzenie)</button>
   </div>
 </section>
 
-<section class="screen" id="lobby">
-  <h1>🎲 Poczekalnia</h1>
-  <p class="sub">Przekaż znajomym kod. Mogą grać do 4 osób.</p>
-  <div class="card">
-    <label>Kod pokoju</label>
-    <div class="code" id="lcode">-----</div>
-    <button class="w" id="cp">📋 Kopiuj kod</button>
-    <div id="plist" style="margin:14px 0"></div>
-    <button class="g" id="st">▶ Start gry</button>
-    <div class="err" id="lerr"></div>
-    <button class="w" id="lv" style="margin-top:8px;font-size:15px;padding:10px">← Wyjdź</button>
+<section class="screen sn" id="lobby">
+  <div class="sn-bg" aria-hidden="true"></div>
+  <div class="sn-wrap">
+    <div class="sn-deco" aria-hidden="true"><i>🐍</i><i>🎲</i><i>🪜</i></div>
+    <div class="sn-logo" role="img" aria-label="Poczekalnia"><div class="sn-l1" data-t="POKÓJ"></div></div>
+    <p class="sn-sub">Przekaż znajomym kod. Mogą grać do 4 osób.</p>
+    <div class="sn-lobby">
+      <span class="sn-badge">🎲 Poczekalnia</span>
+      <label style="display:block;margin-top:12px;text-align:center">Kod pokoju</label>
+      <div class="code" id="lcode">-----</div>
+      <button class="sn-btn sn-ghost" id="cp">📋 Kopiuj kod</button>
+      <div id="plist" style="margin:14px 0"></div>
+      <button class="sn-btn sn-gold" id="st">▶ Start gry</button>
+      <div class="err sn-err" id="lerr" role="alert"></div>
+      <button class="sn-link" id="lv">← Wyjdź</button>
+    </div>
   </div>
 </section>
 
@@ -213,6 +222,18 @@ $('#cp').onclick=async()=>{try{await navigator.clipboard.writeText(code);$('#cp'
 $('#st').onclick=startGame;$('#lv').onclick=leave;$('#rl').onclick=roll;$('#ex').onclick=leave;
 $('#ag').onclick=()=>{$('#win').classList.remove('on');if(local){st=null;enter({ord:[{id:'a',n:myName(),c:myCol()},{id:'b',n:'Gracz 2',c:COL[1]}],pos:{a:1,b:1},turn:0,v:1,win:null,last:null})}else{q=q.then(()=>{st=null});startGame()}};
 $('#cd').addEventListener('input',e=>e.target.value=e.target.value.toUpperCase());
+</script>
+<script>
+/* ===== ekran startowy (styl Monopoly) ===== */
+(function(){
+  document.querySelectorAll('.sn-l1,.sn-l2').forEach(function(el){
+    el.dataset.t.split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i+(el.className==='sn-l2'?4:0));b.textContent=c==' '?'\u00a0':c;el.appendChild(b)})});
+  var em=['🐍','🪜','🎲','🍀','🐍','🪜','🎲','🏆','🐍','🪜','🎲','🍀'];
+  document.querySelectorAll('.sn-bg').forEach(function(bg){em.forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})});
+  var jp=document.getElementById('snJoinPane');
+  document.getElementById('snJoinBtn').onclick=function(){var on=jp.style.display!=='block';jp.style.display=on?'block':'none';if(on)setTimeout(function(){document.getElementById('cd').focus()},60)};
+  document.getElementById('cd').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('jn').click()});
+})();
 </script>
 </body>
 </html>
