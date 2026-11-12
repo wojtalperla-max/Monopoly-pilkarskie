@@ -2,7 +2,7 @@
 <html lang="pl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Go Fish</title>
-<link rel="stylesheet" href="go-fish.css"></head><body>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@500;600;700&display=swap"><link rel="stylesheet" href="go-fish.css"></head><body>
 <div class="bgd">
  <div class="rg" style="width:90px;height:90px;border-width:14px;left:4%;top:24%"></div>
  <div class="rg" style="width:46px;height:46px;border-width:9px;left:20%;top:12%;animation-delay:-2s"></div>
@@ -16,10 +16,31 @@
 <div id="msg" class="err"></div>
 
 <section id="v-home" class="hid">
- <div class="box"><input id="name" placeholder="Twój nick" maxlength="14" autocomplete="off"><button id="create">Stwórz stół</button><div id="net" class="cnt" style="margin-top:8px"></div></div>
- <div class="box"><input id="joincode" class="code" placeholder="KOD" maxlength="4"><button id="join" class="alt">Dosiądź się</button></div>
- <div class="box"><div class="lbl">Gra offline</div><select id="botn"><option value="1">1 bot (we dwoje)</option><option value="2" selected>2 boty (we troje)</option><option value="3">3 boty (we czworo)</option></select><button id="bots">🤖 Graj z botami</button></div>
- <div class="box cnt"><b style="color:var(--fg)">Zasady:</b> w swojej turze dotknij karty (pytasz o jej figurę), potem gracza, od którego chcesz wszystkie takie karty. Jak ma – dostajesz je i pytasz dalej. Jak nie – „Go Fish!” i dobierasz z talii. Cztery karty tej samej figury to komplet. Wygrywa ten z największą liczbą kompletów.</div>
+ <div class="fh-bg" aria-hidden="true" id="fhBg"></div>
+ <div class="fh-wrap">
+  <div class="fh-logo" role="img" aria-label="Go Fish" id="fhLogo"></div>
+  <div class="fh-tiles" aria-hidden="true"><i>🐠</i><i>🐟</i><i>🐡</i><i>🦈</i></div>
+  <p class="fh-sub">Podwodne łowienie kart – gra dla 2–4 osób online.</p>
+  <div class="fh-pane">
+   <label for="name">Twój nick</label>
+   <input id="name" placeholder="Twój nick" maxlength="14" autocomplete="off">
+   <button id="create" class="fh-btn fh-gold"><span class="fh-ic">🎣</span><span>Stwórz stół</span></button>
+   <div id="net" class="fh-net"></div>
+  </div>
+  <div class="fh-or">albo dołącz do znajomych</div>
+  <div class="fh-pane">
+   <label for="joincode">Kod stołu</label>
+   <input id="joincode" class="code" placeholder="KOD" maxlength="4" autocomplete="off">
+   <button id="join" class="fh-btn fh-white"><span class="fh-ic">🚪</span><span>Dosiądź się</span></button>
+  </div>
+  <div class="fh-pane">
+   <label for="botn">Gra offline</label>
+   <select id="botn" class="fh-select"><option value="1">1 bot (we dwoje)</option><option value="2" selected>2 boty (we troje)</option><option value="3">3 boty (we czworo)</option></select>
+   <button id="bots" class="fh-btn fh-white"><span class="fh-ic">🤖</span><span>Graj z botami</span></button>
+  </div>
+  <button type="button" id="fhRulesBtn" class="fh-btn fh-ghost"><span class="fh-ic">📜</span><span>Zasady</span></button>
+  <div id="fhRules" class="fh-pane fh-rules"><b style="color:var(--fg)">Zasady:</b> w swojej turze dotknij karty (pytasz o jej figurę), potem gracza, od którego chcesz wszystkie takie karty. Jak ma – dostajesz je i pytasz dalej. Jak nie – „Go Fish!” i dobierasz z talii. Cztery karty tej samej figury to komplet. Wygrywa ten z największą liczbą kompletów.</div>
+ </div>
 </section>
 
 <section id="v-lobby" class="hid">
@@ -379,5 +400,10 @@ $("name").addEventListener("input",()=>{if(!$("name").readOnly){try{localStorage
 window.__gofLeave=function(){try{if(rm)leave()}catch(e){}};
 window.__gofRefresh=function(){if(!rm)initPrefs()};
 initPrefs();show("home");view="home";
+</script>
+<script>
+(function(){var lg=document.getElementById('fhLogo');'GO FISH!'.split('').forEach(function(c,i){var b=document.createElement('b');if(c===' '){b.className='sp';b.innerHTML='&nbsp;'}else{b.style.setProperty('--i',i);b.textContent=c}lg.appendChild(b)});
+var bg=document.getElementById('fhBg');['🐠','🐟','🫧','🐡','🦈','🫧','🐙','🦀','🐚','🐠','🫧','🐟'].forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)});
+document.getElementById('fhRulesBtn').onclick=function(){var r=document.getElementById('fhRules');r.style.display=r.style.display==='block'?'none':'block'}})();
 </script>
 </body></html>
