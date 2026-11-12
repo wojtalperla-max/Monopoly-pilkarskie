@@ -11,20 +11,30 @@
 <div id="hud"><button class="sec" id="roomBtn" title="Skopiuj link zaproszenia"></button><button class="sec" id="leave">Wyjdź</button></div>
 <button id="reload">R</button>
 <button id="hide">UKRYJ</button>
-<div id="menu"><div class="card">
-  <h1>DARK<span>SWEEP</span></h1>
-  <p class="tag">Taktyczna strzelanka w ciemności. Wszyscy gracze należą do zielonej drużyny, czerwoni to zawsze boty. Widzisz tylko to, co oświetla latarka twojej drużyny.</p>
-  <input id="name" maxlength="14" placeholder="Twój nick" autocomplete="off">
-  <div class="lbl">Kolor postaci</div><div id="cols" class="cols"></div>
-  <div id="who"></div>
-  <button id="btnHost">Stwórz pokój (online)</button>
-  <div class="row"><input id="code" maxlength="5" placeholder="KOD" autocomplete="off"><button id="btnJoin" class="sec">Dołącz</button></div>
-  <button id="btnOffline" class="sec">Graj z botami (offline)</button>
-  <label>Boty na drużynę <select id="bots"><option>0</option><option>1</option><option>2</option><option selected>3</option><option>4</option></select></label>
+<div id="menu">
+<div class="ds-bg" aria-hidden="true"><span style="left:5%;animation-duration:14s;animation-delay:-0s">🔦</span><span style="left:17%;animation-duration:19s;animation-delay:-4s">🎯</span><span style="left:29%;animation-duration:24s;animation-delay:-8s">🔫</span><span style="left:41%;animation-duration:18s;animation-delay:-12s">💥</span><span style="left:53%;animation-duration:23s;animation-delay:-3s">🥷</span><span style="left:65%;animation-duration:17s;animation-delay:-7s">🤖</span><span style="left:77%;animation-duration:22s;animation-delay:-11s">🌑</span><span style="left:89%;animation-duration:16s;animation-delay:-2s">🛡</span></div>
+<div class="ds-wrap">
+  <h1 class="ds-logo" aria-label="DarkSweep"><b class="" style="--i:0">D</b><b class="" style="--i:1">A</b><b class="" style="--i:2">R</b><b class="" style="--i:3">K</b><b class="s" style="--i:4">S</b><b class="s" style="--i:5">W</b><b class="s" style="--i:6">E</b><b class="s" style="--i:7">E</b><b class="s" style="--i:8">P</b></h1>
+  <div class="ds-tiles" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <p class="ds-sub">Taktyczna strzelanka w ciemności. Wszyscy gracze należą do zielonej drużyny, czerwoni to zawsze boty. Widzisz tylko to, co oświetla latarka twojej drużyny.</p>
+  <div class="ds-panel">
+    <input id="name" maxlength="14" placeholder="Twój nick" autocomplete="off">
+    <div class="lbl">Kolor postaci</div><div id="cols" class="cols"></div>
+    <div id="who"></div>
+  </div>
+  <div class="ds-main">
+    <button id="btnHost" class="ds-btn ds-gold"><span class="ds-ic">🌐</span>Stwórz pokój (online)</button>
+    <button id="btnOffline" class="ds-btn ds-white"><span class="ds-ic">🤖</span>Graj z botami (offline)</button>
+    <button id="btnJoinToggle" class="ds-btn ds-ghost" type="button"><span class="ds-ic">🔑</span>Dołącz do pokoju</button>
+  </div>
+  <div class="ds-pane" id="joinPane"><h3>Kod pokoju</h3><div class="row"><input id="code" maxlength="5" placeholder="KOD" autocomplete="off"><button id="btnJoin" class="ds-btn ds-gold ds-small">Dołącz</button></div></div>
+  <div class="ds-panel"><label>Boty na drużynę <select id="bots"><option>0</option><option>1</option><option>2</option><option selected>3</option><option>4</option></select></label></div>
   <div id="status"></div>
-  <div class="help">PC: WASD – ruch, mysz – celowanie, LPM – ogień, R – przeładowanie, Tab – wyniki, <b>Shift / C (przytrzymaj) – wtop się w ścianę</b> (stań przy ścianie; strzał lub trafienie cię ujawnia).<br>Telefon: lewy kciuk – ruch, prawy – celowanie (wychylenie = strzał), przycisk UKRYJ – wtapianie w ścianę.<br>Wygrywa drużyna, która pierwsza zdobędzie 25 zabójstw. Pokój: host tworzy go przyciskiem i podaje znajomym 5-znakowy kod.</div>
-</div></div>
+  <details class="ds-help"><summary>Sterowanie i zasady</summary><div class="help">PC: WASD – ruch, mysz – celowanie, LPM – ogień, R – przeładowanie, Tab – wyniki, <b>Shift / C (przytrzymaj) – wtop się w ścianę</b> (stań przy ścianie; strzał lub trafienie cię ujawnia).<br>Telefon: lewy kciuk – ruch, prawy – celowanie (wychylenie = strzał), przycisk UKRYJ – wtapianie w ścianę.<br>Wygrywa drużyna, która pierwsza zdobędzie 25 zabójstw. Pokój: host tworzy go przyciskiem i podaje znajomym 5-znakowy kod.</div></details>
+</div>
+</div>
 
+<script>document.getElementById("btnJoinToggle").onclick=function(){var p=document.getElementById("joinPane");p.classList.toggle("open");if(p.classList.contains("open"))document.getElementById("code").focus()};</script>
 <script>
 /* DARK SWEEP – silnik gry (mapa, widoczność, strzelanie, boty).
    Działa w przeglądarce i w Node (do testów). Autorytatywna symulacja chodzi u hosta. */
