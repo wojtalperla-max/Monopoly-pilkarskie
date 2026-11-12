@@ -28,19 +28,28 @@
 <!-- MENU -->
 <section id="menu" class="screen hidden">
   <canvas id="fogcv2"></canvas>
-  <div class="center">
-    <h1 class="title glitch" data-t="SZEPT">SZEPT</h1>
-    <p class="tag">Zbierz klucze. Uciekaj. Nie świeć, gdy on słucha.</p>
-    <input id="nameIn" maxlength="14" placeholder="Twój pseudonim" autocomplete="off">
-    <div id="cols" class="row" aria-label="Kolor gracza"></div>
-    <p id="who" class="small dim"></p>
-    <div class="row">
-      <button id="hostBtn" class="btn">STWÓRZ POKÓJ</button>
-      <button id="soloBtn" class="btn ghost">GRAJ SOLO</button>
+  <div class="sz-bg" aria-hidden="true"><span style="left:6%;animation-duration:22s;animation-delay:-0s">👁</span><span style="left:16%;animation-duration:29s;animation-delay:-5s">🕯</span><span style="left:26%;animation-duration:36s;animation-delay:-10s">💀</span><span style="left:36%;animation-duration:28s;animation-delay:-15s">🗝</span><span style="left:46%;animation-duration:35s;animation-delay:-0s">🦴</span><span style="left:56%;animation-duration:27s;animation-delay:-5s">🕷</span><span style="left:66%;animation-duration:34s;animation-delay:-10s">👁</span><span style="left:76%;animation-duration:26s;animation-delay:-15s">🩸</span><span style="left:86%;animation-duration:33s;animation-delay:-0s">🕯</span><span style="left:96%;animation-duration:25s;animation-delay:-5s">🦇</span></div>
+  <div class="sz-rays" aria-hidden="true"></div>
+  <div class="center sz-wrap">
+    <h1 class="sz-logo glitch" aria-label="SZEPT"><b style="--i:0">S</b><b style="--i:1">Z</b><b style="--i:2">E</b><b style="--i:3">P</b><b style="--i:4">T</b></h1>
+    <div class="sz-eyes" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <p class="sz-sub">Zbierz klucze. Uciekaj. Nie świeć, gdy on słucha.</p>
+    <div class="sz-card">
+      <input id="nameIn" maxlength="14" placeholder="Twój pseudonim" autocomplete="off">
+      <div id="cols" class="row" aria-label="Kolor gracza"></div>
+      <p id="who" class="small dim"></p>
     </div>
-    <div class="row">
-      <input id="codeIn" maxlength="4" placeholder="KOD" autocomplete="off">
-      <button id="joinBtn" class="btn">DOŁĄCZ</button>
+    <div class="sz-main">
+      <button id="hostBtn" class="sz-btn sz-blood"><span class="sz-ic">🕯</span>STWÓRZ POKÓJ</button>
+      <button id="soloBtn" class="sz-btn sz-bone"><span class="sz-ic">👁</span>GRAJ SOLO</button>
+      <button id="joinToggle" class="sz-btn sz-ghost" type="button"><span class="sz-ic">🗝</span>DOŁĄCZ DO POKOJU</button>
+    </div>
+    <div id="joinPane" class="sz-pane">
+      <p>Wpisz 4-literowy kod od gospodarza</p>
+      <div class="row">
+        <input id="codeIn" maxlength="4" placeholder="KOD" autocomplete="off">
+        <button id="joinBtn" class="sz-btn sz-blood sz-small">DOŁĄCZ</button>
+      </div>
     </div>
     <p id="menuMsg" class="small err"></p>
     <details class="help">
@@ -5563,5 +5572,6 @@ window.__szeptRefresh = function () { if (state === 'menu') { initPrefs(); music
 window.__szept = { zombie: () => zomb, amb: (k, p) => AMB[k](p || 0), setStress: v => { stress = v; }, setBattery: v => { battery = v; }, get stress() { return stress; }, get battery() { return battery; }, pickups: () => pickups, fly: k => tryFly(k), pop: k => tryFacePop(k), fuseHud: () => updateFuseHud(), decoyAct: () => decoyAct, decoyAct: () => decoyAct,  setYaw: v => { yaw = v; }, setPos: (x, z) => { players[myId].x = x; players[myId].z = z; }, get players() { return players; }, get monster() { return monster; }, get collected() { return collected; }, get state() { return state; }, fusePos: () => fusePos, G: () => G, exitPos: () => exitPos };
 
 </script>
+<script>document.getElementById("joinToggle").onclick=function(){var p=document.getElementById("joinPane");p.classList.toggle("open");if(p.classList.contains("open"))document.getElementById("codeIn").focus();};</script>
 </body>
 </html>
