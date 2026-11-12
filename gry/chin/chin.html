@@ -2,7 +2,7 @@
 <html lang="pl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Chińczyk</title>
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="chin.css"></head><body>
 <div id="app">
 <header>
@@ -11,13 +11,24 @@
 </header>
 
 <section id="home" class="card center">
-<h1>Zagrajmy!</h1><p>Chińczyk dla 2–4 osób. Załóż pokój i podaj znajomym kod albo zagraj z botami.</p>
-<div class="me"><span class="av" id="mav"></span><input id="nick" maxlength="14" placeholder="Twój nick" autocomplete="off" aria-label="Twój nick"></div>
-<button class="btn" id="bC" style="width:100%">Utwórz pokój</button>
-<p class="or">albo dołącz kodem</p>
-<div class="row"><input id="ci" maxlength="4" placeholder="KOD" autocomplete="off"><button class="btn ghost" id="bJ" style="flex:.7">Dołącz</button></div>
-<button class="btn ghost" id="bL" style="width:100%;margin-top:12px">🤖 Graj z botami</button>
-<p class="hint" id="nt2"></p>
+<div class="ch-bg" aria-hidden="true" id="chBg"></div>
+<div class="ch-wrap">
+  <div class="ch-logo" role="img" aria-label="Chińczyk" id="chLogo"></div>
+  <div class="ch-tiles" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <p class="ch-sub">Chińczyk dla 2–4 osób. Załóż pokój albo zagraj z botami.</p>
+  <div class="ch-pane">
+    <div class="me"><span class="av" id="mav"></span><input id="nick" maxlength="14" placeholder="Twój nick" autocomplete="off" aria-label="Twój nick"></div>
+    <button class="ch-btn ch-gold" id="bC"><span class="ch-ic">🎲</span><span>Utwórz pokój</span></button>
+  </div>
+  <div class="ch-or">albo dołącz kodem</div>
+  <div class="ch-pane">
+    <label for="ci">Kod pokoju</label>
+    <input id="ci" class="ch-code" maxlength="4" placeholder="KOD" autocomplete="off">
+    <button class="ch-btn ch-white" id="bJ"><span class="ch-ic">🚪</span><span>Dołącz</span></button>
+  </div>
+  <button class="ch-btn ch-ghost" id="bL"><span class="ch-ic">🤖</span><span>Graj z botami</span></button>
+  <p class="ch-hint" id="nt2"></p>
+</div>
 </section>
 
 <section id="lobby" class="card center" hidden></section>
@@ -361,4 +372,9 @@ $('#nick').addEventListener('input',e=>{if(e.target.readOnly)return;me.name=clea
 window.__chLeave=function(){try{if(R||S)leave()}catch(e){}};
 window.__chRefresh=function(){if(!R&&!S)initPrefs()};
 initPrefs();render();
-</script></body></html>
+</script><script>
+(function(){var cols=['#ff6b78','#6fb2ff','#5ee08a','#ffd84a'];
+var lg=document.getElementById('chLogo');'CHIŃCZYK'.split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i);b.style.color=cols[i%4];b.textContent=c;lg.appendChild(b)});
+var bg=document.getElementById('chBg');['🎲','🔴','🔵','🟢','🟡','🎲','🔴','🔵','🟢','🟡','🎲','⭐'].forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})})();
+</script>
+</body></html>
