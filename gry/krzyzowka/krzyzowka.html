@@ -6,21 +6,26 @@
 <link rel="stylesheet" href="krzyzowka.css"></head><body>
 <input id="kb" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false">
 <section id="lobby">
- <div class="tiles"><span>K</span><span>R</span><span>Z</span><span>Y</span><span>Ż</span><span>Ó</span><span>W</span><span>K</span><span>A</span></div>
- <p class="sub">Krzyżówka jak u babci – rozwiązujcie razem, kto zgadnie więcej haseł</p>
- <div class="card">
-  <label for="nick">Twój nick i kolor</label>
-  <div class="pick"><input class="t" id="nick" maxlength="14" placeholder="Twój nick…" autocomplete="off"><input type="color" id="col" aria-label="Twój kolor"></div>
-  <button class="wide alt" id="bSolo">Graj solo</button>
-  <div class="or">— albo w pokoju —</div>
-  <button class="wide" id="bMk">✎ Załóż nowy pokój</button>
-  <div class="or">— albo —</div>
-  <label for="code">Kod pokoju</label>
-  <input class="t" id="code" maxlength="5" placeholder="•••••">
-  <button class="wide alt" id="bJn">Dołącz do pokoju</button>
+ <div class="kz-bg" aria-hidden="true"><span style="left:5%;animation-duration:14s;animation-delay:-0s">A</span><span style="left:17%;animation-duration:19s;animation-delay:-4s">Ż</span><span style="left:29%;animation-duration:24s;animation-delay:-8s">✎</span><span style="left:41%;animation-duration:18s;animation-delay:-12s">Ó</span><span style="left:53%;animation-duration:23s;animation-delay:-3s">?</span><span style="left:65%;animation-duration:17s;animation-delay:-7s">🧩</span><span style="left:77%;animation-duration:22s;animation-delay:-11s">K</span><span style="left:89%;animation-duration:16s;animation-delay:-2s">📖</span></div>
+ <div class="kz-wrap">
+  <h1 class="kz-logo" aria-label="Krzyżówka"><b style="--i:0">K</b><b style="--i:1">R</b><b style="--i:2">Z</b><b style="--i:3">Y</b><b style="--i:4">Ż</b><b style="--i:5">Ó</b><b style="--i:6">W</b><b style="--i:7">K</b><b style="--i:8">A</b></h1>
+  <div class="kz-tiles" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <p class="kz-sub">Krzyżówka jak u babci – rozwiązujcie razem, kto zgadnie więcej haseł</p>
+  <div class="kz-card">
+   <label for="nick">Twój nick i kolor</label>
+   <div class="pick"><input class="t" id="nick" maxlength="14" placeholder="Twój nick…" autocomplete="off"><input type="color" id="col" aria-label="Twój kolor"></div>
+  </div>
+  <div class="kz-main">
+   <button class="kz-btn kz-gold" id="bSolo"><span class="kz-ic">▶</span>GRAJ SOLO</button>
+   <button class="kz-btn kz-white" id="bMk"><span class="kz-ic">✎</span>ZAŁÓŻ NOWY POKÓJ</button>
+   <button class="kz-btn kz-ghost" id="bJoinToggle" type="button"><span class="kz-ic">🔑</span>DOŁĄCZ DO POKOJU</button>
+  </div>
+  <div class="kz-pane" id="joinPane"><h3>Kod pokoju</h3>
+   <div class="kz-row"><input class="t" id="code" maxlength="5" placeholder="•••••"><button class="kz-btn kz-gold kz-small" id="bJn">Dołącz</button></div>
+  </div>
   <p class="lobinfo" id="lobinfo"></p>
+  <div id="err"></div>
  </div>
- <div id="err"></div>
 </section>
 <section id="game" class="hide">
  <div class="top"><h2>Krzyżówka</h2><span id="roomLbl" style="color:var(--muted)">Kod pokoju:</span><span class="pill" id="room" title="Kliknij, aby skopiować"></span><button class="alt sm" id="bNew">Nowa krzyżówka</button><button class="alt sm" id="bLeave">Wyjdź</button></div>
@@ -34,6 +39,7 @@
   </div>
  </div>
 </section>
+<script>document.getElementById("bJoinToggle").onclick=function(){var p=document.getElementById("joinPane");p.classList.toggle("open");if(p.classList.contains("open"))document.getElementById("code").focus()};</script>
 <script>
 /* most do hosta (index.html): pokoje online przez Firebase + nick + kolor + statystyki */
 (function(){
