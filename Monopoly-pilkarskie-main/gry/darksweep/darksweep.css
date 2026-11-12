@@ -1,0 +1,38 @@
+/* ==========================================================
+   darksweep — wygląd i motyw gry (style wydzielone z darksweep.html)
+   ========================================================== */
+
+:root{--bg:#0e0e0e;--fg:#e8e8e8;--green:#3dff7a;--red:#ff3b3b;--accent:#ff2d8a}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,Segoe UI,Roboto,sans-serif;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
+  canvas{position:fixed;inset:0;display:block}
+  #menu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,8,8,.92);z-index:10;padding:16px;overflow:auto}
+  .card{width:100%;max-width:400px;display:flex;flex-direction:column;gap:12px}
+  h1{margin:0;font-size:44px;letter-spacing:2px;font-style:italic;font-weight:900;color:#fff;text-shadow:0 0 18px var(--accent)}
+  h1 span{color:var(--accent)}
+  p.tag{margin:0;color:#aaa;font-size:14px;line-height:1.4}
+  input,select,button{font:inherit;border-radius:8px;border:1px solid #333;background:#1a1a1a;color:var(--fg);padding:12px}
+  input{width:100%}
+  button{cursor:pointer;font-weight:700;background:var(--accent);border-color:var(--accent);color:#fff}
+  button.sec{background:#1f1f1f;border-color:#444}
+  button:active{transform:scale(.98)}
+  .row{display:flex;gap:8px}.row>*{flex:1;min-width:0}
+  #code{text-transform:uppercase;letter-spacing:4px;text-align:center}
+  label{font-size:13px;color:#aaa;display:flex;align-items:center;justify-content:space-between;gap:8px}
+  label select{width:80px;padding:8px}
+  #status{min-height:20px;font-size:14px;color:#ffd166}
+  #menu{touch-action:pan-y}
+  #name[readonly]{opacity:.8}
+  .lbl{font-size:13px;color:#aaa;margin-bottom:-4px}
+  .cols{display:flex;gap:8px;flex-wrap:wrap}
+  .cols button{width:32px;height:32px;padding:0;border-radius:50%;border:3px solid #333}
+  .cols button.on{border-color:#fff}
+  .cols button.lock{cursor:default}
+  #who{font-size:12px;color:#8fb7a0;line-height:1.4}
+  button:disabled{opacity:.45;cursor:default}
+  .help{font-size:12px;color:#777;line-height:1.5}
+  #hud{position:fixed;top:8px;left:8px;z-index:5;display:none;gap:6px;align-items:center}
+  #hud button{padding:6px 10px;font-size:12px}
+  #hide{position:fixed;right:14px;bottom:225px;z-index:5;display:none;width:60px;height:60px;border-radius:50%;padding:0;opacity:.7;font-size:11px;background:#1f1f1f;border-color:#555}
+  #hide.on{background:var(--green);color:#000;border-color:var(--green)}
+  #reload{position:fixed;right:14px;bottom:150px;z-index:5;display:none;width:60px;height:60px;border-radius:50%;padding:0;opacity:.7}
