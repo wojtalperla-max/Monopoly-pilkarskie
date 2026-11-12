@@ -981,6 +981,7 @@ window.addEventListener('message',e=>{
   const f=islaFrame();if(!f||e.source!==f.contentWindow)return;
   const d=e.data;if(!d||!d.isla)return;
   if(d.type==='ready'){ISL.ready=true;islaSync()}
+  else if(d.type==='lobby'){if(islaNet())islaLobby()}
   else if(d.type==='state'){ISL.state=d.s;islaSendScore();lbIsla(d.s)}
   else if(d.type==='draw'&&ISL.ref&&ISL.host===onlinePlayerId){
     ISL.localDrawPending=true;
