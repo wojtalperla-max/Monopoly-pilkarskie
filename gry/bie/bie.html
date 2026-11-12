@@ -9,13 +9,23 @@
 <header><b class="logo">6 bierze!</b><div class="hb"><button id="rl" class="sq" aria-label="Zasady">?</button><button id="mu" class="sq" aria-label="Dźwięk">🔊</button></div></header>
 
 <section id="menu" class="scr on">
-<div class="hero" id="hero"></div>
-<div class="me" id="me"><i></i><input id="nick" maxlength="14" placeholder="Twój nick" autocomplete="off" aria-label="Twój nick"></div>
-<div class="panel">
-<button id="bC" class="big">Utwórz pokój</button>
-<div class="row2"><input id="cd" maxlength="5" placeholder="KOD" autocomplete="off"><button id="bJ" class="mn">Dołącz</button></div>
-<button id="bL" class="ghost">Gra z botami (solo)</button>
-<p class="note">2–10 graczy · unikaj zbierania kart – wygrywa najmniej ● (byczych głów)</p><p id="nt2" class="hint"></p>
+<div class="bm-bg" aria-hidden="true" id="bmBg"></div>
+<div class="bm-wrap">
+  <div class="bm-logo" role="img" aria-label="6 bierze!" id="bmLogo"></div>
+  <div class="hero" id="hero"></div>
+  <p class="bm-sub">Unikaj zbierania kart – wygrywa najmniej byczych głów.</p>
+  <div class="bm-pane">
+    <div class="me" id="me"><i></i><input id="nick" maxlength="14" placeholder="Twój nick" autocomplete="off" aria-label="Twój nick"></div>
+    <button id="bC" class="bm-btn bm-gold"><span class="bm-ic">🎲</span><span>Utwórz pokój</span></button>
+  </div>
+  <div class="bm-or">albo dołącz do znajomych</div>
+  <div class="bm-pane">
+    <label for="cd">Kod pokoju</label>
+    <input id="cd" class="bm-code" maxlength="5" placeholder="KOD" autocomplete="off">
+    <button id="bJ" class="bm-btn bm-white"><span class="bm-ic">🚪</span><span>Dołącz</span></button>
+  </div>
+  <button id="bL" class="bm-btn bm-ghost"><span class="bm-ic">🤖</span><span>Gra z botami (solo)</span></button>
+  <p class="bm-note">2–10 graczy · wygrywa najmniej ● (byczych głów)</p><p id="nt2" class="hint bm-hint"></p>
 </div></section>
 
 <section id="lobby" class="scr">
@@ -397,4 +407,9 @@ $('#nick').addEventListener('input',e=>{if(e.target.readOnly)return;me.name=clea
 window.__sbLeave=function(){try{if(R||S)leave()}catch(e){}};
 window.__sbRefresh=function(){if(!R)initPrefs()};
 initPrefs();
-</script></body></html>
+</script><script>
+(function(){var cols=['#ffd23f','#fff','#5ee6c8','#fff','#ffd23f','#5ee6c8','#fff','#ffd23f','#5ee6c8'];
+var lg=document.getElementById('bmLogo');'6 BIERZE!'.split('').forEach(function(c,i){var b=document.createElement('b');if(c===' '){b.className='sp';b.innerHTML='&nbsp;'}else{b.style.setProperty('--i',i);b.style.color=cols[i];b.textContent=c}lg.appendChild(b)});
+var bg=document.getElementById('bmBg');['🐂','🃏','⭐','🐮','🃏','🔥','🐂','🃏','⭐','🐮','🔥','🃏'].forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})})();
+</script>
+</body></html>
