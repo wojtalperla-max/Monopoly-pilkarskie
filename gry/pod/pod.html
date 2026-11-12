@@ -4,19 +4,39 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Podbój – gra z kostką</title>
-<link rel="stylesheet" href="pod.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@500;600;700&display=swap"><link rel="stylesheet" href="pod.css">
 </head>
 <body>
 <h1>🗺️ Podbój</h1>
 
 <div id="setup" class="card">
-  <p>Mapa jest podzielona na regiony. Rzucasz kostką i przejmujesz tyle pól, ile wypadnie – każde nowe pole musi sąsiadować z Twoim terytorium. Każda strefa, w której masz choć jeden kafelek, daje Ci punkt (STREFY). Wygrywa ten, kto ma najwięcej stref – przy remisie decyduje liczba pól. Na planszy leżą monety 🪙 (zbierasz je, zajmując pole); w sklepie kupisz działo 🔫 i postawisz je na swoim polu.</p>
-  <label style='display:block;margin-bottom:10px'><input type='checkbox' id='tmode'> 🧪 Tryb testowy</label><b>Ilu graczy?</b>
-  <div class="row"><button onclick="start(2)">2</button><button onclick="start(3)">3</button><button onclick="start(4)">4</button></div>
-  <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
-  <b>🤖 Gra offline z botami</b>
-  <div class="row"><label>Poziom botów: <select id="bdiff" style="font:inherit;padding:6px;border-radius:8px"><option value="0">Łatwy</option><option value="1" selected>Normalny</option><option value="2">Trudny</option><option value="3">Ekstremalny</option></select></label></div>
-  <div class="row"><button onclick="startBots(1)">1 bot</button><button onclick="startBots(2)">2 boty</button><button onclick="startBots(3)">3 boty</button></div>
+  <div class="pd-bg" aria-hidden="true" id="pdBg"></div>
+  <div class="pd-wrap">
+    <div class="pd-logo" role="img" aria-label="Podbój" id="pdLogo"></div>
+    <div class="pd-tiles" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <p class="pd-sub">Rzuć kostką. Zajmij mapę. Przejmij strefy.</p>
+    <div class="pd-main">
+      <button type="button" id="pdOnlineBtn" class="pd-btn pd-gold"><span class="pd-ic">🌐</span><span>Multiplayer online</span></button>
+      <button type="button" id="pdBotsBtn" class="pd-btn pd-white"><span class="pd-ic">🤖</span><span>Gra z botami</span></button>
+      <button type="button" id="pdLocalBtn" class="pd-btn pd-white"><span class="pd-ic">👥</span><span>Kilku graczy na jednym ekranie</span></button>
+      <button type="button" id="pdRulesBtn" class="pd-btn pd-ghost"><span class="pd-ic">📜</span><span>Jak grać?</span></button>
+    </div>
+    <div id="pdBots" class="pd-pane"><h3>Ilu przeciwników?</h3>
+      <div class="pd-lvl"><label for="bdiff">Poziom botów:</label><select id="bdiff" class="pd-select"><option value="0">Łatwy</option><option value="1" selected>Normalny</option><option value="2">Trudny</option><option value="3">Ekstremalny</option></select></div>
+      <div class="pd-nums">
+        <button type="button" class="pd-num" onclick="startBots(1)"><span>🤖</span><b>1</b><small>bot</small></button>
+        <button type="button" class="pd-num" onclick="startBots(2)"><span>🤖</span><b>2</b><small>boty</small></button>
+        <button type="button" class="pd-num" onclick="startBots(3)"><span>🤖</span><b>3</b><small>boty</small></button>
+      </div></div>
+    <div id="pdLocal" class="pd-pane"><h3>Ilu graczy?</h3>
+      <div class="pd-nums">
+        <button type="button" class="pd-num" onclick="start(2)"><span>🚩</span><b>2</b><small>graczy</small></button>
+        <button type="button" class="pd-num" onclick="start(3)"><span>🚩</span><b>3</b><small>graczy</small></button>
+        <button type="button" class="pd-num" onclick="start(4)"><span>🚩</span><b>4</b><small>graczy</small></button>
+      </div></div>
+    <div id="pdRules" class="pd-pane"><h3>Zasady</h3><p>Mapa jest podzielona na regiony. Rzucasz kostką i przejmujesz tyle pól, ile wypadnie – każde nowe pole musi sąsiadować z Twoim terytorium. Każda strefa, w której masz choć jeden kafelek, daje Ci punkt (STREFY). Wygrywa ten, kto ma najwięcej stref – przy remisie decyduje liczba pól. Na planszy leżą monety 🪙 (zbierasz je, zajmując pole); w sklepie kupisz działo 🔫 i postawisz je na swoim polu.</p></div>
+    <label class="pd-test"><input type="checkbox" id="tmode"> 🧪 Tryb testowy</label>
+  </div>
 </div>
 
 <div id="game" class="hide" style="width:100%;max-width:820px;display:flex;flex-direction:column;gap:12px">
@@ -788,6 +808,22 @@ function finish(){
   const e=$("end");e.classList.remove("hide");
   e.innerHTML=`<h2>🏆 ${win.length>1?"Remis: "+win.join(", "):"Wygrywa: "+win[0]}</h2><p>${cnt.map((c,k)=>NAMES[k]+": STREFY "+z[k]+", pól "+c).join("<br>")}</p>`+(podOnline?"":"<button onclick=\"location.reload()\">Zagraj ponownie</button>");
 }
+</script>
+<script>
+/* ===== ekran startowy (styl Monopoly) ===== */
+(function(){
+  var logo=document.getElementById('pdLogo');if(!logo)return;
+  'PODBÓJ'.split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i);b.textContent=c;logo.appendChild(b)});
+  var bg=document.getElementById('pdBg');
+  ['🗺️','🎲','🪙','🔫','🛡️','🏰','🚩','🎲','⚔️','🪙','🗺️','🏆'].forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)});
+  var ob=document.getElementById('pdOnlineBtn'),inFrame=false;try{inFrame=parent!==window}catch(e){inFrame=true}
+  if(!inFrame){ob.disabled=true;ob.title='Pokoje online działają w platformie z kontem i Firebase'}
+  ob.onclick=function(){try{parent.postMessage({podboj:1,type:'online'},'*')}catch(e){}};
+  var panes=['pdBots','pdLocal','pdRules'],btns={pdBots:'pdBotsBtn',pdLocal:'pdLocalBtn',pdRules:'pdRulesBtn'};
+  panes.forEach(function(id){document.getElementById(btns[id]).onclick=function(){
+    panes.forEach(function(o){var el=document.getElementById(o);el.style.display=(o===id&&el.style.display!=='block')?'block':'none'});
+  }});
+})();
 </script>
 </body>
 </html>
