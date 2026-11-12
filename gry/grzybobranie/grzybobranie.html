@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Grzybobranie</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Bowlby+One&display=swap">
 <link rel="stylesheet" href="grzybobranie.css">
 </head>
 <body>
@@ -19,20 +19,29 @@
 </defs></svg>
 
 <div id="home" class="home">
-  <div class="card center">
-    <p class="muted" style="margin:0 0 8px">Twój nick</p>
-    <input id="name" maxlength="14" placeholder="np. Kasia" autocomplete="off">
-    <div class="colrow"><span class="muted">Kolor pionka</span><input id="pcol" type="color" value="#e53935" aria-label="Kolor pionka"></div>
-    <div id="net" class="muted" style="font-size:14px;margin-top:10px"></div>
+  <div class="gh-bg" aria-hidden="true" id="ghBg"></div>
+  <div class="gh-wrap">
+    <div class="gh-logo" role="img" aria-label="Grzybobranie">
+      <div class="gh-row" id="ghR1"></div>
+      <div class="gh-row" id="ghR2"></div>
+    </div>
+    <div class="gh-tiles" aria-hidden="true"><i>🍄</i><i>🧺</i><i>🌲</i><i>🍂</i></div>
+    <p class="gh-sub">Idź ścieżką przez las, zbieraj borowiki do koszyka i uważaj na muchomory!</p>
+    <div class="gh-pane">
+      <label for="name">Twój nick</label>
+      <input id="name" maxlength="14" placeholder="np. Kasia" autocomplete="off">
+      <div class="colrow"><span>Kolor pionka</span><input id="pcol" type="color" value="#e53935" aria-label="Kolor pionka"></div>
+      <div id="net" class="gh-net"></div>
+    </div>
+    <div class="gh-pane">
+      <button id="create" class="gh-btn gh-gold"><span class="gh-ic">🌲</span><span>Stwórz nowy pokój</span></button>
+      <div class="gh-or">albo dołącz do znajomych</div>
+      <input id="code" class="code" maxlength="4" placeholder="KOD" autocomplete="off">
+      <button id="join" class="gh-btn gh-white"><span class="gh-ic">🧺</span><span>Dołącz do pokoju</span></button>
+      <div id="err" class="err"></div>
+    </div>
+    <p class="gh-note">Znajomi wybierają Grzybobranie w menu gier i wpisują kod pokoju (do 4 osób).</p>
   </div>
-  <div class="card" style="display:grid;gap:12px">
-    <button id="create" class="alt">🌲 Stwórz nowy pokój</button>
-    <div class="center muted">— albo dołącz do znajomych —</div>
-    <input id="code" class="code" maxlength="4" placeholder="KOD" autocomplete="off">
-    <button id="join">🧺 Dołącz do pokoju</button>
-    <div id="err" class="err"></div>
-  </div>
-  <p class="sub" style="font-size:13px">Znajomi wybierają Grzybobranie w menu gier i wpisują kod pokoju (do 4 osób).</p>
 </div>
 
 <div id="lobby" class="home hide">
@@ -428,6 +437,10 @@ $('#leave1').onclick=leave;
 $('#leave2').onclick=()=>{if(S&&S.phase==='play'&&S.players.length>1&&!confirm('Wyjść z gry? Stracisz możliwość zapisania wyniku.'))return;leave()};
 $('#copy').onclick=()=>{try{navigator.clipboard.writeText(code)}catch(e){}$('#copy').textContent='✅ Skopiowano'};
 initPrefs();drawBoard();drawDie(0);
+</script>
+<script>
+(function(){[['ghR1','GRZYBO',0],['ghR2','BRANIE',6]].forEach(function(x){var r=document.getElementById(x[0]);x[1].split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i+x[2]);b.textContent=c;r.appendChild(b)})});
+var bg=document.getElementById('ghBg');['🍄','🌲','🍂','🧺','🌰','🍄','🐿️','🍁','🌲','🍄','🌰','🍂'].forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})})();
 </script>
 </body>
 </html>
