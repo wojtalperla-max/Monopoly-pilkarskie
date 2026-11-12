@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Postaw na milion</title>
-<link rel="stylesheet" href="panstwa-miasta.css">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@500;600;700&display=swap"><link rel="stylesheet" href="panstwa-miasta.css">
 </head>
 <body>
 <div id="app"></div>
@@ -523,13 +523,19 @@ function toHome(msg){leaveNet();const nm=S.nm,ln=S.ln;TIME=45000;db=null;S=fresh
 function home(){
  const an=accNick(),ac=HEX.test(accCol())?accCol():"";
  const nick=an||S.nm||"";
- app.innerHTML=logo+`<div class="home"><div class="card center"><p class="lbl">Baza pytań</p><div class="win" style="font-size:36px">${QUESTION_COUNT}</div><p class="note">pytań w ${CATEGORIES.length} kategoriach</p></div>
- <div class="card"><p class="lbl">Twój nick</p><div class="row" style="flex-wrap:nowrap;align-items:center"><div class="av" style="background:${ac||PAL[0]};color:${ink(ac||PAL[0])}">${esc((nick||"?")[0].toUpperCase())}</div><input id="nm" maxlength="14" placeholder="np. Kasia" value="${esc(nick)}" ${an?"readonly":""}></div>
- <p class="note">${an?"Grasz jako <b>"+esc(an)+"</b> – kolor i nick z Twojego konta, wyniki gier online trafią do statystyk.":NET?"Zaloguj się na konto, aby wyniki liczyły się do statystyk.":"Online niedostępne – zagraj offline."}</p></div>
- <div class="card center"><button class="go" id="lc" style="width:100%">📴 Gra offline · jedno urządzenie</button><p class="note">Bez kodu i internetu – podajecie sobie telefon</p></div>
- <div class="card"><p class="lbl">Online – każdy na swoim telefonie</p><button class="go" style="width:100%" id="mk" ${NET?"":"disabled"}>Utwórz pokój</button><p class="note">albo dołącz kodem</p>
- <div class="row"><input id="cd" maxlength="4" placeholder="KOD" style="flex:1;text-transform:uppercase;letter-spacing:.3em;text-align:center" ${NET?"":"disabled"}><button id="jn" class="go" ${NET?"":"disabled"}>Dołącz</button></div>
- <div class="err" id="er">${esc(S.err)}</div></div></div>`;
+ const L=(t,o)=>t.split("").map((c,i)=>`<b style="--i:${i+o}">${c}</b>`).join(""),BG=["💰","🎤","⭐","💎","🏆","❓","🪙","💰","⭐","💎","🎤","❓"].map((e,i)=>`<span style="left:${(i*8.7+3)%96}%;animation-duration:${14+(i*5)%11}s;animation-delay:-${(i*3.3)%14}s">${e}</span>`).join("");
+ app.innerHTML=`<div class="ph-screen"><div class="ph-bg" aria-hidden="true">${BG}</div><div class="ph-wrap">
+ <div class="ph-logo" role="img" aria-label="Postaw na milion"><div class="ph-row">${L("POSTAW",0)}</div><div class="ph-na">na</div><div class="ph-row">${L("MILION",6)}</div></div>
+ <div class="ph-tiles" aria-hidden="true"><i>A</i><i>B</i><i>C</i><i>D</i></div>
+ <p class="ph-sub">Teleturniej na żywo · 2–3 graczy</p>
+ <div class="ph-pane"><label for="nm">Twój nick</label><div class="ph-me"><div class="av" style="background:${ac||PAL[0]};color:${ink(ac||PAL[0])}">${esc((nick||"?")[0].toUpperCase())}</div><input id="nm" maxlength="14" placeholder="np. Kasia" value="${esc(nick)}" ${an?"readonly":""}></div>
+ <p class="ph-note">${an?"Grasz jako <b>"+esc(an)+"</b> – kolor i nick z Twojego konta, wyniki gier online trafią do statystyk.":NET?"Zaloguj się na konto, aby wyniki liczyły się do statystyk.":"Online niedostępne – zagraj offline."}</p>
+ <button class="ph-btn ph-gold" id="mk" ${NET?"":"disabled"}><span class="ph-ic">🎲</span><span>Utwórz pokój</span></button></div>
+ <div class="ph-or">albo dołącz kodem</div>
+ <div class="ph-pane"><label for="cd">Kod pokoju</label><input id="cd" class="ph-code" maxlength="4" placeholder="KOD" ${NET?"":"disabled"}><button id="jn" class="ph-btn ph-white" ${NET?"":"disabled"}><span class="ph-ic">🚪</span><span>Dołącz</span></button><div class="err" id="er">${esc(S.err)}</div></div>
+ <button class="ph-btn ph-ghost" id="lc"><span class="ph-ic">📴</span><span>Gra offline · jedno urządzenie</span></button>
+ <p class="ph-note">Bez kodu i internetu – podajecie sobie telefon.<br>Baza pytań: ${QUESTION_COUNT} w ${CATEGORIES.length} kategoriach.</p>
+ </div></div>`;
  $("#lc").onclick=()=>{S.view="local";render()};$("#mk").onclick=()=>enter(true);$("#jn").onclick=()=>enter(false);
  $("#nm").oninput=e=>{S.nm=e.target.value;if(!an){try{localStorage.setItem("pnm_nick",cleanN(S.nm))}catch(x){}}};
 }
