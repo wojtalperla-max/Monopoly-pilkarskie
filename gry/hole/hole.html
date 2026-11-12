@@ -2,18 +2,35 @@
 <html lang="pl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Hole Arena</title>
-<link rel="stylesheet" href="hole.css"></head><body>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@500;600;700&display=swap"><link rel="stylesheet" href="hole.css"></head><body>
 <canvas id="c"></canvas><div id="hud"></div><div id="tm"></div><div id="rb"></div><button id="mb" title="Wycisz / włącz dźwięk (M)">🔊</button>
-<div id="menu"><h1>HOLE ARENA</h1>
-<div id="who"></div>
-<input id="nick" placeholder="Twój nick" maxlength="14" autocomplete="off">
-<div id="cols" aria-label="Kolor dziury"></div>
-<button id="solo">Graj z botami</button>
-<div class="row"><span>Boty w pokoju:</span><select id="nb"><option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
-<button id="host">Stwórz pokój (multiplayer)</button>
-<div class="row"><input id="code" placeholder="KOD" maxlength="4" autocomplete="off"><button id="join">Dołącz</button></div>
-<div id="mm"></div>
-<small>Pochłaniaj obiekty mniejsze od dziury. Większe dziury zjadają mniejsze! Runda trwa 3 minuty, wygrywa najwyższy wynik. Klawisz M wycisza dźwięk.</small></div>
+<div id="menu">
+<div class="hm-bg" aria-hidden="true" id="hmBg"></div>
+<div class="hm-wrap">
+  <div class="hm-logo" role="img" aria-label="Hole Arena">
+    <div class="hm-row" id="hmR1"></div>
+    <div class="hm-row" id="hmR2"></div>
+  </div>
+  <div class="hm-tiles" aria-hidden="true"><i style="--c:#ef476f"></i><i style="--c:#06d6a0"></i><i style="--c:#ffb703"></i><i style="--c:#4cc9f0"></i></div>
+  <p class="hm-sub">Pochłaniaj wszystko, rośnij i zjedz rywali!</p>
+  <div class="hm-pane">
+    <label for="nick">Twój nick</label>
+    <input id="nick" placeholder="Twój nick" maxlength="14" autocomplete="off">
+    <div id="cols" aria-label="Kolor dziury"></div>
+    <div id="who"></div>
+  </div>
+  <button id="solo" class="hm-btn hm-gold"><span class="hm-ic">🤖</span><span>Graj z botami</span></button>
+  <div class="hm-or">albo graj online</div>
+  <div class="hm-pane">
+    <div class="hm-bots"><label for="nb">Boty w pokoju:</label><select id="nb" class="hm-select"><option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
+    <button id="host" class="hm-btn hm-white"><span class="hm-ic">🕳️</span><span>Stwórz pokój</span></button>
+    <label for="code">Kod pokoju</label>
+    <input id="code" class="hm-code" placeholder="KOD" maxlength="4" autocomplete="off">
+    <button id="join" class="hm-btn hm-white"><span class="hm-ic">🚪</span><span>Dołącz</span></button>
+  </div>
+  <div id="mm"></div>
+  <small>Pochłaniaj obiekty mniejsze od dziury. Większe dziury zjadają mniejsze! Runda trwa 3 minuty, wygrywa najwyższy wynik. Klawisz M wycisza dźwięk.</small>
+</div></div>
 <script>
 /* ===== most do index.html (Firebase: pokoje online, nick i kolor z konta, statystyki) ===== */
 var P=window.parent,B=null;
@@ -232,4 +249,8 @@ window.__holeLeave=function(){
  if(running||roomRef)setTimeout(()=>location.reload(),60)};
 window.__holeRefresh=function(){if(!running)initPrefs()};
 initPrefs();
-</script></body></html>
+</script><script>
+(function(){[['hmR1','HOLE',0],['hmR2','ARENA',4]].forEach(function(x){var r=document.getElementById(x[0]);x[1].split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i+x[2]);b.textContent=c;r.appendChild(b)})});
+var bg=document.getElementById('hmBg');['🕳️','🍎','🚗','🌳','🏠','⭐','🕳️','🎈','🚲','🌳','🍎','🕳️'].forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})})();
+</script>
+</body></html>
