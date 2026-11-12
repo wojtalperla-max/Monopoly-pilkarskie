@@ -94,3 +94,24 @@
 #hub .srv-watchgrid h4{margin:0 0 8px;color:#ffd23f}
 #hub .srv-watchgrid pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:300px;overflow:auto;color:#dcd5f1;font:12px/1.5 ui-monospace,monospace;margin:0}
 #hub .srv-error{color:#ff9c9c}
+
+
+/* ===== PODBÓJ: ekran startowy i lobby pokoju (styl Monopoly, niebieski) ===== */
+#podGate{position:fixed;inset:0;z-index:19050;display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto;color:#fff;font-size:16px;text-align:center;background:radial-gradient(circle at 50% 18%,#3b8cff 0,#1746a8 38%,#071b4d 100%)}
+#podGate::before{content:"";position:fixed;inset:-50%;background:conic-gradient(from 0deg,#ffffff00 0 8%,#ffffff14 10%,#ffffff00 12% 33%,#ffffff12 35%,#ffffff00 37% 58%,#ffffff14 60%,#ffffff00 62% 83%,#ffffff12 85%,#ffffff00 87%);animation:ogSpin 40s linear infinite;pointer-events:none}
+#pod #podGate,#pod #podGate *{font-family:"Fredoka","Trebuchet MS",system-ui,sans-serif}
+#pod #podGate .og-logo b,#pod #podGate .og-code{font-family:"Bowlby One","Impact",sans-serif}
+#podGate .og-red{color:#1746a8}
+#podGate .og-wrap{margin:auto}
+#podGate .og-join input{background:#071b4d}
+#podGate .og-code{text-shadow:0 3px 0 #70080f}
+#podGate .pg-nick{margin:0;font-size:18px;opacity:.92;animation:ogUp .7s 1.15s both}
+#podGate .pg-note{margin:0;opacity:.85}
+#podGate .pg-err{color:#ffe08a;font-weight:600;overflow-wrap:anywhere;margin-top:10px}
+#podGate .pg-status{opacity:.92;font-size:16px;margin:6px 0}
+#podGate .pg-players{margin:10px 0;text-align:left}
+#podGate .pg-players>div{display:flex;align-items:center;gap:8px;border-bottom:1px solid #ffffff2a;padding:8px 2px;font-size:18px;animation:ogUp .4s both}
+#podGate .pg-host{color:#ffd84a}
+#podGate .pg-hostrow{display:flex;gap:10px;flex-wrap:wrap}
+#podGate .pg-hostrow .og-btn{flex:1 1 140px;width:auto}
+@media(prefers-reduced-motion:reduce){#podGate *,#podGate::before{animation:none!important}}
