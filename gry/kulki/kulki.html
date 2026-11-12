@@ -3,31 +3,44 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kulki – gra jak z Squid Game</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="kulki.css"></head><body>
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="kulki.css"></head><body>
 <div id="bg"></div><canvas id="fx"></canvas>
 
-<section class="scr on" id="menu">
- <div class="logo"><div class="shapes">○ △ □</div><h1>KULKI</h1><div style="color:var(--mut)">Parzysta czy nieparzysta? Zgarnij wszystkie kulki.</div></div>
- <div class="card">
-  <label for="name">Twój pseudonim</label>
-  <input id="name" maxlength="16" placeholder="np. Gracz 456" value="Gracz 456">
-  <div class="grid">
-   <button class="btn" id="bBot">🤖 Graj z botem</button>
-   <button class="btn t onl" id="bCreate" disabled>🚪 Stwórz pokój</button>
-   <div class="row"><input id="jc" maxlength="4" placeholder="KOD" style="text-transform:uppercase;text-align:center;letter-spacing:.3em"><button class="btn g onl" id="bJoin" disabled style="flex:.9">DOŁĄCZ</button></div>
+<section class="scr kl on" id="menu">
+ <div class="kl-bg" aria-hidden="true"></div>
+ <div class="kl-wrap">
+  <div class="kl-shapes" aria-hidden="true"><i class="p">○</i><i class="t">△</i><i class="w">□</i></div>
+  <div class="kl-logo" role="img" aria-label="Kulki"><div class="kl-l" data-t="KULKI"></div></div>
+  <p class="kl-sub">Parzysta czy nieparzysta? Zgarnij wszystkie kulki.</p>
+  <div class="kl-panel">
+   <label for="name">Twój pseudonim</label>
+   <input id="name" maxlength="16" placeholder="np. Gracz 456" value="Gracz 456" autocomplete="off">
   </div>
-  <div id="net">Łączenie z trybem online<span class="dots"></span></div>
+  <div class="kl-main">
+   <button class="kl-btn kl-gold onl" id="bCreate" disabled><span class="kl-ic">🚪</span><span>Stwórz pokój</span></button>
+   <button class="kl-btn kl-white" id="klJoinBtn" type="button"><span class="kl-ic">🔑</span><span>Dołącz do znajomego</span></button>
+  </div>
+  <div id="klJoinPane" class="kl-pane"><label for="jc" style="text-align:center">Kod pokoju od znajomego</label>
+   <div class="kl-join"><input id="jc" maxlength="4" placeholder="KOD" autocomplete="off" style="text-transform:uppercase"><button class="kl-btn kl-green onl" id="bJoin" disabled>Dołącz</button></div></div>
+  <button class="kl-btn kl-ghost" id="bBot"><span class="kl-ic">🤖</span><span>Graj z botem</span></button>
+  <div id="net" class="kl-note">Łączenie z trybem online<span class="dots"></span></div>
+  <div id="klRulesPane" class="kl-pane"><h3>Zasady</h3><p>Każdy zaczyna z 10 kulkami. W swojej turze ukrywasz w dłoni od 1 kulki w górę, a przeciwnik zgaduje, czy ich liczba jest parzysta. Trafi – zabiera Ci tyle kulek, ile miałeś w dłoni. Pudło – to Ty zabierasz tyle jemu. Potem zamiana ról. Kto straci wszystkie, odpada.</p></div>
+  <button class="kl-link" id="klRulesBtn" type="button">📜 Jak grać?</button>
  </div>
- <div class="card" style="font-size:14px;color:var(--mut)"><b style="color:var(--ink)">Zasady:</b> każdy zaczyna z 10 kulkami. W swojej turze ukrywasz w dłoni od 1 kulki w górę, a przeciwnik zgaduje, czy ich liczba jest parzysta. Trafi – zabiera Ci tyle kulek, ile miałeś w dłoni. Pudło – to Ty zabierasz tyle jemu. Potem zamiana ról. Kto straci wszystkie, odpada.</div>
 </section>
 
-<section class="scr" id="lobby">
- <div class="logo"><h1 style="font-size:64px">POKÓJ</h1></div>
- <div class="card" style="text-align:center">
-  <div id="lobTxt">Podaj ten kod drugiemu graczowi</div>
-  <div class="code" id="codeBox"></div>
-  <div style="color:var(--mut);margin-bottom:14px">Czekam na przeciwnika<span class="dots"></span></div>
-  <div class="row"><button class="btn t" id="bCopy">KOPIUJ KOD</button><button class="btn g" id="bCancel">ANULUJ</button></div>
+<section class="scr kl" id="lobby">
+ <div class="kl-bg" aria-hidden="true"></div>
+ <div class="kl-wrap">
+  <div class="kl-shapes" aria-hidden="true"><i class="p">○</i><i class="t">△</i><i class="w">□</i></div>
+  <div class="kl-logo" role="img" aria-label="Pokój"><div class="kl-l" data-t="POKÓJ"></div></div>
+  <div class="kl-lobby">
+   <span class="kl-badge">⏳ Poczekalnia</span>
+   <div id="lobTxt" class="kl-lt">Podaj ten kod drugiemu graczowi</div>
+   <div class="code" id="codeBox"></div>
+   <div class="kl-wait">Czekam na przeciwnika<span class="dots"></span></div>
+   <div class="row"><button class="kl-btn kl-gold" id="bCopy">KOPIUJ KOD</button><button class="kl-btn kl-ghost" id="bCancel">ANULUJ</button></div>
+  </div>
  </div>
 </section>
 
@@ -185,4 +198,16 @@ syncNick();
 window.__kulkiLeave=leave;
 function ovl(t,s,c,btns,wait){$('#ov').className='on '+c;$('#ovT').textContent=t;$('#ovS').textContent=s+(wait?' Czekaj, aż host zacznie rewanż.':'');const B=$('#ovB');B.innerHTML='';
  btns.forEach(([l,k,f])=>{const e=document.createElement('button');e.className='btn '+k;e.textContent=l;e.onclick=f;B.append(e)})}
-</script></body></html>
+</script><script>
+/* ===== ekran startowy (styl Monopoly) ===== */
+(function(){
+  document.querySelectorAll('.kl-l').forEach(function(el){el.dataset.t.split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i);b.textContent=c;el.appendChild(b)})});
+  var em=['○','△','□','🔴','○','△','□','🔵','○','△','□','🔴'];
+  document.querySelectorAll('.kl-bg').forEach(function(bg){em.forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})});
+  var jp=document.getElementById('klJoinPane'),rp=document.getElementById('klRulesPane');
+  document.getElementById('klJoinBtn').onclick=function(){var on=jp.style.display!=='block';jp.style.display=on?'block':'none';rp.style.display='none';if(on)setTimeout(function(){document.getElementById('jc').focus()},60)};
+  document.getElementById('klRulesBtn').onclick=function(){var on=rp.style.display!=='block';rp.style.display=on?'block':'none';jp.style.display='none'};
+  document.getElementById('jc').addEventListener('keydown',function(e){if(e.key==='Enter'){var j=document.getElementById('bJoin');if(!j.disabled)j.click()}});
+})();
+</script>
+</body></html>
