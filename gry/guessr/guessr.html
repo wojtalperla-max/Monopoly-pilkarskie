@@ -8,13 +8,22 @@
 <h1>GUESS<b>R</b></h1><div class="sub">Zgadnij, co to jest – sam albo ze znajomymi!</div>
 <div class="row" id="tabs"></div>
 
-<div id="lobby" class="card"><div class="lob">
-<div class="pick"><input id="nick" placeholder="Twój nick…" maxlength="14" autocomplete="off"><input type="color" id="col" aria-label="Twój kolor"></div>
-<button class="pri" id="bSolo">▶ Gra solo</button>
-<button class="pri" id="bCreate">＋ Utwórz pokój dla znajomych</button>
-<div class="in"><input id="jc" placeholder="Kod pokoju" maxlength="4" autocomplete="off" style="text-transform:uppercase"><button id="bJoin">Dołącz</button></div>
+<div id="lobby" class="gz">
+<div class="gz-bg" aria-hidden="true"><span style="left:5%;animation-duration:14s;animation-delay:-0s">❓</span><span style="left:17%;animation-duration:19s;animation-delay:-4s">🎯</span><span style="left:29%;animation-duration:24s;animation-delay:-8s">🔍</span><span style="left:41%;animation-duration:18s;animation-delay:-12s">🧩</span><span style="left:53%;animation-duration:23s;animation-delay:-3s">💡</span><span style="left:65%;animation-duration:17s;animation-delay:-7s">❔</span><span style="left:77%;animation-duration:22s;animation-delay:-11s">🏆</span><span style="left:89%;animation-duration:16s;animation-delay:-2s">🎲</span></div>
+<div class="gz-wrap">
+<h1 class="gz-logo" aria-label="GuessR"><b style="--i:0">G</b><b style="--i:1">U</b><b style="--i:2">E</b><b style="--i:3">S</b><b style="--i:4">S</b><b style="--i:5">R</b></h1>
+<div class="gz-tiles" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+<p class="gz-sub">Zgadnij, co to jest – sam albo ze znajomymi!</p>
+<div class="gz-card"><div class="pick"><input id="nick" placeholder="Twój nick…" maxlength="14" autocomplete="off"><input type="color" id="col" aria-label="Twój kolor"></div></div>
+<div class="gz-main">
+<button class="gz-btn gz-gold" id="bSolo"><span class="gz-ic">▶</span>GRA SOLO</button>
+<button class="gz-btn gz-white" id="bCreate"><span class="gz-ic">＋</span>UTWÓRZ POKÓJ</button>
+<button class="gz-btn gz-ghost" id="bJoinToggle" type="button"><span class="gz-ic">🔑</span>DOŁĄCZ DO POKOJU</button>
+</div>
+<div class="gz-pane" id="joinPane"><h3>Kod pokoju</h3><div class="in"><input id="jc" placeholder="Kod pokoju" maxlength="4" autocomplete="off" style="text-transform:uppercase"><button id="bJoin" class="gz-btn gz-gold gz-small">Dołącz</button></div></div>
 <small id="lobinfo"></small>
-</div></div>
+</div>
+</div>
 
 <div id="game" class="hid">
 <div class="card" id="roomBox"><div class="code" id="rc"></div><div class="pl" id="pl"></div><div class="feed" id="feed"></div></div>
@@ -31,6 +40,7 @@
 
 <div id="ed"><div class="card" id="edc"></div></div>
 
+<script>document.getElementById("bJoinToggle").onclick=function(){var p=document.getElementById("joinPane");p.classList.toggle("open");if(p.classList.contains("open"))document.getElementById("jc").focus()};</script>
 <script>
 /* most do hosta (index.html): pokoje online przez Firebase + nick + kolor + statystyki */
 (function(){
