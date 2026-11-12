@@ -4,13 +4,53 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Prawda czy Wyzwanie 🔥</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Bowlby+One&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="pcw.css">
 </head>
-<body>
+<body class="menu">
 <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+<section id="start">
+ <div class="st-bg" aria-hidden="true"></div>
+ <div class="st-wrap">
+  <div class="st-logo" role="img" aria-label="Prawda czy Wyzwanie" id="stLogo">
+   <div class="st-row" id="stR1"></div>
+   <div class="st-czy">czy</div>
+   <div class="st-row w" id="stR2"></div>
+  </div>
+  <div class="st-tiles" aria-hidden="true"><i>💬</i><i>🌶</i><i>🔥</i><i>⚡</i></div>
+  <p class="st-sub">Gra imprezowa 18+ · odwaga mile widziana</p>
+
+  <div class="st-panel">
+   <label class="st-lab" for="stInp">Kto gra?</label>
+   <div class="st-add"><input id="stInp" maxlength="16" placeholder="Imię gracza…" autocomplete="off"><button id="stAdd" type="button">Dodaj</button></div>
+   <div class="st-chips" id="stChips"></div>
+  </div>
+
+  <div class="st-panel">
+   <span class="st-lab" id="stHeatLab">Jak ostro?</span>
+   <div class="st-heat" id="stHeat" role="radiogroup" aria-labelledby="stHeatLab">
+    <button type="button" role="radio" data-l="1"><i>🌶</i>Lekko</button>
+    <button type="button" role="radio" data-l="2"><i>🌶🌶</i>Ostro</button>
+    <button type="button" role="radio" data-l="3"><i>🌶🌶🌶</i>Bez hamulców</button>
+   </div>
+  </div>
+
+  <button class="st-go" id="stGo" type="button">🔥 Zaczynamy</button>
+  <div class="st-rules" id="stRules">
+   <p>Wybierz Prawdę albo Wyzwanie. Karta się odwraca i masz pytanie albo zadanie do wykonania.</p>
+   <p>Dodaj graczy, a gra sama pokaże, czyja kolej. Poziom ostrości możesz zmienić w każdej chwili.</p>
+   <p>Nie chcesz odpowiadać? Pijesz łyk i losujesz inną kartę. Szanuj granice innych.</p>
+  </div>
+  <button class="st-link" id="stRulesBtn" type="button">📜 Jak grać?</button>
+  <p class="st-note">Pij odpowiedzialnie. 💜</p>
+ </div>
+</section>
 <main>
+  <button class="st-back" id="toMenu" type="button">← Menu</button>
   <h1>Prawda czy Wyzwanie</h1>
   <div class="sub">Gra imprezowa 18+ · odwaga mile widziana</div>
+  <div class="lv" id="lv"><button data-l="1">🌶 Lekko</button><button data-l="2">🌶🌶 Ostro</button><button data-l="3">🌶🌶🌶 Gorąco</button></div>
   <div class="who" id="who"></div>
   <div class="scene"><div class="card" id="card">
     <div class="face front"><div class="em">🔥</div><p>Wybierz: prawda czy wyzwanie?</p></div>
@@ -128,6 +168,42 @@ $("add").onclick=()=>{const v=$("inp").value.trim();if(v){players.push(v);$("inp
 $("inp").onkeydown=e=>{if(e.key==="Enter")$("add").click()};
 $("clr").onclick=()=>{players=[];pi=0;who()};
 foot();
+
+// ===== EKRAN STARTOWY =====
+(function(){
+  const bg=document.querySelector('.st-bg'),em=['🔥','💬','⚡','🌶','💋','🎲','😈','💜','🔥','⚡','💬','🌶'];
+  em.forEach((e,i)=>{const s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)});
+  [['stR1','PRAWDA',0],['stR2','WYZWANIE',6]].forEach(([id,t,o])=>{const r=$(id);t.split('').forEach((c,i)=>{const e=document.createElement('b');e.style.setProperty('--i',i+o);e.textContent=c;r.appendChild(e)})});
+  const chips=$('stChips');
+  function renderChips(){
+    chips.innerHTML='';
+    if(!players.length){const h=document.createElement('span');h.className='st-hint';h.textContent='Możesz grać bez imion. Dodasz je też w trakcie gry.';chips.append(h);return}
+    players.forEach((n,i)=>{
+      const c=document.createElement('span');c.className='st-chip';c.append(n);
+      const x=document.createElement('button');x.type='button';x.textContent='✕';x.setAttribute('aria-label','Usuń gracza '+n);
+      x.onclick=()=>{players.splice(i,1);pi=0;renderChips()};
+      c.append(x);chips.append(c);
+    });
+  }
+  function addP(){const v=$('stInp').value.trim();if(!v)return;players.push(v);$('stInp').value='';renderChips();$('stInp').focus()}
+  $('stAdd').onclick=addP;
+  $('stInp').onkeydown=e=>{if(e.key==='Enter')addP()};
+  function setLvl(n){
+    lvl=n;
+    document.querySelectorAll('#stHeat button,#lv button').forEach(b=>{
+      const on=+b.dataset.l===n;b.classList.toggle('on',on);b.setAttribute('aria-checked',on)});
+  }
+  document.querySelectorAll('#stHeat button,#lv button').forEach(b=>b.onclick=()=>setLvl(+b.dataset.l));
+  $('stRulesBtn').onclick=()=>$('stRules').classList.toggle('on');
+  $('stGo').onclick=()=>{
+    document.body.classList.remove('menu');
+    $('card').classList.remove('flip');flipped=false;
+    pi=players.length?players.length-1:0;
+    who();window.scrollTo(0,0);
+  };
+  $('toMenu').onclick=()=>{document.body.classList.add('menu');renderChips()};
+  setLvl(lvl);renderChips();
+})();
 </script>
 </body>
 </html>
