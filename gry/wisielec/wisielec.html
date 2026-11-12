@@ -4,23 +4,31 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Wisielec Online</title>
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Bowlby+One&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="wisielec.css">
 </head>
 <body>
 <div class="wrap">
 
 <section id="home" class="card">
-  <svg class="mini" viewBox="0 0 300 340"><g class="gal"><path class="st" d="M30 310H190M70 310V40H200M70 90L120 40M200 40V80"/><g id="m"><circle cx="200" cy="105" r="25" stroke="#f8fafc" style="stroke-width:9"/><path d="M200 130V210M200 150L165 185M200 150L235 185M200 210L170 265M200 210L230 265" stroke="#f8fafc" style="stroke-width:9"/></g></g></svg>
-  <h1>WISIELEC</h1>
-  <p class="sub">Zgadujcie hasło razem, przez kod pokoju.</p>
-  <p class="small" id="net" style="margin:-12px 0 18px"></p>
-  <div class="stack">
-    <div><label for="nick">Twój pseudonim</label><input id="nick" maxlength="14" placeholder="np. Kuba" autocomplete="off"></div>
-    <button class="btn" id="bCreate">Utwórz pokój</button>
-    <div class="or">albo dołącz do znajomych</div>
-    <div class="row"><input id="code" maxlength="5" placeholder="KOD" autocomplete="off"><button class="btn alt" id="bJoin">Dołącz</button></div>
-    <button class="btn ghost" id="bSolo">Zagraj solo</button>
+  <div class="wh-bg" aria-hidden="true" id="whBg"></div>
+  <div class="wh-wrap">
+    <div class="wh-logo" role="img" aria-label="Wisielec" id="whLogo"></div>
+    <div class="wh-tiles" aria-hidden="true"><i>H</i><i>A</i><i>S</i><i>Ł</i><i>O</i></div>
+    <p class="wh-sub">Zgadujcie hasło razem, przez kod pokoju.</p>
+    <div class="wh-pane">
+      <label for="nick">Twój pseudonim</label>
+      <input id="nick" maxlength="14" placeholder="np. Kuba" autocomplete="off">
+      <button class="wh-btn wh-gold" id="bCreate"><span class="wh-ic">🎲</span><span>Utwórz pokój</span></button>
+    </div>
+    <div class="wh-or">albo dołącz do znajomych</div>
+    <div class="wh-pane">
+      <label for="code">Kod pokoju</label>
+      <input id="code" maxlength="5" placeholder="KOD" autocomplete="off">
+      <button class="wh-btn wh-white" id="bJoin"><span class="wh-ic">🚪</span><span>Dołącz</span></button>
+    </div>
+    <button class="wh-btn wh-ghost" id="bSolo"><span class="wh-ic">🧩</span><span>Zagraj solo</span></button>
+    <p class="wh-net" id="net"></p>
   </div>
 </section>
 
@@ -238,6 +246,10 @@ $('#code').addEventListener('keydown',e=>{if(e.key==='Enter')$('#bJoin').click()
 window.__wisRefresh=()=>{if(!R&&role!=='solo')initPrefs()};
 window.__wisLeave=()=>{try{reset()}catch(e){}};
 initPrefs();
+</script>
+<script>
+(function(){var lg=document.getElementById('whLogo');'WISIELEC'.split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i);b.textContent=c;lg.appendChild(b)});
+var bg=document.getElementById('whBg');['A','Ł','💀','?','Ż','👻','W','Ś','🕯️','Ó','Z','Ę'].forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})})();
 </script>
 </body>
 </html>
