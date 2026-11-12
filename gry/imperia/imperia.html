@@ -2,20 +2,34 @@
 <html lang="pl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Imperia – gra online</title>
-<link rel="stylesheet" href="imperia.css"></head><body>
-<div id="lobby" class="card">
-  <div class="logo-lobby" role="img" aria-label="Imperia"></div>
-  <h2 style="margin-top:0;text-align:center;font-size:0;line-height:0">Imperia</h2>
-  <p>Zbuduj królestwo, odkrywaj nieznane ziemie i rywalizuj o dominację. Stwórz pokój lub dołącz do rozgrywki znajomych.</p>
-  <input id="nm" placeholder="Twoje imię" maxlength="16"><div id="nmacc" style="display:none;margin:8px 0;color:var(--muted)"></div>
-  <input id="kingdom" placeholder="Nazwa królestwa (np. Złota Korona)" maxlength="24">
-  <input id="cd" placeholder="Kod pokoju (np. ZAMEK7)" maxlength="8">
-  <div class="row"><button class="p" onclick="enter(true)">Utwórz pokój</button><button onclick="enter(false)">Dołącz</button></div>
-  <div class="err" id="er"></div>
-  <hr><b>Gra lokalna</b><p><small>Tryb testowy na jednym urządzeniu. Ustaw <b>Ludzi: 0</b> i min. 2 AI, żeby włączyć <b>tryb obserwatora</b> (bez mgły wojny, możesz pomijać tury i oglądać statystyki).</small></p>
-  <div class="row">Ludzi: <select id="ln" onchange="localCivUI()"><option value="0">0 (obserwator)</option><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select> AI: <select id="la"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select> Mapa: <select id="ls"><option value="s">Mała</option><option value="m" selected>Średnia</option><option value="l">Duża</option><option value="xl">Bardzo duża</option><option value="xxl">Ogromna</option></select></div>
-  <h3 style="margin:18px 0 8px;color:#e7d2aa">Cywilizacje graczy</h3><div id="local-civs" class="grid"></div>
-  <button onclick="localGame()">Graj lokalnie</button>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap"><link rel="stylesheet" href="imperia.css"></head><body>
+<div id="lobby" class="il">
+  <div class="il-bg" id="ilBg" aria-hidden="true"></div>
+  <div class="il-wrap">
+    <div class="logo-lobby il-logo" role="img" aria-label="Imperia"></div>
+    <p class="il-sub">Zbuduj królestwo. Odkryj ziemie. Zdominuj świat.</p>
+    <div class="il-main">
+      <button type="button" id="ilCreate" class="il-btn il-gold"><span class="il-ic">👑</span><span>Utwórz pokój</span></button>
+      <button type="button" id="ilJoin" class="il-btn il-white"><span class="il-ic">🚪</span><span>Dołącz do znajomego</span></button>
+    </div>
+    <div id="ilRoomPane" class="il-pane">
+      <h3 id="ilRoomTitle">Utwórz pokój</h3>
+      <div id="nmacc" style="display:none;margin:0 0 8px;color:var(--muted)"></div>
+      <input id="nm" placeholder="Twoje imię" maxlength="16" autocomplete="off">
+      <input id="kingdom" placeholder="Nazwa królestwa (np. Złota Korona)" maxlength="24" autocomplete="off">
+      <input id="cd" placeholder="Kod pokoju (np. ZAMEK7)" maxlength="8" autocomplete="off" style="text-transform:uppercase">
+      <button type="button" id="ilGo" class="il-btn il-gold il-go"><span class="il-ic">⚔️</span><span id="ilGoTxt">Utwórz pokój</span></button>
+    </div>
+    <div class="err il-err" id="er" role="alert"></div>
+    <div id="ilLocalPane" class="il-pane il-local">
+      <h3>Gra lokalna</h3>
+      <p><small>Tryb na jednym urządzeniu. Ustaw <b>Ludzi: 0</b> i min. 2 AI, żeby włączyć <b>tryb obserwatora</b> (bez mgły wojny, możesz pomijać tury i oglądać statystyki).</small></p>
+      <div class="row">Ludzi: <select id="ln" onchange="localCivUI()"><option value="0">0 (obserwator)</option><option>1</option><option selected>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select> AI: <select id="la"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option></select> Mapa: <select id="ls"><option value="s">Mała</option><option value="m" selected>Średnia</option><option value="l">Duża</option><option value="xl">Bardzo duża</option><option value="xxl">Ogromna</option></select></div>
+      <h3 style="margin:18px 0 8px;color:#e7d2aa">Cywilizacje graczy</h3><div id="local-civs" class="grid"></div>
+      <button type="button" class="il-btn il-gold il-go" onclick="localGame()"><span class="il-ic">🎲</span><span>Graj lokalnie</span></button>
+    </div>
+    <button type="button" id="ilLocal" class="il-local-link">🎲 Gra lokalna na jednym urządzeniu</button>
+  </div>
 </div>
 <div id="room" class="card" style="display:none"></div>
 <div id="st" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:5;padding:16px;overflow:auto"><div class="card" id="stc" style="margin:auto"></div></div>
@@ -1396,4 +1410,26 @@ function hudBattle(){
   w.addEventListener('dragstart',e=>e.preventDefault());
 })();
 impLobbyInfo();localCivUI();
-</script></body></html>
+</script><script>
+/* ===== ekran startowy (styl Monopoly) ===== */
+(function(){
+  var bg=document.getElementById('ilBg');if(!bg)return;
+  ['👑','🏰','⚔️','🛡️','🗺️','🏹','🪙','🐎','👑','⚔️','🏰','🪙'].forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)});
+  var rp=document.getElementById('ilRoomPane'),lp=document.getElementById('ilLocalPane'),go=document.getElementById('ilGo'),mode='';
+  function show(el,on){el.style.display=on?'block':'none'}
+  function setMode(m){
+    var er=document.getElementById('er');if(er)er.textContent='';
+    if(mode===m){mode='';show(rp,false);return}
+    mode=m;show(lp,false);show(rp,true);
+    document.getElementById('ilRoomTitle').textContent=m==='create'?'Utwórz pokój':'Dołącz do pokoju';
+    document.getElementById('ilGoTxt').textContent=m==='create'?'Utwórz pokój':'Dołącz';
+    setTimeout(function(){var t=document.getElementById('cd');if(t)t.focus()},60);
+  }
+  document.getElementById('ilCreate').onclick=function(){setMode('create')};
+  document.getElementById('ilJoin').onclick=function(){setMode('join')};
+  go.onclick=function(){enter(mode==='create')};
+  document.getElementById('cd').addEventListener('keydown',function(e){if(e.key==='Enter')go.click()});
+  document.getElementById('ilLocal').onclick=function(){mode='';show(rp,false);show(lp,lp.style.display!=='block')};
+})();
+</script>
+</body></html>
