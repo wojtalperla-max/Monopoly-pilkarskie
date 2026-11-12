@@ -2,17 +2,32 @@
 <html lang="pl"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kropki i Kwadraty</title>
-<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="kropki-kwadraty.css"></head><body>
 <div id="app">
 <header><b class="logo">Kropki i Kwadraty</b><button id="mu">🔊</button></header>
 <section id="menu" class="scr on">
-<div class="me" id="me"><i></i><input id="nick" maxlength="14" placeholder="Twój nick" autocomplete="off" aria-label="Twój nick"></div>
-<div class="card">
-<button id="bC" class="big">Utwórz pokój</button>
-<div class="row"><input id="cd" maxlength="5" placeholder="KOD" autocomplete="off"><button id="bJ" class="go">Dołącz</button></div>
-<button id="bL" class="ghost">Gra lokalna na jednym ekranie</button>
-<p id="nt">2–6 graczy · Zamykaj kwadraty i zbieraj punkty</p><p id="nt2" class="hint"></p>
+<div class="km-bg" aria-hidden="true" id="kmBg"></div>
+<div class="km-wrap">
+  <div class="km-logo" role="img" aria-label="Kropki i Kwadraty">
+    <div class="km-row" id="kmR1"></div>
+    <div class="km-i">i</div>
+    <div class="km-row" id="kmR2"></div>
+  </div>
+  <div class="km-tiles" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <p class="km-sub">Zamykaj kwadraty i zbieraj punkty.</p>
+  <div class="km-pane">
+    <div class="me" id="me"><i></i><input id="nick" maxlength="14" placeholder="Twój nick" autocomplete="off" aria-label="Twój nick"></div>
+    <button id="bC" class="km-btn km-gold"><span class="km-ic">🎲</span><span>Utwórz pokój</span></button>
+  </div>
+  <div class="km-or">albo dołącz do znajomych</div>
+  <div class="km-pane">
+    <label for="cd">Kod pokoju</label>
+    <input id="cd" class="km-code" maxlength="5" placeholder="KOD" autocomplete="off">
+    <button id="bJ" class="km-btn km-white"><span class="km-ic">🚪</span><span>Dołącz</span></button>
+  </div>
+  <button id="bL" class="km-btn km-ghost"><span class="km-ic">👥</span><span>Gra lokalna na jednym ekranie</span></button>
+  <p id="nt">2–6 graczy · Zamykaj kwadraty i zbieraj punkty</p><p id="nt2" class="hint km-hint"></p>
 </div></section>
 <section id="lobby" class="scr">
 <div class="top"><button id="lv" class="ghost">← Wyjdź</button><div class="code" id="lc" title="Kopiuj kod"></div><span></span></div>
@@ -250,4 +265,9 @@ $('#nick').addEventListener('input',e=>{if(e.target.readOnly)return;me.name=clea
 window.__kroLeave=function(){try{if(R)leave()}catch(e){}};
 window.__kroRefresh=function(){if(!R)initPrefs()};
 initPrefs();
-</script></body></html>
+</script><script>
+(function(){var cols=['#ff5d73','#ffc928','#2fd68f','#2fb8ff','#d3b8ff'];
+[['kmR1','KROPKI',0],['kmR2','KWADRATY',6]].forEach(function(x){var r=document.getElementById(x[0]);x[1].split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i+x[2]);b.style.color=cols[(i+x[2])%5];b.textContent=c;r.appendChild(b)})});
+var bg=document.getElementById('kmBg');['🔴','🟦','🟨','🟩','🟪','⭐','🔴','🟦','🟨','🟩','🟪','⭐'].forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})})();
+</script>
+</body></html>
