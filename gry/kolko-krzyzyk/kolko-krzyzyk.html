@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Kółko i krzyżyk – Neon</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="kolko-krzyzyk.css">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="kolko-krzyzyk.css">
 </head>
 <body>
 <div class="bg"><i></i><i></i><i></i></div>
@@ -13,19 +13,37 @@
 <main>
 <div class="logo"><svg class="lx" viewBox="0 0 100 100"><path pathLength="1" d="M24 24L76 76"/><path pathLength="1" d="M76 24L24 76"/></svg><svg class="lo" viewBox="0 0 100 100"><circle pathLength="1" cx="50" cy="50" r="30"/></svg></div>
 <h1>Kółko i krzyżyk</h1>
-<section id="menu" class="card">
-  <p class="sub">Trzy w rzędzie. Mała lub ogromna plansza.</p>
-  <div><label for="nm">Twój nick</label><input id="nm" maxlength="16" placeholder="np. Kuba" autocomplete="off" style="margin-top:6px"></div>
-  <div><label>Plansza</label><div class="chips" id="sz" style="margin-top:6px"><button class="chip on" data-s="3">Normalna<small>3 × 3</small></button><button class="chip" data-s="8">Większa<small>8 × 8</small></button><button class="chip" data-s="12">Ogromna<small>12 × 12</small></button></div></div>
-  <button class="btn" id="mk" disabled>Utwórz pokój online</button>
-  <div class="or">albo dołącz do znajomego</div>
-  <div class="r2"><input id="jc" maxlength="5" placeholder="KOD" style="text-transform:uppercase;letter-spacing:.2em;text-align:center"><button class="btn g" id="jn" disabled>Dołącz</button></div>
-  <div class="r2"><button class="btn g" id="bot">🤖 Z komputerem</button><button class="btn g" id="loc">👥 Lokalnie</button></div>
-  <p class="err" id="err"></p><p class="note" id="mpn">Łączę z trybem online…</p>
+<section id="menu" class="ms">
+  <div class="ms-bg" aria-hidden="true"></div>
+  <div class="ms-wrap">
+    <div class="ms-xo" aria-hidden="true"><i class="x">✕</i><i class="o">○</i><i class="x">✕</i></div>
+    <div class="ms-logo" role="img" aria-label="Kółko i krzyżyk"><div class="ms-l1" data-t="KÓŁKO"></div><div class="ms-l2" data-t="I KRZYŻYK"></div></div>
+    <p class="ms-sub">Trzy w rzędzie. Zero litości.</p>
+    <div class="ms-panel">
+      <label for="nm">Twój nick</label>
+      <input id="nm" maxlength="16" placeholder="np. Kuba" autocomplete="off">
+      <label>Plansza</label>
+      <div class="chips" id="sz"><button class="chip on" data-s="3">Normalna<small>3 × 3</small></button><button class="chip" data-s="8">Większa<small>8 × 8</small></button><button class="chip" data-s="12">Ogromna<small>12 × 12</small></button></div>
+    </div>
+    <div class="ms-main">
+      <button class="ms-btn ms-gold" id="mk" disabled><span class="ms-ic">🏠</span><span>Utwórz pokój online</span></button>
+      <button class="ms-btn ms-white" id="msJoinBtn" type="button"><span class="ms-ic">🚪</span><span>Dołącz do znajomego</span></button>
+    </div>
+    <div id="msJoinPane" class="ms-pane"><label for="jc" style="text-align:center">Kod pokoju od znajomego</label>
+      <div class="ms-join"><input id="jc" maxlength="5" placeholder="KOD" autocomplete="off" style="text-transform:uppercase"><button class="ms-btn ms-green" id="jn" disabled>Dołącz</button></div></div>
+    <div class="ms-two"><button class="ms-btn ms-ghost" id="bot">🤖 Z komputerem</button><button class="ms-btn ms-ghost" id="loc">👥 Lokalnie</button></div>
+    <p class="err ms-err" id="err"></p><p class="note ms-note" id="mpn">Łączę z trybem online…</p>
+  </div>
 </section>
-<section id="lobby" class="card hidden">
-  <label style="text-align:center">Kod pokoju – podaj go znajomemu</label><div class="code" id="cb"></div><p class="note" id="cp">Kliknij kod, aby skopiować</p>
-  <p class="status">Czekam na przeciwnika…</p><button class="btn g" id="lv">Anuluj</button>
+<section id="lobby" class="ms hidden">
+  <div class="ms-bg" aria-hidden="true"></div>
+  <div class="ms-wrap">
+    <div class="ms-xo" aria-hidden="true"><i class="x">✕</i><i class="o">○</i><i class="x">✕</i></div>
+    <div class="ms-logo" role="img" aria-label="Kółko i krzyżyk"><div class="ms-l1" data-t="KÓŁKO"></div><div class="ms-l2" data-t="I KRZYŻYK"></div></div>
+    <div class="ms-lobby"><span class="ms-badge">⏳ Poczekalnia</span>
+      <label style="text-align:center;display:block;margin-top:12px">Kod pokoju – podaj go znajomemu</label><div class="code" id="cb"></div><p class="note ms-note" id="cp">Kliknij kod, aby skopiować</p>
+      <p class="status">Czekam na przeciwnika…</p><button class="ms-btn ms-ghost" id="lv">Anuluj</button></div>
+  </div>
 </section>
 <section id="game" class="hidden" style="flex-direction:column;gap:16px">
   <div class="top"><span class="tag" id="tag"></span><button class="btn g" id="gl" style="padding:8px 16px;font-size:14px">Wyjdź</button></div>
@@ -178,6 +196,18 @@ $('#bd').addEventListener('click',e=>{const el=e.target.closest('.c');if(!el||!S
  if(R){$('#mk').disabled=false;$('#jn').disabled=false;$('#mpn').textContent='Gra online: utwórz pokój i podaj kod znajomemu. Wyniki zapisują się w statystykach zalogowanego konta.'}else $('#mpn').textContent='Tryb online niedostępny (brak połączenia z Firebase). Tryby z komputerem i lokalny działają.';
  try{const n=window.__tttNick&&window.__tttNick();if(n&&!$('#nm').value){$('#nm').value=n.slice(0,16);$('#nm').dispatchEvent(new Event('input'))}}catch(e){}})();
 window.__tttLeave=leave;
+})();
+</script>
+<script>
+/* ===== ekran startowy (styl Monopoly) ===== */
+(function(){
+  document.querySelectorAll('.ms-l1,.ms-l2').forEach(function(el){
+    el.dataset.t.split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i+(el.className==='ms-l2'?5:0));b.textContent=c==' '?'\u00a0':c;el.appendChild(b)})});
+  var em=['✕','○','✕','○','🤖','👥','✕','○','🏆','✕','○','✕'];
+  document.querySelectorAll('.ms-bg').forEach(function(bg){em.forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.className=e==='✕'?'x':e==='○'?'o':'';s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})});
+  var jp=document.getElementById('msJoinPane');
+  document.getElementById('msJoinBtn').onclick=function(){var on=jp.style.display!=='block';jp.style.display=on?'block':'none';if(on)setTimeout(function(){document.getElementById('jc').focus()},60)};
+  document.getElementById('jc').addEventListener('keydown',function(e){if(e.key==='Enter'){var j=document.getElementById('jn');if(!j.disabled)j.click()}});
 })();
 </script>
 </body>
