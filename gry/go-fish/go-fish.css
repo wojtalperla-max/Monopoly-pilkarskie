@@ -1,0 +1,81 @@
+/* ==========================================================
+   go-fish — wygląd i motyw gry (style wydzielone z go-fish.html)
+   ========================================================== */
+
+:root{--bg1:#233384;--bg2:#121a52;--ring:#2f4fb0;--fg:#f4f6ff;--mut:#a9b6ee;--gold:#f6c445;--panel:rgba(8,14,60,.55);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg1:#1d2a73;--bg2:#0d1340}}
+:root[data-theme="dark"]{--bg1:#1d2a73;--bg2:#0d1340}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%}
+body{background:radial-gradient(ellipse at 50% 30%,var(--bg1),var(--bg2) 80%) fixed;color:var(--fg);font:16px/1.4 "Trebuchet MS",system-ui,-apple-system,"Segoe UI",sans-serif;overflow-x:hidden}
+main{position:relative;z-index:2;max-width:560px;margin:0 auto;padding:14px 12px 10px;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column}
+.bgd{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.rg{position:absolute;border-radius:50%;border:solid var(--ring);animation:fl 7s ease-in-out infinite alternate}
+@keyframes fl{to{transform:translateY(-16px)}}
+.sw{position:absolute;font-size:22px;opacity:.55;animation:sw 28s linear infinite}
+@keyframes sw{from{transform:translateX(-60px)}to{transform:translateX(115vw)}}
+h1{font:900 36px/1 Impact,"Arial Black",sans-serif;margin:8px 0 4px;color:var(--gold);letter-spacing:1px;text-shadow:0 3px 0 #3a2208}
+.sub{color:var(--mut);margin:0 0 16px}
+.box{background:var(--panel);border:1px solid #fff2;border-radius:16px;padding:16px;margin-bottom:12px}
+input{width:100%;font:inherit;padding:12px;border-radius:10px;border:1px solid #fff3;background:#0a114a;color:var(--fg);margin-bottom:10px}
+select{width:100%;font:inherit;padding:12px;border-radius:10px;border:1px solid #fff3;background:#0a114a;color:var(--fg);margin-bottom:10px}
+input.code{text-transform:uppercase;letter-spacing:6px;text-align:center;font-size:22px;font-weight:700}
+button{font:inherit;font-weight:800;padding:12px 16px;border-radius:12px;border:0;background:linear-gradient(#ffd45a,#e9961f);color:#3a2208;cursor:pointer;width:100%;box-shadow:0 3px 0 #8a5510}
+button.alt{background:transparent;color:var(--fg);border:1px solid #fff4;box-shadow:none}
+.err{color:#ffb4a8;min-height:22px;margin:4px 0}.hid{display:none!important}
+.big{font:900 46px/1 Impact,"Arial Black",sans-serif;letter-spacing:8px;text-align:center;color:var(--gold)}
+.lbl{color:var(--mut);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:6px}
+.pl{padding:7px 0;border-bottom:1px solid #fff1}.cnt{font-size:13px;color:var(--mut)}
+/* karty */
+.c{font-size:var(--w,70px);width:1em;height:1.4em;border-radius:.09em;position:relative;flex:none;user-select:none;-webkit-user-select:none}
+.c.f{background:linear-gradient(170deg,#e4e5ea,#cfd0d8);box-shadow:0 .01em .05em #000a,inset 0 0 0 .012em #fff8;overflow:hidden;color:#17171d}
+.c.f.r{color:#d92b3a}
+.rk{position:absolute;left:.08em;top:.04em;font:700 .3em/1 "Trebuchet MS",system-ui,sans-serif;text-align:center;z-index:2}
+.rk small{display:block;font-size:.95em;margin-top:.02em}
+.an{position:absolute;right:-.12em;bottom:.1em;font-size:.78em;line-height:1;filter:saturate(.95)}
+.c.k{background:#cfd0d8;box-shadow:0 .01em .05em #000b}
+.c.k::after{content:"★";position:absolute;inset:.06em;border-radius:.06em;background:linear-gradient(#4d3597,#3a2680);display:flex;align-items:center;justify-content:center;color:#ef6585;font-size:.62em;text-shadow:0 0 .1em #ff9ab0}
+/* ręka */
+.hand{position:relative;height:calc(var(--w,92px)*1.75);margin-top:auto}
+.hand .c{position:absolute;bottom:0;transition:transform .18s;cursor:pointer}
+.hand .c:hover{transform:translateY(-.1em)}
+.hand .c.sel{transform:translateY(-.3em);box-shadow:0 0 0 .03em var(--gold),0 .06em .2em #000c}
+.hand .c.n{animation:deal .5s ease-out backwards}
+@keyframes deal{from{opacity:0;transform:translateY(-70vh) scale(.6)}}
+/* gracze */
+.opp{text-align:center;position:relative}
+.ring{width:62px;height:62px;border-radius:50%;margin:3px auto;display:flex;align-items:center;justify-content:center;font-size:32px;background:var(--cl,#3b6fd6);border:4px solid #2a8be0;box-shadow:0 2px 6px #0007;transition:.2s}
+.opp.turn .ring{border-color:var(--gold);box-shadow:0 0 0 3px #f6c44566,0 0 20px #f6c445aa}
+.opp.pick{cursor:pointer}.opp.pick .ring{animation:pulse .9s infinite alternate}
+@keyframes pulse{to{transform:scale(1.12)}}
+.on{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bkc{font-weight:800;color:var(--gold);font-size:15px;text-shadow:0 1px 0 #0006}.bkc b{color:#ef6585}
+.chips{display:flex;gap:3px;justify-content:center;flex-wrap:wrap;font-size:11px;min-height:4px}
+.chips span{background:var(--gold);color:#3a2208;border-radius:5px;padding:0 5px;font-weight:800}
+.tm{height:10px;width:70px;margin:2px auto;background:#161b49;border-radius:6px;overflow:hidden;border:1px solid #fff3}
+.tm i{display:block;height:100%;width:100%;background:linear-gradient(#ffe27a,#f0b429);animation:tm 40s linear forwards}
+@keyframes tm{to{width:0}}
+.bks{display:flex;justify-content:center;--w:34px;height:calc(var(--w)*1.4);overflow:hidden;margin:0 auto}
+.bks .c{margin-left:calc(var(--w)*-.7)}.bks .c:first-child{margin-left:0}
+.top .bks{--w:62px;height:calc(var(--w)*.8);margin-top:-14px}
+.top .bks .c{margin-left:calc(var(--w)*-.6);transform:translateY(-38%)}
+.top .bks .c:first-child{margin-left:0}
+.midrow{display:grid;grid-template-columns:84px 1fr 84px;align-items:center;gap:4px;margin:10px 0}
+.midrow .opp .ring{width:52px;height:52px;font-size:26px}
+.center{text-align:center}
+.pile{--w:62px;position:relative;width:calc(var(--w)*1.1);height:calc(var(--w)*1.55);margin:0 auto 8px}
+.pile .c{position:absolute;left:0;background:#f1f1f5}
+.pile .c::after{inset:.07em}
+.pile b{position:absolute;left:50%;bottom:-12px;transform:translateX(-50%);z-index:9;background:#000;color:#fff;border-radius:50%;width:38px;height:38px;display:flex;align-items:center;justify-content:center;font-size:17px}
+.msg{font-size:17px;font-weight:700;min-height:48px;padding:0 4px}
+.msg div{font-size:14px;font-weight:600;color:var(--mut)}
+.hint{text-align:center;font-weight:800;color:var(--gold);min-height:26px;margin:4px 0}
+.me{text-align:center;margin-top:2px}
+.me .ring{width:54px;height:54px;font-size:28px;margin-top:0}
+.splash{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;gap:2vw;pointer-events:none;opacity:0;z-index:100}
+.splash.show{animation:pop 1.8s ease-out}
+@keyframes pop{0%{opacity:0;transform:scale(.3) rotate(-8deg)}14%{opacity:1;transform:scale(1.14) rotate(2deg)}24%{transform:scale(1) rotate(0)}82%{opacity:1}100%{opacity:0;transform:scale(1.12)}}
+.gf{font:900 clamp(70px,24vw,130px)/.88 Impact,"Arial Black",sans-serif;text-align:center;-webkit-text-stroke:.07em #3a2208;paint-order:stroke fill;filter:drop-shadow(0 .05em 0 #3a2208)}
+.gf div:first-child{color:#eceef5}
+.gf div:last-child{background:linear-gradient(#ffe27a,#e0861a);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:0;filter:drop-shadow(0 0 .02em #3a2208)}
+.mute{position:fixed;top:calc(env(safe-area-inset-top,0px) + 8px);right:8px;z-index:120;width:40px;height:40px;padding:0;border-radius:50%;font-size:18px;background:rgba(8,14,60,.7);box-shadow:none;border:1px solid #fff3;color:#fff}
+.fl{font-size:clamp(46px,15vw,86px);filter:drop-shadow(0 4px 0 #3a2208)}.fl.l{transform:scaleX(-1)}

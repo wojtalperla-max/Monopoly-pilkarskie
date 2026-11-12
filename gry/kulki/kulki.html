@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="pl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kulki – gra jak z Squid Game</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Nunito:wght@600;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="kulki.css"></head><body>
+<div id="bg"></div><canvas id="fx"></canvas>
+
+<section class="scr on" id="menu">
+ <div class="logo"><div class="shapes">○ △ □</div><h1>KULKI</h1><div style="color:var(--mut)">Parzysta czy nieparzysta? Zgarnij wszystkie kulki.</div></div>
+ <div class="card">
+  <label for="name">Twój pseudonim</label>
+  <input id="name" maxlength="16" placeholder="np. Gracz 456" value="Gracz 456">
+  <div class="grid">
+   <button class="btn" id="bBot">🤖 Graj z botem</button>
+   <button class="btn t onl" id="bCreate" disabled>🚪 Stwórz pokój</button>
+   <div class="row"><input id="jc" maxlength="4" placeholder="KOD" style="text-transform:uppercase;text-align:center;letter-spacing:.3em"><button class="btn g onl" id="bJoin" disabled style="flex:.9">DOŁĄCZ</button></div>
+  </div>
+  <div id="net">Łączenie z trybem online<span class="dots"></span></div>
+ </div>
+ <div class="card" style="font-size:14px;color:var(--mut)"><b style="color:var(--ink)">Zasady:</b> każdy zaczyna z 10 kulkami. W swojej turze ukrywasz w dłoni od 1 kulki w górę, a przeciwnik zgaduje, czy ich liczba jest parzysta. Trafi – zabiera Ci tyle kulek, ile miałeś w dłoni. Pudło – to Ty zabierasz tyle jemu. Potem zamiana ról. Kto straci wszystkie, odpada.</div>
+</section>
+
+<section class="scr" id="lobby">
+ <div class="logo"><h1 style="font-size:64px">POKÓJ</h1></div>
+ <div class="card" style="text-align:center">
+  <div id="lobTxt">Podaj ten kod drugiemu graczowi</div>
+  <div class="code" id="codeBox"></div>
+  <div style="color:var(--mut);margin-bottom:14px">Czekam na przeciwnika<span class="dots"></span></div>
+  <div class="row"><button class="btn t" id="bCopy">KOPIUJ KOD</button><button class="btn g" id="bCancel">ANULUJ</button></div>
+ </div>
+</section>
+
+<section class="scr" id="game">
+ <div class="top"><button id="bQuit">← wyjdź</button><span class="role" id="rnd"></span></div>
+ <div class="pl op" id="pop"><div class="ph"><div><div class="big" id="no"></div><div class="role" id="ro"></div></div><div class="cnt" id="co"></div></div><div class="pile" id="po"></div></div>
+ <div class="stage"><div class="hand" id="hand">✊</div><div id="msg"></div><div id="shown"></div><div id="ctl"></div></div>
+ <div class="pl me" id="pmc"><div class="ph"><div><div class="big" id="nm"></div><div class="role" id="rm"></div></div><div class="cnt" id="cm" style="color:var(--pink)"></div></div><div class="pile" id="pm"></div></div>
+</section>
+
+<div id="ov"><div class="box"><h2 id="ovT"></h2><p id="ovS"></p><div class="grid" id="ovB"></div></div></div>
+
+<script>
+/* most do Firebase hosta (index.html): pokoje online dla Kulek */
+(function(){
+var P=window.parent,B=null;
+try{B=P&&P.kulkiBridge&&P.kulkiBridge()}catch(e){B=null}
+window.__kulkiNick=function(){try{return B&&B.nick()||''}catch(e){return''}};
+window.__kulkiStats=function(code,gid,players,r){try{if(B)B.stats(code,gid,players,r)}catch(e){}};
+if(!B||!B.net())return;
+window.claude={use:async function(){
+ if(!B.net())throw new Error('offline');
+ return{join:async function(name){
+  var uid=await B.auth();
+  window.__kulkiUid=uid;
+  var path='tttRooms/'+String(name).toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,40);
+  var ref=B.db.ref(path),pr=ref.child('peers'),ms=ref.child('msgs');
+  var peers={},h={},pc=[],gone=false;
+  var snap=await pr.once('value'),cur=snap.val()||{};
+  Object.keys(cur).forEach(function(k){peers[k]=1});
+  peers[uid]=1;
+  var startKey=ms.push().key;
+  await pr.child(uid).set({t:B.ts});
+  try{pr.child(uid).onDisconnect().remove()}catch(e){}
+  function fire(c){pc.forEach(function(f){try{f(c)}catch(e){console.error(e)}})}
+  var onAdd=pr.on('child_added',function(s){var k=s.key;if(k===uid||peers[k])return;peers[k]=1;fire({joined:[{peer:k,isMe:false}],left:[]})});
+  var onRem=pr.on('child_removed',function(s){var k=s.key;if(k===uid||!peers[k])return;delete peers[k];fire({joined:[],left:[{peer:k,isMe:false}]})});
+  var q=ms.orderByKey().startAt(startKey);
+  var onMsg=q.on('child_added',function(s){var v=s.val();if(!v||!v.t)return;var fs=h[v.t];if(!fs)return;var m={peer:v.peer,isMe:v.peer===uid,data:v.data===undefined?null:v.data};fs.slice().forEach(function(f){try{f(m)}catch(e){console.error(e)}})});
+  return{
+   peers:function(){return Object.keys(peers).map(function(k){return{peer:k,isMe:k===uid,sameTab:k===uid}})},
+   on:function(t,f){(h[t]=h[t]||[]).push(f);return function(){h[t]=(h[t]||[]).filter(function(x){return x!==f})}},
+   onPeers:function(f){pc.push(f);return function(){pc=pc.filter(function(x){return x!==f})}},
+   emit:function(t,d){if(gone)return Promise.resolve();var r=ms.push();var p=r.set({t:t,peer:uid,data:d===undefined?null:d,ts:B.ts});setTimeout(function(){r.remove().catch(function(){})},20000);return p},
+   leave:function(){if(gone)return;gone=true;try{pr.off('child_added',onAdd);pr.off('child_removed',onRem);q.off('child_added',onMsg)}catch(e){}
+    try{pr.child(uid).onDisconnect().cancel()}catch(e){}
+    pr.child(uid).remove().then(function(){return pr.once('value')}).then(function(s){if(!s.val())return ref.remove()}).catch(function(){})}
+  }}}}};
+})();
+</script>
+<script>
+const $=s=>document.querySelector(s),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+let roomMod=null,room=null,G=null,isHost=false,guestPeer=null,hostPeer=null,curCode='',helloT=null,myName='Gracz',unsubs=[];
+const TOPICS=['hello','start','hid','guess','reveal'];
+// tło
+for(let i=0;i<16;i++){const s=document.createElement('span');s.textContent=['○','△','□'][i%3];s.style.cssText=`left:${Math.random()*100}%;animation-duration:${14+Math.random()*18}s;animation-delay:-${Math.random()*20}s;font-size:${24+Math.random()*40}px;color:${i%2?'#ed1b76':'#1fb5a6'}`;$('#bg').append(s)}
+// dźwięk
+let AC;function beep(f=440,d=.12,t='sine',v=.05){try{AC=AC||new AudioContext();const o=AC.createOscillator(),g=AC.createGain();o.type=t;o.frequency.value=f;g.gain.value=v;g.gain.exponentialRampToValueAtTime(.0001,AC.currentTime+d);o.connect(g);g.connect(AC.destination);o.start();o.stop(AC.currentTime+d)}catch(e){}}
+// konfetti
+const cv=$('#fx'),cx=cv.getContext('2d');let P=[],raf=0;
+function fit(){cv.width=innerWidth;cv.height=innerHeight}fit();addEventListener('resize',fit);
+function burst(x,y,n,cols){for(let i=0;i<n;i++){const a=Math.random()*6.28,v=3+Math.random()*9;P.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-5,r:3+Math.random()*5,c:cols[i%cols.length],l:1,s:Math.random()<.5})}if(!raf)loop()}
+function loop(){cx.clearRect(0,0,cv.width,cv.height);P=P.filter(p=>p.l>0);for(const p of P){p.x+=p.vx;p.y+=p.vy;p.vy+=.25;p.vx*=.99;p.l-=.011;cx.globalAlpha=Math.max(p.l,0);cx.fillStyle=p.c;cx.shadowColor=p.c;cx.shadowBlur=10;p.s?(cx.beginPath(),cx.arc(p.x,p.y,p.r,0,7),cx.fill()):cx.fillRect(p.x,p.y,p.r*1.6,p.r*1.6)}raf=P.length?requestAnimationFrame(loop):0;if(!raf)cx.clearRect(0,0,cv.width,cv.height)}
+const PC=['#ed1b76','#1fb5a6','#ffd166','#fff'];
+function show(id){if(typeof syncNick==='function'&&id==='menu')syncNick();document.querySelectorAll('.scr').forEach(s=>s.classList.toggle('on',s.id===id));$('#ov').classList.remove('on')}
+// online
+(async()=>{try{roomMod=window.claude&&await claude.use('room')}catch(e){}
+ $('#net').textContent=roomMod?'🟢 Tryb online gotowy':'Online niedostępny w tym widoku – zagraj z botem';
+ if(roomMod)document.querySelectorAll('.onl').forEach(b=>b.disabled=false)})();
+const accNick=()=>{try{return(window.__kulkiNick&&window.__kulkiNick()||'').trim()}catch(e){return''}};
+const nm=()=>(accNick()||$('#name').value.trim()||'Gracz').slice(0,16);
+function syncNick(){const n=accNick();if(n){$('#name').value=n.slice(0,16);$('#name').readOnly=true}}
+const goHub=()=>{try{window.parent.kulkiExit()}catch(e){toMenu()}};
+function leave(){clearInterval(helloT);unsubs.forEach(u=>u());unsubs=[];if(room){room.leave().catch(()=>{});room=null}G=null;guestPeer=null}
+async function enter(code,host){
+ myName=nm();isHost=host;guestPeer=null;hostPeer=null;curCode=code.toLowerCase();
+ try{room=await roomMod.join('kulki-'+code.toLowerCase())}catch(e){$('#net').textContent='Nie udało się wejść do pokoju ('+(e.code||'błąd')+')';return false}
+ TOPICS.forEach(t=>unsubs.push(room.on(t,m=>{if(!m.isMe)onMsg(t,m.data||{},m)})));
+ unsubs.push(room.onPeers(ch=>{if(G&&G.on&&!G.over&&G.mode==='online'&&ch.left.some(p=>!p.isMe)){G.over=true;ovl('Przeciwnik wyszedł','Gra została przerwana.','lose',[['MENU KULEK','g',toMenu],['MENU GŁÓWNE','g',goHub]])}}));
+ return true}
+$('#bCreate').onclick=async()=>{const A='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let c='';for(let i=0;i<4;i++)c+=A[Math.random()*A.length|0];
+ if(!await enter(c,true))return;
+ $('#codeBox').innerHTML=[...c].map(x=>`<b>${x}</b>`).join('');$('#lobTxt').textContent='Podaj ten kod drugiemu graczowi';show('lobby');beep(520,.15,'triangle')};
+$('#bJoin').onclick=async()=>{const c=$('#jc').value.trim().toUpperCase();if(c.length!==4){$('#jc').focus();return}
+ if(!await enter(c,false))return;
+ $('#codeBox').innerHTML=[...c].map(x=>`<b>${x}</b>`).join('');$('#lobTxt').textContent='Łączenie z pokojem';show('lobby');
+ const hi=()=>room&&room.emit('hello',{name:myName}).catch(()=>{});hi();helloT=setInterval(hi,1500)};
+$('#bCopy').onclick=()=>{try{navigator.clipboard.writeText([...$('#codeBox').children].map(b=>b.textContent).join(''))}catch(e){}$('#bCopy').textContent='SKOPIOWANO ✓'};
+$('#bCancel').onclick=toMenu;$('#bQuit').onclick=toMenu;
+function toMenu(){leave();show('menu')}
+$('#bBot').onclick=()=>{myName=nm();newGame([myName,'Bot 067'],0,Math.random()<.5?0:1,'bot')};
+function onMsg(t,d,m){
+ if(t==='hello'){if(!isHost)return;if(guestPeer&&guestPeer!==m.peer)return;guestPeer=m.peer;
+  if(G&&G.on&&G.startData){room.emit('start',G.startData).catch(()=>{});return}
+  startOnline(String(d.name||'Gracz').slice(0,16))}
+ else if(t==='start'){if(isHost||(G&&G.on&&!G.over))return;clearInterval(helloT);hostPeer=m.peer;newGame(d.names,1,d.first,'online');G.gid=d.gid}
+ else apply(t,d)}
+function startOnline(gn,first){const sd={names:[myName,gn],first:first??(Math.random()<.5?0:1),gid:Date.now().toString(36)};room.emit('start',sd).catch(()=>{});newGame(sd.names,0,sd.first,'online',sd);G.gid=sd.gid}
+// gra
+function newGame(names,me,first,mode,sd){G={names,me,m:[10,10],att:first,phase:'hide',pick:1,secret:0,bs:0,mode,on:true,over:false,startData:sd,rnd:1};
+ $('#ov').classList.remove('on');$('#pm').innerHTML='';$('#po').innerHTML='';$('#pm')._n=$('#po')._n=0;$('#hand').textContent='✊';$('#shown').innerHTML='';show('game');beep(330,.2,'triangle');beep(660,.3,'triangle');render();tick()}
+const seatEl=s=>s===G.me?$('#pm'):$('#po');
+function mk(c){const s=document.createElement('span');s.className='marble '+c;return s}
+function draw(el,n,c){el._n=el._n||0;while(el._n<n){const m=mk(c);m.style.animationDelay=(el._n%6)*40+'ms';el.append(m);el._n++}while(el._n>n){el.lastChild.remove();el._n--}}
+function say(t,c){$('#msg').textContent=t;$('#msg').className=c||''}
+function render(){const me=G.me,op=1-me,att=G.att;
+ $('#nm').textContent=G.names[me]+' (Ty)';$('#no').textContent=G.names[op];$('#cm').textContent=G.m[me];$('#co').textContent=G.m[op];
+ draw($('#pm'),G.m[me],'me');draw($('#po'),G.m[op],'op');
+ $('#rm').textContent=att===me?'Ukrywa kulki':'Zgaduje';$('#ro').textContent=att===op?'Ukrywa kulki':'Zgaduje';
+ const live=G.phase!=='reveal'&&!G.over;$('#pmc').classList.toggle('act',live&&G.phase!=='wait'&&(G.phase==='hide'?att===me:att!==me));$('#pop').classList.toggle('act',live&&G.phase!=='wait'&&(G.phase==='hide'?att===op:att!==op));
+ $('#rnd').textContent='RUNDA '+G.rnd;
+ G.pick=Math.max(1,Math.min(G.pick,G.m[att]||1));
+ const c=$('#ctl'),h=$('#hand');
+ if(G.phase==='reveal')return;
+ h.className='hand'+(G.phase==='guess'||G.phase==='wait'?' shake':'');h.textContent='✊';$('#shown').innerHTML='';
+ if(G.phase==='hide'&&att===me){say('Twoja tura – ile kulek ukryjesz?');c.innerHTML=`<div class="step"><button id="mi">−</button><b id="pk">${G.pick}</b><button id="pl">+</button></div><button class="btn" id="bH">UKRYJ W DŁONI</button>`;
+  $('#mi').onclick=()=>{G.pick=Math.max(1,G.pick-1);$('#pk').textContent=G.pick;beep(300,.05)};$('#pl').onclick=()=>{G.pick=Math.min(G.m[me],G.pick+1);$('#pk').textContent=G.pick;beep(400,.05)};
+  $('#bH').onclick=()=>{G.secret=G.pick;send('hid',{})}}
+ else if(G.phase==='hide'){say(G.names[att]+' ukrywa kulki…');c.innerHTML='<div class="dots role">czekaj</div>'}
+ else if(G.phase==='guess'&&att!==me){say('Ile kulek w dłoni?');c.innerHTML='<div class="row"><button class="btn t" id="gO">NIEPARZYSTA</button><button class="btn" id="gE">PARZYSTA</button></div>';
+  $('#gO').onclick=()=>send('guess',{g:'odd'});$('#gE').onclick=()=>send('guess',{g:'even'})}
+ else{say(G.phase==='guess'?'Dłoń zamknięta… przeciwnik zgaduje':'Typ oddany…');c.innerHTML='<div class="dots role">czekaj</div>'}}
+function send(t,d){apply(t,d);if(G&&G.mode==='online'&&room)room.emit(t,d).catch(()=>{})}
+function apply(t,d){if(!G||G.over)return;
+ if(t==='hid'){if(G.phase!=='hide')return;G.phase='guess';beep(260,.15,'square',.03);render();tick()}
+ else if(t==='guess'){if(G.phase!=='guess')return;G.phase='wait';render();
+  if(G.att===G.me)send('reveal',{n:G.secret,g:d.g});else if(G.mode==='bot')setTimeout(()=>apply('reveal',{n:G.bs,g:d.g}),900)}
+ else if(t==='reveal'){if(G.phase!=='wait')return;doReveal(d.n,d.g)}}
+function tick(){if(!G||G.mode!=='bot'||G.over)return;
+ if(G.phase==='hide'&&G.att===1)setTimeout(()=>{if(G&&G.phase==='hide'&&G.att===1){G.bs=1+Math.floor(Math.random()*Math.min(G.m[1],6));apply('hid',{})}},1500);
+ if(G.phase==='guess'&&G.att===0)setTimeout(()=>{if(G&&G.phase==='guess')apply('guess',{g:Math.random()<.5?'even':'odd'})},1900)}
+async function fly(l,w,k){const src=seatEl(l),dst=seatEl(w),kids=[...src.children].slice(-k),dr=dst.getBoundingClientRect(),cls=l===G.me?'me':'op';
+ const cl=kids.map((el,i)=>{const r=el.getBoundingClientRect(),c=mk(cls);c.style.cssText=`position:fixed;left:${r.left}px;top:${r.top}px;z-index:60;margin:0;animation:none`;el.style.visibility='hidden';document.body.append(c);
+  const dx=dr.left+dr.width/2-r.left-14+(Math.random()*40-20),dy=dr.top+dr.height/2-r.top-14;setTimeout(()=>beep(500+i*60,.07,'triangle',.04),i*110);
+  return c.animate([{transform:'none'},{transform:`translate(${dx*.5}px,${dy*.5-90}px) scale(1.5)`},{transform:`translate(${dx}px,${dy}px) scale(1)`}],{duration:800,delay:i*110,easing:'ease-in-out',fill:'forwards'}).finished.then(()=>c)});
+ const done=await Promise.all(cl);done.forEach(c=>c.remove())}
+async function doReveal(n,g){G.phase='reveal';render();const a=G.att,d=1-a,ok=(n%2===0)===(g==='even');
+ const h=$('#hand');h.textContent='🖐️';h.className='hand open';$('#ctl').innerHTML='';
+ const sh=$('#shown');sh.innerHTML='';for(let i=0;i<n;i++){const s=mk(a===G.me?'me':'op');s.style.animationDelay=i*90+'ms';sh.append(s);setTimeout(()=>beep(520+i*40,.08),i*90)}
+ say(G.names[d]+' typuje: '+(g==='even'?'PARZYSTA':'NIEPARZYSTA'));await sleep(1000+n*90);
+ say(ok?`TRAFIONE! Było ${n}`:`PUDŁO! Było ${n}`,ok?'ok':'bad');beep(ok?740:180,.35,'triangle');
+ const w=ok?d:a,l=ok?a:d,k=Math.min(n,G.m[l]),mine=w===G.me;
+ if(mine)burst(innerWidth/2,innerHeight/2,50,PC);else{document.body.classList.add('shake');setTimeout(()=>document.body.classList.remove('shake'),500)}
+ await sleep(900);await fly(l,w,k);G.m[l]-=k;G.m[w]+=k;sh.innerHTML='';render();await sleep(300);
+ if(G.m[l]===0){end(w);return}
+ G.att=d;G.phase='hide';G.pick=1;G.rnd++;render();tick()}
+function end(w){G.over=true;const win=w===G.me;render();
+ if(G.mode==='online'&&window.__kulkiStats&&window.__kulkiUid){const opp=isHost?guestPeer:hostPeer;if(opp&&G.gid)try{window.__kulkiStats(curCode,G.gid,[{uid:window.__kulkiUid,name:G.names[G.me]},{uid:opp,name:G.names[1-G.me]}],win?'w':'l')}catch(e){}}
+ if(win){for(let i=0;i<6;i++)setTimeout(()=>burst(Math.random()*innerWidth,innerHeight*.3,60,PC),i*250);beep(523,.2,'triangle');setTimeout(()=>beep(784,.4,'triangle'),200)}
+ else{document.body.classList.add('shake');beep(110,.8,'sawtooth',.06)}
+ const b=[];if(G.mode==='bot')b.push(['JESZCZE RAZ','',()=>newGame(G.names,0,Math.random()<.5?0:1,'bot')]);else if(isHost)b.push(['JESZCZE RAZ','',()=>startOnline(G.names[1])]);
+ b.push(['MENU KULEK','g',toMenu]);b.push(['MENU GŁÓWNE','g',goHub]);
+ setTimeout(()=>ovl(win?'ZWYCIĘSTWO':'ELIMINACJA',win?`${G.names[w]} zgarnia wszystkie kulki!`:`${G.names[w]} zabrał Ci wszystkie kulki.`,win?'win':'lose',b,!isHost&&G.mode==='online'),1100)}
+syncNick();
+window.__kulkiLeave=leave;
+function ovl(t,s,c,btns,wait){$('#ov').className='on '+c;$('#ovT').textContent=t;$('#ovS').textContent=s+(wait?' Czekaj, aż host zacznie rewanż.':'');const B=$('#ovB');B.innerHTML='';
+ btns.forEach(([l,k,f])=>{const e=document.createElement('button');e.className='btn '+k;e.textContent=l;e.onclick=f;B.append(e)})}
+</script></body></html>

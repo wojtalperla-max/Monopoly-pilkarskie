@@ -1,0 +1,73 @@
+/* ==========================================================
+   kulki — wygląd i motyw gry (style wydzielone z kulki.html)
+   ========================================================== */
+
+:root{--bg:#0a0a10;--pink:#ed1b76;--teal:#1fb5a6;--ink:#f4f1f6;--mut:#9a95a8;--card:#15151f;--line:#2a2a3a;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a0a10}}
+:root[data-theme="dark"]{--bg:#0a0a10}
+*{box-sizing:border-box}html,body{margin:0;min-height:100%}
+body{background:radial-gradient(ellipse at 50% 0,#2a0f22 0,var(--bg) 60%) fixed;color:var(--ink);font-family:'Nunito',system-ui,sans-serif;font-weight:600;overflow-x:hidden}
+h1,h2,.big{font-family:'Bebas Neue',Impact,sans-serif;letter-spacing:.06em;font-weight:400;margin:0}
+#bg{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+#bg span{position:absolute;bottom:-60px;color:var(--pink);opacity:.12;animation:up linear infinite;font-size:40px}
+@keyframes up{to{transform:translateY(-120vh) rotate(360deg)}}
+canvas#fx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:90}
+.scr{display:none;position:relative;z-index:1;max-width:760px;margin:0 auto;padding:18px}
+.scr.on{display:block;animation:fade .5s}
+@keyframes fade{from{opacity:0;transform:translateY(14px)}}
+.logo{text-align:center;margin:28px 0 8px}
+.logo h1{font-size:clamp(64px,16vw,110px);color:var(--pink);text-shadow:0 0 18px #ed1b76aa,0 0 50px #ed1b7655;animation:flick 4s infinite}
+@keyframes flick{0%,92%,96%,100%{opacity:1}94%{opacity:.55}98%{opacity:.8}}
+.shapes{font-size:34px;letter-spacing:14px;color:var(--teal);text-shadow:0 0 14px var(--teal)}
+.card{background:var(--card);border:2px solid var(--line);border-radius:20px;padding:18px;margin-top:16px}
+input{width:100%;background:#0d0d15;border:2px solid var(--line);color:var(--ink);border-radius:12px;padding:13px 14px;font:800 18px 'Nunito',sans-serif;outline:0;transition:.2s}
+input:focus{border-color:var(--pink);box-shadow:0 0 16px #ed1b7655}
+label{font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.1em}
+.btn{cursor:pointer;border:0;border-radius:14px;padding:14px 18px;font:400 26px 'Bebas Neue',Impact,sans-serif;letter-spacing:.07em;color:#fff;background:var(--pink);box-shadow:0 6px 0 #8a0c42,0 10px 24px #ed1b7644;transition:.12s;width:100%}
+.btn:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.12)}
+.btn:active:not(:disabled){transform:translateY(4px);box-shadow:0 2px 0 #8a0c42}
+.btn.t{background:var(--teal);box-shadow:0 6px 0 #0b6b62,0 10px 24px #1fb5a644}
+.btn.g{background:#2a2a3a;box-shadow:0 6px 0 #14141d}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.row{display:flex;gap:10px}.row>*{flex:1}
+.grid{display:grid;gap:12px;margin-top:14px}
+#net{text-align:center;font-size:13px;color:var(--mut);margin-top:14px}
+.code{display:flex;gap:10px;justify-content:center;margin:20px 0}
+.code b{width:62px;height:78px;display:grid;place-items:center;font:400 56px 'Bebas Neue',Impact,sans-serif;background:#0d0d15;border:2px solid var(--pink);border-radius:12px;color:var(--pink);text-shadow:0 0 14px var(--pink);animation:pop .5s backwards}
+.code b:nth-child(2){animation-delay:.1s}.code b:nth-child(3){animation-delay:.2s}.code b:nth-child(4){animation-delay:.3s}
+.dots::after{content:'';animation:dots 1.4s infinite}
+@keyframes dots{33%{content:'.'}66%{content:'..'}100%{content:'...'}}
+.pl{background:var(--card);border:2px solid var(--line);border-radius:18px;padding:12px 14px;transition:.3s}
+.pl.act{border-color:var(--pink);animation:glow 1.6s infinite}
+.pl.act.op{border-color:var(--teal);animation-name:glow2}
+@keyframes glow{50%{box-shadow:0 0 28px #ed1b7677}}
+@keyframes glow2{50%{box-shadow:0 0 28px #1fb5a677}}
+.ph{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.ph .big{font-size:28px}.cnt{font:400 40px 'Bebas Neue',Impact;color:var(--pink)}.op .cnt{color:var(--teal)}
+.role{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--mut)}
+.pile{display:flex;flex-wrap:wrap;gap:4px;min-height:34px}
+.marble{display:inline-block;width:var(--s,28px);height:var(--s,28px);border-radius:50%;background:radial-gradient(circle at 32% 28%,#fff 0 7%,var(--c1) 28%,var(--c2) 100%);box-shadow:0 0 9px var(--c2),inset -3px -4px 6px #0006;animation:pop .45s backwards}
+.marble.me{--c1:#ff8fbd;--c2:#c01157}.marble.op{--c1:#7ff5e6;--c2:#0b8478}
+@keyframes pop{from{transform:scale(0) rotate(-90deg);opacity:0}70%{transform:scale(1.25)}}
+.stage{text-align:center;margin:14px 0;padding:16px;border-radius:20px;background:linear-gradient(#171722,#101018);border:2px dashed #3a3a50;min-height:270px}
+.hand{font-size:84px;line-height:1;filter:drop-shadow(0 0 18px #ed1b7688);transition:.3s}
+.hand.shake{animation:shk .35s infinite}
+@keyframes shk{25%{transform:rotate(-12deg) translateY(-6px)}75%{transform:rotate(12deg) translateY(6px)}}
+.hand.open{animation:pop .5s}
+#msg{font:400 30px 'Bebas Neue',Impact;letter-spacing:.06em;min-height:38px;margin:6px 0}
+#msg.ok{color:#5df2a0;text-shadow:0 0 14px #5df2a0}#msg.bad{color:var(--pink);text-shadow:0 0 14px var(--pink)}
+#shown{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;min-height:34px;margin-bottom:8px}
+.step{display:flex;align-items:center;justify-content:center;gap:18px;margin:8px 0 14px}
+.step button{width:52px;height:52px;border-radius:50%;border:2px solid var(--pink);background:0;color:var(--pink);font:400 30px 'Bebas Neue';cursor:pointer}
+.step button:hover{background:var(--pink);color:#fff}
+.step b{font:400 62px 'Bebas Neue';min-width:60px}
+.shake{animation:scr .5s}
+@keyframes scr{20%{transform:translate(-9px,4px)}40%{transform:translate(8px,-5px)}60%{transform:translate(-6px,3px)}80%{transform:translate(4px,-2px)}}
+#ov{position:fixed;inset:0;z-index:80;display:none;place-items:center;background:#000c;backdrop-filter:blur(6px);padding:20px}
+#ov.on{display:grid;animation:fade .4s}
+#ov .box{text-align:center;max-width:420px;width:100%}
+#ov h2{font-size:clamp(54px,14vw,96px);line-height:1}
+#ov.win h2{color:#5df2a0;text-shadow:0 0 30px #5df2a0}#ov.lose h2{color:var(--pink);text-shadow:0 0 30px var(--pink)}
+#ov p{color:var(--mut);margin:10px 0 22px}
+.top{display:flex;justify-content:space-between;align-items:center}
+.top button{background:0;border:0;color:var(--mut);cursor:pointer;font:700 14px Nunito}
