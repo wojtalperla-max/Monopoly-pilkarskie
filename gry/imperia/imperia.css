@@ -354,3 +354,9 @@ body.inbattle #act,body.inbattle #toast{display:none!important}
 #lobby .il-menu{position:fixed;top:10px;left:10px;z-index:40;display:inline-flex;align-items:center;gap:6px;width:auto;margin:0;padding:9px 16px;font:700 15px/1 "Fredoka","Trebuchet MS",system-ui,sans-serif;color:#fff;background:#00000038;border:2px solid #ffffffd9;border-radius:999px;cursor:pointer;box-shadow:0 3px 10px #0006;text-shadow:0 1px 2px #0008;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);transition:transform .15s,background .15s}
 #lobby .il-menu:hover{background:#00000066;transform:translateY(-2px)}
 #lobby .il-menu:active{transform:scale(.96)}
+
+#lobby .il-menu{display:none!important}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

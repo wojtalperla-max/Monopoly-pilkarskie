@@ -111,3 +111,7 @@ body:has(#menu.on) header button{background:#00000050;color:#fff;border:2px soli
 #menu #nt,#menu .km-hint{color:#ffffffcc;font-size:15px;text-align:center;margin:0}
 #menu .km-hint:empty{display:none}
 @media(prefers-reduced-motion:reduce){#menu *,#menu::before{animation:none!important}}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

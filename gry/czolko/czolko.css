@@ -70,3 +70,7 @@ input:focus-visible,select:focus-visible{outline:3px solid var(--pink);outline-o
 .lgadm .lgbtn{padding:4px 12px;font-size:.85em}
 
 @keyframes czti{from{opacity:0;transform:translateX(-50%) scale(.9)}to{opacity:1;transform:translateX(-50%) scale(1)}}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

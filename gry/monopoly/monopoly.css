@@ -389,3 +389,10 @@ button,.lgbtn{transition:none}
 @keyframes dotb{50%{transform:translateY(-.4em)}}
 @keyframes flUp{0%{transform:translateY(0) scale(.6);opacity:0}15%{opacity:1;transform:translateY(-8px) scale(1.2)}100%{transform:translateY(-46px);opacity:0}}
 @keyframes toastIn{0%{opacity:0;transform:translate(-50%,-30px) scale(.8)}10%{opacity:1;transform:translate(-50%,0) scale(1.04)}16%{transform:translate(-50%,0) scale(1)}85%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-14px)}}
+
+#ogBack{display:none!important}
+#cmbar>.cmb.ghost:first-child{display:none!important}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

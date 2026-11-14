@@ -118,3 +118,7 @@ button:disabled{opacity:.5;cursor:default}
 #lobby .lobinfo{color:#ffffffd9;margin:0}
 #lobby #err{color:#ffd84a;font-weight:700}
 @media(prefers-reduced-motion:reduce){#lobby *,#lobby::before{animation:none!important}}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

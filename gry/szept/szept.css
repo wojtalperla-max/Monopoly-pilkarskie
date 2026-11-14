@@ -114,3 +114,7 @@ input[readonly]{opacity:.75;cursor:not-allowed}
 @keyframes szPane{0%{transform:translateY(-10px);opacity:0}100%{transform:none;opacity:1}}
 #menu .help{max-width:100%}
 @media(prefers-reduced-motion:reduce){#menu *,.sz-rays{animation:none!important}}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

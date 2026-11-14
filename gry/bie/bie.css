@@ -144,3 +144,7 @@ body:has(#menu.on) header .logo{display:none}
 @keyframes bmPulse{50%{box-shadow:0 6px 0 #a26b00,0 14px 22px #0006,0 0 0 8px #ffd84a44}}
 #menu .bm-note,#menu .bm-hint{color:#ffffffcc;font-size:15px;text-align:center;margin:0}
 #menu .bm-hint:empty{display:none}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

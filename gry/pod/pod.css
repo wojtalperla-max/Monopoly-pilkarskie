@@ -115,3 +115,7 @@ body:has(#setup:not(.hide)) > h1{display:none}
 .pd-test{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:17px;color:#ffffffd9;border-bottom:2px dashed #ffffff77;padding:6px;cursor:pointer;animation:pdUp .7s 1.5s both}
 .pd-test input{width:20px;height:20px;accent-color:#ffd84a}
 @media(prefers-reduced-motion:reduce){#setup *,#setup::before{animation:none!important}}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

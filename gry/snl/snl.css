@@ -119,3 +119,9 @@ button.g{background:#3fae3c}button.b{background:#2a9df4}button.w{background:var(
 .sn-menu:active:not(:disabled){transform:none;box-shadow:0 4px 14px rgba(0,0,0,.35)}
 body.ingame .sn-menu{display:none}
 .screen.sn{padding-top:64px}
+
+.sn-menu{display:none!important}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

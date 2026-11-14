@@ -125,3 +125,9 @@ body:has(#home:not(.hide)) .back{z-index:70}
 #localPane .row{gap:8px}
 #localPane .gh-btn{font-size:clamp(20px,5vw,26px);padding:12px 6px}
 #home .gh-wrap{padding-top:64px}
+
+.back{display:none!important}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

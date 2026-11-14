@@ -787,7 +787,7 @@ function statsMono(){
 
 function askHub(){document.querySelector('#menu .box').innerHTML='<h2>Wyjść do menu głównego?</h2><div class=row>Obecna gra zostanie przerwana.</div><button onclick="monoLeaveToHub()">Tak, wyjdź</button><button class=skip onclick="closeMenu()">Anuluj</button>'}
 /* wyjście do menu głównego platformy: klik w pasek „← Menu główne” rodzica (zatrzymuje też licznik czasu gry) */
-function monoLeaveToHub(){try{window.parent.document.querySelector('#monobar button').click()}catch(e){location.reload()}}
+function monoLeaveToHub(){try{window.parent.document.querySelector('#mono .gmenu').click()}catch(e){location.reload()}}
 
 
 /* ===== integracja z platformą ===== */

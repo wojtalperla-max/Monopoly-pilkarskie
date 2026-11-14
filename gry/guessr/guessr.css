@@ -136,3 +136,9 @@ th{background:#3d2a63;border-color:#2f2542}
 .gz-logo{background:linear-gradient(180deg,#ff5fb0,#c2187a);box-shadow:0 0 0 clamp(3px,.7vw,5px) #14060a,0 14px 0 #6d0a45,0 26px 40px #000a}
 .gz-logo b{text-shadow:0 3px 0 #6d0a45,0 6px 0 #4a062f,0 9px 14px #0008}
 .gz-white{color:#5b21b6}
+
+.back{display:none!important}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

@@ -66,3 +66,7 @@ input:focus-visible,select:focus-visible{outline:3px solid var(--pink);outline-o
 @keyframes stkflame{from{transform:scale(1,.8)}to{transform:scale(.85,1.2)}}
 @keyframes stksmoke{0%{transform:translateY(0);opacity:.75}100%{transform:translateY(-34px);opacity:0}}
 @keyframes flUp{0%{transform:translateY(0) scale(.6);opacity:0}15%{opacity:1;transform:translateY(-8px) scale(1.2)}100%{transform:translateY(-46px);opacity:0}}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

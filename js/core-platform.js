@@ -755,7 +755,6 @@ function podOfflineBack(){POD.offline=false;POD.frameReady=false;const f=podFram
 function podRender(){const el=document.getElementById('podroom'),f=podFrame();if(!el)return;if(!POD.ref&&POD.offline){if(f)f.hidden=false;el.innerHTML=`<div class="podbox"><div class="podrow"><button onclick="podOfflineBack()">← Wróć do pokoi online</button><span class="podmuted">Tryb offline — wybierz liczbę botów poniżej.</span></div></div>`;return}
   if(!POD.ref){if(f)f.hidden=true;const pv=(document.getElementById('podJoinCode')||{}).value||'',net=podNet();
     el.innerHTML=`<div id="podGate" class="pg"><div class="og-bg" aria-hidden="true">${podFloat()}</div>
-    <button class="og-back" onclick="podExit()">← Menu główne</button>
     <div class="og-wrap"><div class="og-logo" role="img" aria-label="Podbój">${podLogo()}</div>
       <p class="og-sub">Rzuć kostką. Zajmij mapę. Przejmij strefy.</p>
       <p class="pg-nick">Grasz jako <b>${lgEsc(podNick())}</b></p>

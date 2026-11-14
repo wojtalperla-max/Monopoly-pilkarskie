@@ -251,7 +251,7 @@ $('#ag').onclick=()=>{$('#win').classList.remove('on');if(local){st=null;enter(l
 $('#menuBtn').onclick=()=>{
   try{leave()}catch(e){}
   try{const P=window.parent;
-    if(P&&P!==window){const B=P.snlBridge&&P.snlBridge();
+    if(P&&P!==window){const G=P.document.querySelector('#snl .gmenu');if(G){G.click();return}const B=P.snlBridge&&P.snlBridge();
       for(const k of ['menu','home','exit','close','back']){if(B&&typeof B[k]==='function'){B[k]();return}}
       P.location.href=P.location.pathname;return}}catch(e){}
   location.href='../index.html'};

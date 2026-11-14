@@ -92,3 +92,7 @@ input:focus-visible,select:focus-visible{outline:3px solid var(--pink);outline-o
 .rtbar .lgbtn{padding:4px 14px;min-width:42px}
 .lgadm .lgbtn{padding:4px 12px;font-size:.85em}
 .unhand .unc.sel{transform:rotate(var(--r,0deg)) translateY(calc(var(--y,0px) - 44px));box-shadow:0 0 0 4px #ffe066,0 0 22px #ffe066;z-index:40}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

@@ -730,7 +730,7 @@ const TOAST=document.createElement('div');TOAST.id='toast';$('game').appendChild
 
 /* ===== Menu główne, pełny ekran, ukrycie paska portalu w grze ===== */
 (function(){
-  function pmenu(){const out=[];try{const d=window.parent.document;d.querySelectorAll('button,a,div,span').forEach(e=>{if(e.children.length<=2&&/^\s*(←|<)?\s*menu g[łl]ówne\s*$/i.test(e.textContent||''))out.push(e)})}catch(e){}return out}
+  function pmenu(){const out=[];try{const d=window.parent.document;d.querySelectorAll('button,a,div,span').forEach(e=>{if(!e.classList.contains('gmenu')&&e.children.length<=2&&/^\s*(←|<)?\s*menu g[łl]ówne\s*$/i.test(e.textContent||''))out.push(e)})}catch(e){}return out}
   function hideParentBtn(){pmenu().forEach(e=>{if(e.dataset.impHid==null){e.dataset.impHid=e.style.display||'';e.style.display='none'}})}
   function restoreParentBtn(){try{window.parent.document.querySelectorAll('[data-imp-hid]').forEach(e=>{e.style.display=e.dataset.impHid;delete e.dataset.impHid})}catch(e){}}
   const prevClean=window.__impCleanup;window.__impCleanup=()=>{try{prevClean&&prevClean()}catch(e){}restoreParentBtn();restorePortalBar();};
@@ -738,6 +738,7 @@ const TOAST=document.createElement('div');TOAST.id='toast';$('game').appendChild
   function goMenu(){
     leaving=true;clearInterval(syncT);
     try{window.__impCleanup()}catch(e){}
+    try{const g=window.parent.document.querySelector('#imp .gmenu');if(g){g.click();return}}catch(e){}
     const p=pmenu();
     if(p.length){try{p[0].click();return}catch(e){}}
     const B=impBridge();
@@ -748,7 +749,7 @@ const TOAST=document.createElement('div');TOAST.id='toast';$('game').appendChild
   $('ilMenu').onclick=goMenu;
   function hidePortalBar(){try{
     const pd=window.parent.document,fe=window.frameElement;
-    const hide=e=>{if(!e||/^(SCRIPT|STYLE|LINK)$/.test(e.tagName)||e.dataset.impHid2!=null)return;e.dataset.impHid2=e.style.display||'';e.style.display='none'};
+    const hide=e=>{if(!e||(e.classList&&e.classList.contains('gmenu'))||/^(SCRIPT|STYLE|LINK)$/.test(e.tagName)||e.dataset.impHid2!=null)return;e.dataset.impHid2=e.style.display||'';e.style.display='none'};
     if(fe){let n=fe;while(n&&n!==pd.body&&n!==pd.documentElement){let s=n.previousElementSibling;while(s){hide(s);s=s.previousElementSibling}n=n.parentElement}
       if(fe.dataset.impH==null){fe.dataset.impH=fe.style.height||'';fe.style.height='100dvh'}}
     pd.querySelectorAll('header,nav,div,h1,h2,span').forEach(e=>{if(e.contains(fe))return;if(/^\s*imperia\s*$/i.test(e.textContent||'')){let t=e;while(t.parentElement&&t.parentElement!==pd.body&&!t.parentElement.contains(fe)&&(t.parentElement.textContent||'').trim().length<40)t=t.parentElement;hide(t)}});

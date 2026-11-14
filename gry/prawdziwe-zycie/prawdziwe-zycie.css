@@ -206,3 +206,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#87ceeb;font-family:sy
   #mapBigCanvas{cursor:zoom-in;display:block;width:100%;height:auto;aspect-ratio:4/3;border-radius:10px;border:1px solid rgba(255,255,255,.25);box-sizing:border-box}
   #mapClose{position:absolute;right:16px;top:14px;border:0;border-radius:7px;padding:7px 11px;background:#3a7bd5;color:white;font-size:14px;cursor:pointer}
   @media(max-width:600px){#mapCanvas{width:145px;height:109px;left:8px;bottom:8px}#mapCard{padding:12px}#mapCard h2{font-size:17px}#mapClose{right:10px;top:9px;padding:5px 8px}}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

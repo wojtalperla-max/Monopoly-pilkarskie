@@ -117,3 +117,7 @@ input:focus-visible,select:focus-visible{outline:3px solid var(--pink);outline-o
 @keyframes unpulse2{to{transform:scale(1.07)}}
 @keyframes unpulse{50%{filter:drop-shadow(0 0 14px #ffe066)}}
 @keyframes unpop{from{transform:translateY(120px) rotate(40deg) scale(.7);opacity:0}}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

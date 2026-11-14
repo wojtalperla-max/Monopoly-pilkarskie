@@ -78,3 +78,7 @@ h1.tb-logo{position:relative;margin:0;display:flex;justify-content:center;paddin
 .tb-sub2{margin:0;color:#ffffffb3;font-size:14px}
 .tb-home.again .tb-logo,.tb-home.again .tb-logo b,.tb-home.again .tb-tiles,.tb-home.again .tb-sub,.tb-home.again .tb-card,.tb-home.again .tb-main,.tb-home.again .tb-pane{animation:none}
 @media(prefers-reduced-motion:reduce){.tb-home *,.tb-home::before{animation:none!important}}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

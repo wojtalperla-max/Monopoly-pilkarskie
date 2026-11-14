@@ -90,3 +90,7 @@
 .ds-help summary{cursor:pointer;font-weight:600}
 .ds-help .help{color:#ffffffcc;font-size:13px;text-align:left;margin-top:8px;line-height:1.55}
 @media(prefers-reduced-motion:reduce){#menu *,#menu::before{animation:none!important}}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

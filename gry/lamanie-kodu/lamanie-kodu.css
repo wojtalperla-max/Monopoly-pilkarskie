@@ -91,3 +91,7 @@ button.kdd{cursor:pointer}
 .cmpl.act{border-color:#ffd84a;background:#ffffff26;transform:scale(1.02);box-shadow:0 0 18px #ffd84a44}
 .rtbar .lgbtn{padding:4px 14px;min-width:42px}
 .lgadm .lgbtn{padding:4px 12px;font-size:.85em}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

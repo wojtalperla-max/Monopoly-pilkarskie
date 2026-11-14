@@ -31,7 +31,6 @@ button:not(:disabled):active,.lgbtn:not(:disabled):active{transform:translateY(3
 .lgcard,.stbx div,.mko,.thr,.podbox,.mkopp{border-radius:16px}
 :is(#lgc,#kodc,#czc,#pmc,#frbox,#stbox,.accbox,.mkbox,.thbox,.islabox,.podbox) :is(input,select){border:2px solid #8b6bff!important;background:#150a30!important;border-radius:12px}
 input:focus-visible,select:focus-visible{outline:3px solid var(--pink);outline-offset:1px}
-:is(#lgbar,#monobar,#kodbar,#czbar,#pmbar,#islabar,#podbar,#impbar,#rlbar){background:#1a1033dd;backdrop-filter:blur(8px);border-bottom:3px dashed #ffffff33}
 /* plansza Football Monopoly */
 .c:hover{filter:brightness(1.1) saturate(1.1);z-index:2}
 .c.corner{background:linear-gradient(135deg,#ffe38a,#ffb3d1)}

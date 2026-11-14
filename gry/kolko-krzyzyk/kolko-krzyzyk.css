@@ -141,3 +141,7 @@ button{font:inherit;cursor:pointer}
 .ms .code{border:2px dashed #ffffff66;background:none;-webkit-background-clip:border-box;background-clip:border-box;color:#ffdc4a;text-shadow:0 3px 0 #6e0a40;font-family:"Bowlby One",Impact,sans-serif;font-weight:400}
 .ms .status{color:#fff;font-size:18px;min-height:0}
 @media(prefers-reduced-motion:reduce){.ms *,.ms::before{animation:none!important}}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}

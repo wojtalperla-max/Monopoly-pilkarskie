@@ -73,3 +73,7 @@ button:disabled{opacity:.5}
 @keyframes tkPulse{50%{box-shadow:0 6px 0 #a26b00,0 14px 22px #0006,0 0 0 8px #ffd84a44}}
 .tk-note{font-size:14px;opacity:.85;min-height:1.2em;text-shadow:0 1px 4px #0006;animation:tkUp .7s 1.5s both}
 @media(prefers-reduced-motion:reduce){#tkStart *,#tkStart::before{animation:none!important}}
+
+/* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
+html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
+html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
