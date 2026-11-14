@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="snl.css">
 </head>
 <body>
+<button class="sn-menu" id="menuBtn" type="button">← Menu główne</button>
 <div id="app">
 
 <section class="screen sn on" id="home">
@@ -111,12 +112,35 @@ window.claude={use:async function(){
 </script>
 <script>
 const $=s=>document.querySelector(s), esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const LAD={4:14,9:31,21:42,28:84,36:44,51:67,71:91,80:100}, SNK={17:7,54:34,62:19,64:60,87:24,93:73,95:75,98:79};
+const DLAD={4:14,9:31,21:42,28:84,36:44,51:67,71:91,80:100}, DSNK={17:7,54:34,62:19,64:60,87:24,93:73,95:75,98:79};
+let LAD=DLAD,SNK=DSNK;
+const rnd=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
+/* losowa plansza: każde pole jest początkiem/końcem co najwyżej jednego węża lub drabiny */
+function genMap(){
+  for(let attempt=0;attempt<200;attempt++){
+    const used=new Set([1,100]),lad={},snk={},nl=rnd(7,9),ns=rnd(7,9);let ok=true,toTop=false;
+    for(let i=0;i<nl&&ok;i++){let done=false;
+      for(let t=0;t<300&&!done;t++){const b=rnd(2,88),e=Math.min(100,b+rnd(10,55));
+        if(e-b<10||used.has(b)||used.has(e)||(e===100&&toTop))continue;
+        used.add(b);used.add(e);lad[b]=e;if(e===100)toTop=true;done=true}
+      if(!done)ok=false}
+    for(let i=0;i<ns&&ok;i++){let done=false;
+      for(let t=0;t<300&&!done;t++){const h=rnd(14,99),e=Math.max(2,h-rnd(10,60));
+        if(h-e<10||used.has(h)||used.has(e))continue;
+        used.add(h);used.add(e);snk[h]=e;done=true}
+      if(!done)ok=false}
+    if(ok)return{lad,snk}}
+  return{lad:{...DLAD},snk:{...DSNK}}}
+function validMap(l,k){
+  const chk=(o,up)=>o&&typeof o==='object'&&Object.keys(o).length<=15&&Object.keys(o).every(a=>{const x=+a,y=o[a];return Number.isInteger(x)&&Number.isInteger(y)&&x>1&&x<100&&y>=1&&y<=100&&(up?y>x:y<x)});
+  return chk(l,true)&&chk(k,false)}
+function setMap(s){if(s&&validMap(s.lad,s.snk)){LAD=s.lad;SNK=s.snk}else{LAD=DLAD;SNK=DSNK;if(s){s.lad=DLAD;s.snk=DSNK}}}
+function localState(){const m=genMap();return{gid:'',ord:[{id:'a',n:myName(),c:myCol()},{id:'b',n:'Gracz 2',c:COL[1]}],pos:{a:1,b:1},turn:0,v:1,win:null,last:null,lad:m.lad,snk:m.snk}}
 const COL=['#ef476f','#2a9df4','#18c28a','#ffb703'],HEX=/^#[0-9a-f]{6}$/i, EMO=['🦊','🐸','🐙','🦄'], OFF=[[-15,-11],[15,-11],[-15,13],[15,13]];
 const PAL=['#a9d046','#d96fb3','#35c6f4','#ffd23f','#ff6fa0','#ff9a3c','#ef4a4a'];
 let room=null,local=false,isHost=false,myId=null,st=null,code='',busy=false,q=Promise.resolve(),shown=false,unsubs=[];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id))}
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));document.body.classList.toggle('ingame',id==='game')}
 function ctr(n){const r=Math.floor((n-1)/10),c=r%2?9-(n-1)%10:(n-1)%10;return[c*100+50,(9-r)*100+50]}
 
 /* ---------- board ---------- */
@@ -142,23 +166,24 @@ function mkToks(){$('#toks').innerHTML=st.ord.map((p,i)=>`<g class="tok" id="t${
 
 /* ---------- ui ---------- */
 function face(n){const m={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]}[n]||[];$('#dice').innerHTML=Array.from({length:9},(_,i)=>`<b class="${m.includes(i)?'o':''}"></b>`).join('')}
-function myTurn(){return !st.win&&(local||st.ord[st.turn].id===myId)}
+function whoAmI(){if(myId)return myId;try{const m=room&&room.peers().find(p=>p.isMe&&p.sameTab);if(m)myId=m.peer}catch(e){}return myId}
+function myTurn(){return !st.win&&(local||st.ord[st.turn].id===whoAmI())}
 function panel(msg){
-  $('#pcs').innerHTML=st.ord.map((p,i)=>`<div class="pc ${i===st.turn&&!st.win?'act':''}" style="--pcol:${p.c||COL[i]};border-left:8px solid ${p.c||COL[i]}"><i>${EMO[i]}</i>${esc(p.n)}${p.id===myId?' (Ty)':''}<small>pole ${st.pos[p.id]}</small></div>`).join('');
+  $('#pcs').innerHTML=st.ord.map((p,i)=>`<div class="pc ${i===st.turn&&!st.win?'act':''}" style="--pcol:${p.c||COL[i]};border-left:8px solid ${p.c||COL[i]}"><i>${EMO[i]}</i>${esc(p.n)}${p.id===whoAmI()?' (Ty)':''}<small>pole ${st.pos[p.id]}</small></div>`).join('');
   const rb=$('#rl');rb.disabled=busy||!myTurn();rb.textContent=myTurn()?'🎲 Rzuć kostką':'⏳ Tura: '+st.ord[st.turn].n;
   if(msg!==undefined)$('#msg').textContent=msg}
-function enter(s){st=s;drawBoard();mkToks();$('#gcode').textContent=local?'lokalna':code;show('game');face(1);panel('Zaczynamy! Powodzenia 🍀');$('#win').classList.remove('on')}
+function enter(s){setMap(s);st=s;drawBoard();mkToks();$('#gcode').textContent=local?'lokalna':code;show('game');face(1);panel('Zaczynamy! Powodzenia 🍀');$('#win').classList.remove('on')}
 
 /* ---------- game logic ---------- */
 function roll(){
   if(busy||!st||!myTurn())return;
   const p=st.ord[st.turn],from=st.pos[p.id],r=1+Math.floor(Math.random()*6),mid=from+r>100?from:from+r,to=LAD[mid]||SNK[mid]||mid,win=to===100?p.id:null;
   const n=st.ord.length,turn=(r===6&&!win)?st.turn:(st.turn+1)%n;
-  send('s',{s:{gid:st.gid,ord:st.ord,pos:{...st.pos,[p.id]:to},turn,v:st.v+1,win,last:{id:p.id,r,from,mid,to,n:p.n}}})}
+  send('s',{s:{gid:st.gid,ord:st.ord,pos:{...st.pos,[p.id]:to},turn,lad:st.lad,snk:st.snk,v:st.v+1,win,last:{id:p.id,r,from,mid,to,n:p.n}}})}
 function apply(s,sync){q=q.then(async()=>{
   if(!st){if(s.v>0)enter(s);return}
   if(s.v<=st.v)return;
-  if(sync||!s.last){st=s;st.ord.forEach(p=>place(p.id,st.pos[p.id]));panel('');busy=false;return}
+  if(sync||!s.last){setMap(s);st=s;st.ord.forEach(p=>place(p.id,st.pos[p.id]));panel('');busy=false;return}
   busy=true;panel('');const L=s.last,d=$('#dice');
   d.classList.add('roll');let t=0;const iv=setInterval(()=>face(1+Math.floor(Math.random()*6)),90);await sleep(750);clearInterval(iv);d.classList.remove('roll');face(L.r);
   $('#msg').textContent=`${L.n} wyrzuca ${L.r}`+(L.mid===L.from?' – za dużo, zostaje na miejscu!':'');
@@ -172,21 +197,22 @@ function confetti(){for(let i=0;i<50;i++){const e=document.createElement('div');
 /* ---------- networking ---------- */
 function send(t,d){const m={t,...d};if(local){onMsg({data:m,peer:'local'});return}room&&room.emit('g',m).catch(e=>$('#msg').textContent='Błąd sieci: '+(e.code||e.message))}
 function onMsg(m){const d=m.data;if(!d)return;
-  if(d.t==='start'){const sp=local||(room.peers().find(p=>p.peer===m.peer)||{presence:{}}).presence.h;if(!sp||!Array.isArray(d.ord))return;st=null;q=q.then(()=>{enter({gid:d.gid||'',ord:d.ord,pos:Object.fromEntries(d.ord.map(p=>[p.id,1])),turn:0,v:1,win:null,last:null})})}
+  if(d.t==='start'){const sp=local||(room.peers().find(p=>p.peer===m.peer)||{presence:{}}).presence.h;if(!sp||!Array.isArray(d.ord))return;st=null;q=q.then(()=>{enter({gid:d.gid||'',ord:d.ord,pos:Object.fromEntries(d.ord.map(p=>[p.id,1])),turn:0,v:1,win:null,last:null,lad:d.lad,snk:d.snk})})}
   else if(d.t==='s'&&d.s)apply(d.s,!!d.sync)}
 function plist(){return room.peers().filter(p=>p.presence&&p.presence.n).sort((a,b)=>(b.presence.h?1:0)-(a.presence.h?1:0)||(a.presence.ts-b.presence.ts)||(a.peer<b.peer?-1:1))}
 function renderLobby(){const L=plist();$('#plist').innerHTML=L.map((p,i)=>`<div class="pl" style="border-left:8px solid ${HEX.test(p.presence.c||'')?p.presence.c:COL[i%4]}"><i>${EMO[i]||'🙂'}</i>${esc(p.presence.n)}${p.isMe?' (Ty)':''}<small>${p.presence.h?'👑 gospodarz':'gotowy'}</small></div>`).join('')||'<div class="pl">Łączenie…</div>';
   $('#st').style.display=isHost?'':'none';$('#st').disabled=L.length<2;$('#st').textContent=L.length<2?'Czekam na graczy…':'▶ Start gry ('+Math.min(L.length,4)+')'}
-function startGame(){const L=plist().slice(0,4);send('start',{gid:Date.now().toString(36)+Math.random().toString(36).slice(2,6),ord:L.map((p,i)=>({id:p.peer,n:p.presence.n,c:HEX.test(p.presence.c||'')?p.presence.c:COL[i]}))})}
+function startGame(){const L=plist().slice(0,4);const m=genMap();send('start',{lad:m.lad,snk:m.snk,gid:Date.now().toString(36)+Math.random().toString(36).slice(2,6),ord:L.map((p,i)=>({id:p.peer,n:p.presence.n,c:HEX.test(p.presence.c||'')?p.presence.c:COL[i]}))})}
 async function connect(host){
   const name=myName();$('#herr').textContent='';
   let c=host?Array.from({length:5},()=>'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.random()*32|0]).join(''):$('#cd').value.trim().toUpperCase();
   if(!/^[A-Z0-9]{5}$/.test(c)){$('#herr').textContent='Wpisz 5-znakowy kod pokoju.';return}
   try{
     const R=await (typeof claude!=='undefined'?claude.use('room'):null);if(!R)throw{message:'Pokoje online są niedostępne. Zaloguj się lub zagraj lokalnie.'};
-    room=await R.join('snl-'+c.toLowerCase());code=c;isHost=host;local=false;st=null;q=Promise.resolve();
+    myId=null;room=await R.join('snl-'+c.toLowerCase());code=c;isHost=host;local=false;st=null;q=Promise.resolve();
     await room.presence({n:name,c:myCol(),h:host,ts:Date.now()});
-    unsubs=[room.on('g',onMsg),room.onPeers(ch=>{myId=(room.peers().find(p=>p.isMe&&p.sameTab)||{}).peer;
+    whoAmI();
+    unsubs=[room.on('g',onMsg),room.onPeers(ch=>{whoAmI();
       if(isHost&&st&&ch.joined.some(p=>!p.isMe))room.emit('g',{t:'s',s:st,sync:true}).catch(()=>{});
       if(!st)renderLobby()})];
     $('#lcode').textContent=c;show('lobby');renderLobby();$('#lerr').textContent='';
@@ -194,7 +220,7 @@ async function connect(host){
       if(!L.some(p=>p.presence.h)){$('#lerr').textContent='';leave();$('#herr').textContent='Nie znaleziono pokoju o kodzie '+c+'.';return}
       if(L.length>4&&!L.slice(0,4).some(p=>p.isMe)){leave();$('#herr').textContent='Pokój jest pełny (max 4 graczy).'}}
   }catch(e){$('#herr').textContent=e.message||('Nie udało się połączyć ('+(e.code||'błąd')+').');show('home')}}
-function leave(){unsubs.forEach(u=>u());unsubs=[];if(room)room.leave().catch(()=>{});room=null;st=null;local=false;$('#win').classList.remove('on');show('home')}
+function leave(){unsubs.forEach(u=>u());unsubs=[];if(room)room.leave().catch(()=>{});room=null;myId=null;st=null;local=false;$('#win').classList.remove('on');show('home')}
 
 
 /* ---------- nick, kolor, statystyki (host: index.html) ---------- */
@@ -202,7 +228,7 @@ const cleanN=v=>String(v||'').replace(/[\u0000-\u001f\u200b-\u200f\u2028-\u202f<
 function myName(){const v=cleanN($('#nm').value);return v||'Gracz'}
 function myCol(){const v=$('#pc').value;return HEX.test(v)?v:'#2a9df4'}
 function recStats(s){
-  if(local||!s||!s.win||!s.gid||!myId)return;
+  if(local||!s||!s.win||!s.gid||!whoAmI())return;
   const pl=s.ord.map(p=>({uid:p.id,name:p.n}));
   window.__snlStats&&window.__snlStats(code,s.gid,pl,s.win===myId?'w':'l');
 }
@@ -217,10 +243,18 @@ window.__snlLeave=function(){try{if(room)leave()}catch(e){}};
 
 /* ---------- wiring ---------- */
 $('#mk').onclick=()=>connect(true);$('#jn').onclick=()=>connect(false);
-$('#lc').onclick=()=>{local=true;isHost=true;const n=myName();st=null;q=Promise.resolve();enter({ord:[{id:'a',n,c:myCol()},{id:'b',n:'Gracz 2',c:COL[1]}],pos:{a:1,b:1},turn:0,v:1,win:null,last:null})};
+$('#lc').onclick=()=>{local=true;isHost=true;st=null;q=Promise.resolve();enter(localState())};
 $('#cp').onclick=async()=>{try{await navigator.clipboard.writeText(code);$('#cp').textContent='✅ Skopiowano!'}catch(e){$('#cp').textContent='Zaznacz kod i skopiuj ręcznie'}setTimeout(()=>$('#cp').textContent='📋 Kopiuj kod',1800)};
 $('#st').onclick=startGame;$('#lv').onclick=leave;$('#rl').onclick=roll;$('#ex').onclick=leave;
-$('#ag').onclick=()=>{$('#win').classList.remove('on');if(local){st=null;enter({ord:[{id:'a',n:myName(),c:myCol()},{id:'b',n:'Gracz 2',c:COL[1]}],pos:{a:1,b:1},turn:0,v:1,win:null,last:null})}else{q=q.then(()=>{st=null});startGame()}};
+$('#ag').onclick=()=>{$('#win').classList.remove('on');if(local){st=null;enter(localState())}else{q=q.then(()=>{st=null});startGame()}};
+/* powrót do menu głównego (index.html) */
+$('#menuBtn').onclick=()=>{
+  try{leave()}catch(e){}
+  try{const P=window.parent;
+    if(P&&P!==window){const B=P.snlBridge&&P.snlBridge();
+      for(const k of ['menu','home','exit','close','back']){if(B&&typeof B[k]==='function'){B[k]();return}}
+      P.location.href=P.location.pathname;return}}catch(e){}
+  location.href='../index.html'};
 $('#cd').addEventListener('input',e=>e.target.value=e.target.value.toUpperCase());
 </script>
 <script>

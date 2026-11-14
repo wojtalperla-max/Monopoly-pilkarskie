@@ -112,3 +112,10 @@ button.g{background:#3fae3c}button.b{background:#2a9df4}button.w{background:var(
 .sn .pl{background:#ffffff1c;color:#fff;border-radius:14px;margin:6px 0;text-align:left;animation:snUp .4s both}
 .sn .pl small{color:#ffffffbb}
 @media(prefers-reduced-motion:reduce){.sn *,.sn::before{animation:none!important}}
+
+/* ===== przycisk „Menu główne” (jak w Imperii) ===== */
+.sn-menu{position:fixed;top:max(12px,env(safe-area-inset-top,0px));left:12px;z-index:60;width:auto;display:inline-flex;align-items:center;gap:6px;font:inherit;font-weight:700;font-size:15px;color:#fff;background:rgba(15,8,35,.55);border:2px solid #fff;border-radius:999px;padding:9px 18px;box-shadow:0 4px 14px rgba(0,0,0,.35);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);transition:transform .15s,background .15s}
+.sn-menu:hover{background:rgba(15,8,35,.8);transform:translateY(-2px)}
+.sn-menu:active:not(:disabled){transform:none;box-shadow:0 4px 14px rgba(0,0,0,.35)}
+body.ingame .sn-menu{display:none}
+.screen.sn{padding-top:64px}
