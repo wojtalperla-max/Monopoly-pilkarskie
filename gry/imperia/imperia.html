@@ -734,14 +734,16 @@ const TOAST=document.createElement('div');TOAST.id='toast';$('game').appendChild
   function hideParentBtn(){pmenu().forEach(e=>{if(e.dataset.impHid==null){e.dataset.impHid=e.style.display||'';e.style.display='none'}})}
   function restoreParentBtn(){try{window.parent.document.querySelectorAll('[data-imp-hid]').forEach(e=>{e.style.display=e.dataset.impHid;delete e.dataset.impHid})}catch(e){}}
   const prevClean=window.__impCleanup;window.__impCleanup=()=>{try{prevClean&&prevClean()}catch(e){}restoreParentBtn();restorePortalBar();};
+  let leaving=false,syncT=0;
   function goMenu(){
-    const p=pmenu();
-    if(p.length){try{window.__impCleanup()}catch(e){}restoreParentBtn();restorePortalBar();try{p[0].click();return}catch(e){}}
+    leaving=true;clearInterval(syncT);
     try{window.__impCleanup()}catch(e){}
+    const p=pmenu();
+    if(p.length){try{p[0].click();return}catch(e){}}
     const B=impBridge();
     try{if(B){for(const k of ['menu','mainMenu','home','exit','back','close']){if(typeof B[k]==='function'){B[k]();return}}}}catch(e){}
     try{window.parent.postMessage({type:'imperia:menu',imperia:'menu'},'*')}catch(e){}
-    setTimeout(()=>{try{(window.top||window.parent).location.href='./'}catch(e){location.href='./'}},150);
+    setTimeout(()=>{try{window.top.location.href='/'}catch(e){try{window.parent.location.href='/'}catch(e2){location.href='/'}}},150);
   }
   $('ilMenu').onclick=goMenu;
   function hidePortalBar(){try{
@@ -753,8 +755,8 @@ const TOAST=document.createElement('div');TOAST.id='toast';$('game').appendChild
   }catch(e){}
     try{window.parent.postMessage({type:'imperia:hideHeader',imperia:'hideHeader'},'*')}catch(e){}}
   function restorePortalBar(){try{const pd=window.parent.document;pd.querySelectorAll('[data-imp-hid2]').forEach(e=>{e.style.display=e.dataset.impHid2;delete e.dataset.impHid2});const fe=window.frameElement;if(fe&&fe.dataset.impH!=null){fe.style.height=fe.dataset.impH;delete fe.dataset.impH}}catch(e){}}
-  function sync(){hideParentBtn();hidePortalBar()}
-  setInterval(sync,700);sync();
+  function sync(){if(leaving)return;hideParentBtn();hidePortalBar()}
+  syncT=setInterval(sync,700);sync();
 })();
 let _actKey='',_lastMsg='',_toastT=0;
 const UIC={W:'⚔️',A:'🏹',S:'🧺',C:'🐎'};
