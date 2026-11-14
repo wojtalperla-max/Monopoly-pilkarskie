@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Czółko</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="czolko.css">
+</head>
+<body>
+<div id="cz"><div id="czc"></div></div>
+<script>
+/* ===== most do platformy (index.html): konto, Firebase, statystyki ===== */
+(function(){
+  var PB=null;try{PB=window.parent&&window.parent!==window?window.parent.PLATFORM_BRIDGE:null}catch(e){PB=null}
+  function def(n,g){Object.defineProperty(window,n,{get:g,configurable:true})}
+  def('ACC',function(){return PB?PB.ACC:{user:null,nick:'',col:'',admin:false}});
+  def('fbDB',function(){return PB?PB.fbDB:null});
+  def('firebase',function(){return PB?PB.firebase:undefined});
+  def('onlinePlayerId',function(){return PB?PB.onlinePlayerId:null});
+  def('ISL',function(){return PB?PB.ISL:{board:'isla-petit'}});
+  window.onlineEnsureAuth=function(){return PB?PB.onlineEnsureAuth():Promise.reject(new Error('Brak połączenia z platformą — otwórz grę przez index.html.'))};
+  window.onlineCode=function(){return Math.random().toString(36).slice(2,7).toUpperCase()};
+  window.statsRecord=function(){if(PB)return PB.statsRecord.apply(null,arguments)};
+  window.serverMarkRoomFinished=function(r){if(PB)PB.serverMarkRoomFinished(r)};
+  window.serverReopenRoom=function(r){if(PB)PB.serverReopenRoom(r)};
+  window.tgBox=function(refExpr,isTest){
+    if(typeof ACC!=='undefined'&&ACC.admin)return '<label class="lgnote tgbox" style="display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer"><input type="checkbox" '+(isTest?'checked':'')+' onchange="tgSet('+refExpr+',this.checked)"><span>🧪 <b>Gra testowa</b> (admin) – wyniki nie liczą się do statystyk</span></label>';
+    return isTest?'<div class="lgnote tgbox">🧪 <b>Gra testowa</b> – wyniki nie liczą się do statystyk</div>':'';
+  };
+  window.tgSet=function(ref,v){
+    if(!ref||typeof ACC==='undefined'||!ACC.admin)return;
+    ref.child('test').set(v?true:null).catch(function(e){alert('Nie udało się zmienić trybu gry testowej: '+(e&&e.message||e))});
+  };
+})();
+const lgEsc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function lgDot(c){return '<i class="lgd" style="background:'+(/^#[0-9a-f]{6}$/i.test(c)?c:'#888')+'"></i>'}
+</script>
+<script>
+/* ===== CZÓŁKO (online, pokoje) ===== */
+let CZ={screen:'start',ref:null,listener:null,code:'',host:null,players:[],words:{},game:null,status:null,msg:'',draft:'',nick:'',col:'#2a9df4',joinCode:'',promoting:false,show:false,historyPlayer:'all',cmode:'all',category:'',catDraft:''};
+const czNet=()=>typeof fbDB!=='undefined'&&!!fbDB&&typeof onlineEnsureAuth==='function';
+const czWordRe=/^[\p{L}\p{N} '’.\-]{1,30}$/u;
+const czNewGame=()=>({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),turn:0,pending:null,log:[],solved:[],done:false});
+const czMe=()=>CZ.players.findIndex(p=>p.id===(typeof onlinePlayerId!=='undefined'?onlinePlayerId:null));
+const czAuthor=(i,n)=>(i-1+n)%n;
+function czNext(g,n,from){let k=from;for(let s=0;s<n;s++){k=(k+1)%n;if(!g.solved.includes(k))return k}return from}
+function czWordOf(j){const n=CZ.players.length;if(!n)return '';const a=CZ.players[czAuthor(j,n)];return a?(CZ.words[a.id]||''):''}
+let czToastT=null;
+function czToast(e){
+  const pl=CZ.players,p=pl[e.p];if(!p)return;
+  const old=document.getElementById('czt');if(old)old.remove();clearTimeout(czToastT);
+  const yes=e.k==='q'?e.a==='Tak':!!e.ok,ans=e.k==='q'?e.a:(e.ok?'Poprawnie!':'Niepoprawnie');
+  const d=document.createElement('div');d.id='czt';d.setAttribute('role','status');
+  d.innerHTML=`<b>${lgEsc(p.name)}</b> ${e.k==='q'?'pyta':'zgaduje'}:<br>„${lgEsc(e.t)}”<span class="cza ${yes?'yes':'no'}">${lgEsc(ans)}</span>`;
+  document.body.appendChild(d);
+  czToastT=setTimeout(()=>{d.remove()},2000);
+}
+function czRefresh(keep){
+  const c=document.getElementById('czc');if(!c)return;
+  const a=document.activeElement,fid=keep&&a&&a.id&&c.contains(a)?a.id:null,pos=fid?a.selectionStart:0;
+  c.innerHTML=czScreen();
+  if(fid){const e=document.getElementById(fid);if(e){e.focus();try{e.setSelectionRange(pos,pos)}catch(x){}}}
+}
+function czDetach(){try{if(CZ.ref&&CZ.listener)CZ.ref.off('value',CZ.listener)}catch(e){}CZ.ref=null;CZ.listener=null}
+function czLeave(){
+  czVoiceStop();
+  try{if(CZ.ref&&onlinePlayerId)CZ.ref.child('players/'+onlinePlayerId).remove()}catch(e){}
+  czDetach();Object.assign(CZ,{screen:'start',players:[],words:{},game:null,status:null,msg:'',draft:'',category:'',catDraft:''});czRefresh();
+}
+function czScreen(){
+  const m=CZ.msg?`<div class="lgmsg" role="alert">${lgEsc(CZ.msg)}</div>`:'';
+  switch(CZ.screen){
+    case 'start':return czStartHTML()+m;
+    case 'lobby':return czLobbyHTML()+m;
+    case 'category':return czCatHTML()+m;
+    case 'words':return czWordsHTML()+m;
+    case 'play':case 'end':return czPlayHTML()+m;
+  }
+  return '';
+}
+function czStartHTML(){
+  const net=czNet();
+  return `<h2>Czółko</h2>
+  <p class="lgrules">Każdy gracz wpisuje hasło dla następnej osoby. Widzisz hasła wszystkich oprócz własnego i zadajesz pytania, na które odpowiada się tylko <b>tak</b> albo <b>nie</b>. Po każdym pytaniu — niezależnie od odpowiedzi „tak” lub „nie” — kolejka przechodzi do następnego gracza. W swojej turze możesz też zgadywać swoje hasło. Odpowiada i sprawdza zgadywanie ten, kto wpisał ci hasło. Kto zgadnie, zdobywa miejsce w rankingu.</p>
+  <div class="lgrow"><label>Twój nick <input id="cznick" maxlength="14" value="${lgEsc(CZ.nick||'Gracz')}" oninput="CZ.nick=this.value"></label>
+  <label>Kolor <input id="czcol" type="color" value="${lgEsc(CZ.col||'#2a9df4')}" oninput="CZ.col=this.value"></label></div>
+  <div class="lgrow">Tryb gry: <button class="lgbtn ${CZ.cmode==='cat'?'':'on'}" onclick="CZ.cmode='all';czRefresh(true)">Wszystkie hasła</button><button class="lgbtn ${CZ.cmode==='cat'?'on':''}" onclick="CZ.cmode='cat';czRefresh(true)">Wybierz kategorię</button></div>
+  <p class="lgnote">${CZ.cmode==='cat'?'Na początku partii host wpisze kategorię, w której wszyscy wymyślają hasła.':'Hasła mogą być dowolne.'}</p>
+  <div class="lgrow"><button class="lgbtn go" ${net?'':'disabled'} onclick="czCreate()">Utwórz pokój</button></div>
+  <div class="lgrow"><input id="czjoin" maxlength="5" placeholder="Kod pokoju" value="${lgEsc(CZ.joinCode||'')}" oninput="CZ.joinCode=this.value" style="text-transform:uppercase"><button class="lgbtn" ${net?'':'disabled'} onclick="czJoin()">Dołącz</button></div>
+  ${net?'':'<p class="lgnote">Czółko wymaga pokoju online, bo każdy widzi inne hasła. Działa po wgraniu gry na własny hosting z Firebase.</p>'}`;
+}
+const czClean=s=>String(s||'').replace(/[<>&]/g,'').trim().slice(0,14);
+async function czCreate(){
+  try{
+    const uid=await onlineEnsureAuth(),code=onlineCode(),ref=fbDB.ref('czRooms/'+code);
+    await ref.set({host:uid,status:'lobby',cmode:CZ.cmode==='cat'?'cat':'all',board:ISL.board||'isla-petit',createdAt:firebase.database.ServerValue.TIMESTAMP,players:{[uid]:{id:uid,name:czClean(CZ.nick)||'Gracz',color:CZ.col||'#2a9df4',order:0}}});
+    czAttach(ref,code);
+  }catch(e){CZ.msg='Nie udało się utworzyć pokoju: '+e.message;czRefresh()}
+}
+async function czJoin(){
+  try{
+    const uid=await onlineEnsureAuth(),code=String(CZ.joinCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);
+    if(code.length!==5)throw new Error('Wpisz pięcioznakowy kod pokoju.');
+    const ref=fbDB.ref('czRooms/'+code),room=(await ref.once('value')).val();
+    if(!room)throw new Error('Nie znaleziono pokoju o takim kodzie.');
+    ISL.board=room.board||'isla-petit';
+    const players=Object.values(room.players||{});
+    if(!(room.players&&room.players[uid])){
+      if(room.status!=='lobby')throw new Error('Ta rozgrywka już się rozpoczęła.');
+      if(players.length>=8)throw new Error('Pokój jest pełny (maksymalnie 8 osób).');
+      await ref.child('players/'+uid).set({id:uid,name:czClean(CZ.nick)||'Gracz',color:CZ.col||'#2a9df4',order:Math.max(-1,...players.map(p=>Number(p.order)||0))+1});
+    }
+    czAttach(ref,code);
+  }catch(e){CZ.msg='Nie udało się dołączyć: '+e.message;czRefresh()}
+}
+function czAttach(ref,code){
+  czDetach();CZ.ref=ref;CZ.code=code;CZ.msg='';CZ.seenId=null;CZ.seenN=0;
+  CZ.listener=ref.on('value',snap=>czOnRoom(snap.val()),err=>{CZ.msg='Błąd połączenia: '+err.message;czRefresh()});
+}
+function czOnRoom(room){
+  if(!room){CZ.msg='Pokój został usunięty.';czDetach();CZ.screen='start';czRefresh();return}
+  CZ.host=room.host;CZ.status=room.status;CZ.test=!!room.test;CZ.cmode=room.cmode==='cat'?'cat':'all';CZ.category=String(room.category||'');
+  CZ.players=Object.values(room.players||{}).sort((a,b)=>(a.order||0)-(b.order||0)).map(p=>({id:p.id,name:String(p.name||'Gracz'),color:p.color}));
+  CZ.words=room.words||{};
+  try{CZ.game=room.game?JSON.parse(room.game):null}catch(e){CZ.game=null}
+  if(CZ.game&&Array.isArray(CZ.game.log)){
+    const gg=CZ.game;
+    if(CZ.seenId!==gg.id){CZ.seenId=gg.id;CZ.seenN=gg.log.length}
+    else if(gg.log.length>CZ.seenN){CZ.seenN=gg.log.length;czToast(gg.log[gg.log.length-1])}
+  }
+  if(room.status==='lobby')CZ.screen='lobby';
+  else if(room.status==='category')CZ.screen='category';
+  else if(room.status==='words')CZ.screen='words';
+  else if(room.status==='play')CZ.screen=CZ.game&&CZ.game.done?'end':'play';
+  if(room.status==='words'&&CZ.players.length>=2&&CZ.players.every(p=>CZ.words[p.id])&&!CZ.promoting){
+    CZ.promoting=true;
+    CZ.ref.child('status').transaction(s=>s==='words'?'play':undefined).then(r=>{
+      if(r&&r.committed)return CZ.ref.child('game').set(JSON.stringify(czNewGame()));
+    }).catch(e=>console.error('Start czółka:',e)).then(()=>{CZ.promoting=false});
+  }
+  if(CZ.game&&CZ.game.done){serverMarkRoomFinished(CZ.ref);statsCz();}
+  czRefresh(true);
+}
+function czLobbyHTML(){
+  const isHost=CZ.host===onlinePlayerId;
+  const list=CZ.players.map((p,i)=>`<div class="lghist">${lgDot(p.color)}${i+1}. ${lgEsc(p.name)}${p.id===CZ.host?' <b>(host)</b>':''}${p.id===onlinePlayerId?' (Ty)':''}</div>`).join('');
+  return `<h2>Pokój: <span class="lgcode">${lgEsc(CZ.code)}</span></h2><p class="lgnote">Tryb: <b>${CZ.cmode==='cat'?'wybierz kategorię':'wszystkie hasła'}</b></p>${list}${tgBox('CZ.ref',CZ.test)}
+  <p class="lgnote">${isHost?(CZ.players.length>=2?'Możesz rozpocząć grę.':'Poczekaj, aż dołączy co najmniej jeden gracz.'):'Czekaj, aż host rozpocznie grę.'} (Gracze: ${CZ.players.length}/8)</p>
+  <div class="lgrow">${isHost?`<button class="lgbtn go" ${CZ.players.length>=2?'':'disabled'} onclick="czHostStart()">Rozpocznij grę</button>`:''}<button class="lgbtn" onclick="navigator.clipboard&&navigator.clipboard.writeText(CZ.code)">Kopiuj kod</button><button class="lgbtn" onclick="czLeave()">Wyjdź</button></div>`;
+}
+const czCatBanner=()=>(CZ.cmode==='cat'&&CZ.category)?`<div class="lgnote lgcat">Kategoria: <b>${lgEsc(CZ.category)}</b></div>`:'';
+function czHostStart(){if(CZ.host!==onlinePlayerId||CZ.players.length<2)return;CZ.ref.child('status').set(CZ.cmode==='cat'?'category':'words')}
+function czCatHTML(){
+  const isHost=CZ.host===onlinePlayerId;
+  if(!isHost)return `<h2>Wybór kategorii</h2><p>Host wybiera kategorię, w której trzeba wymyślić hasła…</p>`;
+  return `<h2>Wybierz kategorię</h2>
+  <p class="lgnote">Wpisz kategorię, w której wszyscy gracze wymyślą hasła dla innych (np. zwierzęta, miasta, jedzenie).</p>
+  <div class="lgrow"><input id="czcatin" type="text" maxlength="40" autocomplete="off" value="${lgEsc(CZ.catDraft||'')}" oninput="CZ.catDraft=this.value" onkeydown="if(event.key==='Enter')czSubmitCat()" aria-label="Kategoria"><button class="lgbtn go" onclick="czSubmitCat()">Zatwierdź</button></div>`;
+}
+function czSubmitCat(){
+  if(CZ.host!==onlinePlayerId||!CZ.ref)return;
+  const c=String(CZ.catDraft||'').replace(/[<>&]/g,'').replace(/\s+/g,' ').trim().slice(0,40);
+  if(!c){CZ.msg='Wpisz kategorię.';czRefresh(true);return}
+  CZ.catDraft='';CZ.msg='';
+  CZ.ref.update({category:c,status:'words'}).catch(e=>{CZ.msg='Nie udało się zapisać kategorii: '+e.message;czRefresh()});
+}
+function czWordsHTML(){
+  const me=czMe(),n=CZ.players.length;
+  if(me<0)return '<h2>Czółko</h2><p>Nie jesteś w tym pokoju.</p>';
+  const target=CZ.players[(me+1)%n],mine=CZ.words[CZ.players[me].id];
+  const waiting=CZ.players.filter(p=>!CZ.words[p.id]).map(p=>lgEsc(p.name)).join(', ');
+  const cb=czCatBanner();
+  if(mine)return `<h2>Hasło zapisane</h2>${cb}<p>Wpisałeś hasło dla gracza <b>${lgEsc(target.name)}</b>: <b>${lgEsc(mine)}</b>. Czekamy na pozostałych${waiting?': <b>'+waiting+'</b>':''}…</p>`;
+  return `<h2>Wpisz hasło dla gracza ${lgDot(target.color)}${lgEsc(target.name)}</h2>${cb}
+  <p class="lgnote">${CZ.cmode==='cat'&&CZ.category?'Hasło musi pasować do kategorii (do 30 znaków).':'Wymyśl osobę, zwierzę, przedmiot albo miejsce (do 30 znaków).'} ${lgEsc(target.name)} nie zobaczy hasła, ale zobaczą je wszyscy pozostali.</p>
+  <div class="lgrow"><input id="czin" maxlength="30" autocomplete="off" value="${lgEsc(CZ.draft)}" oninput="CZ.draft=this.value" onkeydown="if(event.key==='Enter')czSendWord()" aria-label="Hasło dla ${lgEsc(target.name)}"><button class="lgbtn go" onclick="czSendWord()">Zatwierdź</button></div>
+  <p class="lgnote">Czekamy jeszcze na: ${waiting||'—'}</p>`;
+}
+function czSendWord(){
+  const w=String(CZ.draft||'').trim().replace(/\s+/g,' ');
+  if(!czWordRe.test(w)){CZ.msg='Hasło: 1–30 znaków (litery, cyfry, spacje, myślnik, kropka).';czRefresh(true);return}
+  CZ.draft='';CZ.msg='';
+  CZ.ref.child('words/'+onlinePlayerId).set(w).catch(e=>{CZ.msg='Nie udało się zapisać hasła: '+e.message;czRefresh()});
+  czRefresh();
+}
+function czTx(fn,errMsg){
+  CZ.ref.child('game').transaction(cur=>{const g=cur?JSON.parse(cur):null;if(!g||g.done)return;const r=fn(g,CZ.players.length);return r?JSON.stringify(r):undefined})
+    .then(r=>{if(r&&!r.committed){CZ.msg=errMsg||'Ruch nie został zapisany (zmienił się stan gry).';czRefresh()}})
+    .catch(e=>{CZ.msg='Błąd: '+e.message;czRefresh()});
+}
+let czRec=null;
+const czSR=()=>window.SpeechRecognition||window.webkitSpeechRecognition;
+function czVoiceStop(){if(czRec){try{czRec.stop()}catch(e){}}CZ.listening=false}
+function czVoice(){
+  if(CZ.listening){czVoiceStop();czRefresh(true);return}
+  const SR=czSR();if(!SR)return;
+  const r=new SR(),base=String(CZ.draft||'').trim();
+  r.lang='pl-PL';r.interimResults=true;r.continuous=false;r.maxAlternatives=1;
+  r.onresult=e=>{
+    let t='';for(let i=0;i<e.results.length;i++)t+=e.results[i][0].transcript;
+    CZ.draft=((base?base+' ':'')+t.trim()).slice(0,120);
+    const inp=document.getElementById('czin');if(inp)inp.value=CZ.draft;
+  };
+  r.onerror=e=>{
+    const m={'not-allowed':'Brak zgody na użycie mikrofonu (zezwól w ustawieniach przeglądarki).','service-not-allowed':'Brak zgody na użycie mikrofonu (zezwól w ustawieniach przeglądarki).','no-speech':'Nie usłyszałem mowy. Spróbuj jeszcze raz.','audio-capture':'Nie znaleziono mikrofonu.','network':'Rozpoznawanie mowy wymaga połączenia z internetem.'};
+    if(e.error!=='aborted')CZ.msg=m[e.error]||'Błąd rozpoznawania mowy: '+e.error;
+  };
+  r.onend=()=>{if(czRec===r){czRec=null;CZ.listening=false;czRefresh(true)}};
+  czRec=r;CZ.listening=true;CZ.msg='';
+  try{r.start()}catch(e){CZ.listening=false;czRec=null}
+  czRefresh(true);
+}
+function czAsk(kind){
+  czVoiceStop();
+  const t=String(CZ.draft||'').trim().replace(/\s+/g,' ').slice(0,120),me=czMe();
+  if(!t){CZ.msg=kind==='q'?'Wpisz pytanie.':'Wpisz swoje hasło.';czRefresh(true);return}
+  CZ.draft='';CZ.msg='';
+  czTx((g,n)=>{if(g.turn!==me||g.pending)return null;g.pending={k:kind,p:me,t};return g});
+  czRefresh();
+}
+function czAnswer(v){
+  const me=czMe();
+  czTx((g,n)=>{
+    const pd=g.pending;if(!pd||czAuthor(pd.p,n)!==me)return null;
+    if(pd.k==='q'){
+      g.log.push({k:'q',p:pd.p,t:pd.t,a:v?'Tak':'Nie',by:me});g.pending=null;
+      g.turn=czNext(g,n,pd.p);
+    }else{
+      g.log.push({k:'g',p:pd.p,t:pd.t,ok:!!v,by:me});g.pending=null;
+      if(v){g.solved.push(pd.p);if(g.solved.length>=n-1)g.done=true;else g.turn=czNext(g,n,pd.p)}
+      else g.turn=czNext(g,n,pd.p);
+    }
+    return g;
+  });
+}
+function czPlayHTML(){
+  const g=CZ.game,pl=CZ.players,n=pl.length,me=czMe();
+  if(!g)return '<h2>Przygotowanie gry…</h2>';
+  const turn=g.turn,pd=g.pending;
+  let h=czCatBanner()+`<div class="lgh"><span>Pokój ${lgEsc(CZ.code)}</span>${g.done?'<b>Koniec gry</b>':''}</div>`;
+  if(g.done){
+    const rest=pl.map((_,i)=>i).filter(i=>!g.solved.includes(i)),rank=g.solved.concat(rest);
+    h+=`<div class="lgwin">Wygrywa <b>${lgEsc(pl[rank[0]].name)}</b>!<small>${rank.map((i,k)=>(k+1)+'. '+lgEsc(pl[i].name)).join(' · ')}</small></div>`;
+  }else{
+    h+=`<div class="lgturn">${lgDot(pl[turn].color)}Tura: <b>${lgEsc(pl[turn].name)}</b>${me===turn?' (Ty)':''}</div>`;
+    if(pd){
+      const asker=pl[pd.p],auth=czAuthor(pd.p,n),authName=lgEsc(pl[auth].name);
+      h+=`<div class="czpend">${lgDot(asker.color)}<b>${lgEsc(asker.name)}</b> ${pd.k==='q'?'pyta':'zgaduje'}: <b>„${lgEsc(pd.t)}”</b></div>`;
+      if(me===auth)h+=pd.k==='q'
+        ?`<div class="lgrow"><span>Odpowiedz (hasło: <b>${lgEsc(czWordOf(pd.p))}</b>):</span><button class="lgbtn go" onclick="czAnswer(true)">Tak</button><button class="lgbtn" onclick="czAnswer(false)">Nie</button></div>`
+        :`<div class="lgrow"><span>Czy to hasło (<b>${lgEsc(czWordOf(pd.p))}</b>)?</span><button class="lgbtn go" onclick="czAnswer(true)">Zgadza się</button><button class="lgbtn" onclick="czAnswer(false)">Nie zgadza się</button></div>`;
+      else h+=`<div class="lgnote">Czekamy na odpowiedź gracza ${authName}…</div>`;
+    }else if(me===turn){
+      h+=`<div class="lgrow"><input id="czin" maxlength="120" autocomplete="off" value="${lgEsc(CZ.draft)}" placeholder="Pytanie (tak/nie) albo twoje hasło" oninput="CZ.draft=this.value" onkeydown="if(event.key==='Enter')czAsk('q')" aria-label="Pytanie lub zgadywanie">${czSR()?`<button class="lgbtn ${CZ.listening?'on':''}" onclick="czVoice()" aria-label="Wpisywanie głosowe" title="Wpisywanie głosowe">${CZ.listening?'🎤 Słucham…':'🎤'}</button>`:''}<button class="lgbtn go" onclick="czAsk('q')">Zapytaj</button><button class="lgbtn" onclick="czAsk('g')">Zgaduję!</button></div>`;
+    }else h+=`<div class="lgnote">Czekaj na ruch gracza ${lgEsc(pl[turn].name)}…</div>`;
+  }
+  h+='<div class="lgcards">'+pl.map((p,j)=>{
+    const solvedAt=g.solved.indexOf(j),isMe=j===me,w=czWordOf(j);
+    const shown=isMe&&solvedAt<0&&!g.done?'???':lgEsc(w.toUpperCase());
+    return `<div class="lgcard ${!g.done&&turn===j?'act':''}">${lgDot(p.color)}<b>${lgEsc(p.name)}</b>${isMe?' (Ty)':''}<div class="czw">${shown}</div><div class="lghint">${solvedAt>=0?'Zgadnięte — miejsce '+(solvedAt+1):(isMe?'Twoje czółko — nie znasz hasła':'')}</div></div>`;
+  }).join('')+'</div>';
+  const historyPlayer=CZ.historyPlayer||'all';
+  const myHistory=historyPlayer==='me';
+  const selectedPlayer=historyPlayer==='all'||historyPlayer==='me'?-1:pl.findIndex(p=>p.id===historyPlayer);
+  const historyItems=g.log.slice().reverse().filter(x=>historyPlayer==='all'||(myHistory?(x.k==='q'&&x.p===me):(selectedPlayer>=0&&x.p===selectedPlayer)));
+  const hist=historyItems.map(x=>{const p=pl[x.p],by=pl[x.by];
+    return x.k==='q'
+      ?`<div class="lghist">${lgDot(p.color)}<b>${lgEsc(p.name)}</b> pyta: „${lgEsc(x.t)}” — <b>${x.a}</b> <small>(odpowiada ${lgEsc(by.name)})</small></div>`
+      :`<div class="lghist">${lgDot(p.color)}<b>${lgEsc(p.name)}</b> zgaduje: „${lgEsc(x.t)}” — ${x.ok?'<b>poprawnie!</b>':'niepoprawnie'} <small>(sprawdza ${lgEsc(by.name)})</small></div>`}).join('');
+  const historyOptions=[`<option value="all" ${historyPlayer==='all'?'selected':''}>Cała historia</option>`,`<option value="me" ${myHistory?'selected':''}>Moja historia</option>`,...pl.map((p,j)=>`<option value="${lgEsc(p.id)}" ${historyPlayer===p.id?'selected':''}>${lgEsc(p.name)}</option>`) ].join('');
+  const emptyHistory=myHistory?'Nie zadałeś jeszcze żadnych pytań.':selectedPlayer>=0?'Ten gracz nie wykonał jeszcze żadnych ruchów.':'Jeszcze nie było pytań.';
+  h+=`<div class="lgrow" style="margin-top:16px;flex-wrap:wrap"><h3 style="margin:0">Historia</h3><label class="lgnote" for="czHistoryPlayer">Pokaż:</label><select id="czHistoryPlayer" onchange="czSetHistory(this.value)" aria-label="Historia gracza">${historyOptions}</select></div>${hist||( `<div class="lgnote">${emptyHistory}</div>` )}`;
+  if(g.done){
+    const isHost=CZ.host===onlinePlayerId;
+    h+=`<div class="lgrow">${isHost?'<button class="lgbtn go" onclick="czRematch()">Zagraj ponownie</button>':'<span class="lgnote">Host może rozpocząć kolejną grę.</span>'}<button class="lgbtn" onclick="czLeave()">Wyjdź z pokoju</button></div>`;
+  }
+  return h;
+}
+function czSetHistory(v){CZ.historyPlayer=String(v||'all');czRefresh(true)}
+function czToggleHistory(){czSetHistory(CZ.historyPlayer==='me'?'all':'me')}
+function czRematch(){
+  if(CZ.host!==onlinePlayerId)return;
+  const r=CZ.ref,cat=CZ.cmode==='cat';serverReopenRoom(r);r.child('words').remove();r.child('game').remove();if(cat)r.child('category').remove();r.child('status').set(cat?'category':'words');
+}
+
+function statsCz(){
+  const g=CZ.game;if(!g||!g.done||!g.id||typeof ACC==='undefined'||!ACC.user)return;
+  const me=CZ.players.findIndex(p=>p.id===ACC.user.uid);if(me<0)return;
+  const first=g.solved.length?g.solved[0]:-1;
+  statsRecord('cz_'+g.id,'czolko',first===me?'w':'l',CZ.players.map(p=>({uid:p.id,name:p.name})),CZ.test);
+}
+
+
+/* ===== integracja z platformą: wejście do gry / wyjście z gry ===== */
+window.__show=function(){
+  if(!CZ.ref)Object.assign(CZ,{screen:'start',msg:'',draft:''});czRefresh();
+};
+window.__leave=function(){
+  czLeave();
+};
+window.__setNick=function(n){CZ.nick=n};
+window.__setCol=function(c){CZ.col=c};
+window.__inRoom=function(){return !!CZ.ref};
+window.__joinFromHub=async function(c){CZ.joinCode=c;await czJoin()};
+window.__show();
+</script>
+</body>
+</html>

@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Kim jestem?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="kim-jestem.css">
+</head>
+<body>
+<div id="kj"><div id="kjc"></div></div>
+<script>
+/* ===== most do platformy (index.html): konto, Firebase, statystyki ===== */
+(function(){
+  var PB=null;try{PB=window.parent&&window.parent!==window?window.parent.PLATFORM_BRIDGE:null}catch(e){PB=null}
+  function def(n,g){Object.defineProperty(window,n,{get:g,configurable:true})}
+  def('ACC',function(){return PB?PB.ACC:{user:null,nick:'',col:'',admin:false}});
+  def('fbDB',function(){return PB?PB.fbDB:null});
+  def('firebase',function(){return PB?PB.firebase:undefined});
+  def('onlinePlayerId',function(){return PB?PB.onlinePlayerId:null});
+  window.onlineEnsureAuth=function(){return PB?PB.onlineEnsureAuth():Promise.reject(new Error('Brak połączenia z platformą — otwórz grę przez index.html.'))};
+  window.onlineCode=function(){return Math.random().toString(36).slice(2,7).toUpperCase()};
+  window.statsRecord=function(){if(PB)return PB.statsRecord.apply(null,arguments)};
+  window.serverMarkRoomFinished=function(r){if(PB)PB.serverMarkRoomFinished(r)};
+  window.tgBox=function(refExpr,isTest){
+    if(typeof ACC!=='undefined'&&ACC.admin)return '<label class="lgnote tgbox" style="display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer"><input type="checkbox" '+(isTest?'checked':'')+' onchange="tgSet('+refExpr+',this.checked)"><span>🧪 <b>Gra testowa</b> (admin) – wyniki nie liczą się do statystyk</span></label>';
+    return isTest?'<div class="lgnote tgbox">🧪 <b>Gra testowa</b> – wyniki nie liczą się do statystyk</div>':'';
+  };
+  window.tgSet=function(ref,v){
+    if(!ref||typeof ACC==='undefined'||!ACC.admin)return;
+    ref.child('test').set(v?true:null).catch(function(e){alert('Nie udało się zmienić trybu gry testowej: '+(e&&e.message||e))});
+  };
+})();
+const lgEsc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function lgDot(c){return '<i class="lgd" style="background:'+(/^#[0-9a-f]{6}$/i.test(c)?c:'#888')+'"></i>'}
+</script>
+<script>
+/* ===== KIM JESTEM? (pokoje online, motywy dodawane przez admina) ===== */
+const KJ_N=24;
+const kjEmpty=()=>Array.from({length:KJ_N},()=>({n:'',i:''}));
+const kjImgOk=s=>typeof s==='string'&&s.length<60000&&/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(s);
+function kjFixIcons(a){const r=kjEmpty();if(Array.isArray(a))for(let k=0;k<KJ_N;k++){const x=a[k]||{};r[k]={n:String(x.n||'').replace(/[<>&]/g,'').slice(0,24),i:kjImgOk(x.i)?x.i:''}}return r}
+let KJ={screen:'start',ref:null,listener:null,code:'',host:null,players:[],status:null,lastStatus:null,msg:'',ok:'',nick:'',col:'',anim:{},joinCode:'',themeId:'default',roomTheme:'default',themes:{},tRef:null,tListener:null,board:null,picks:{},cover:{},game:null,selPick:null,guessing:false,guessSel:null,draft:'',promoting:false,edit:null,busy:false,seenId:null};
+const kjNet=()=>typeof fbDB!=='undefined'&&!!fbDB&&typeof onlineEnsureAuth==='function';
+const kjMe=()=>KJ.players.findIndex(p=>p.id===(typeof onlinePlayerId!=='undefined'?onlinePlayerId:null));
+const kjHex=c=>/^#[0-9a-f]{6}$/i.test(c||'')?c:'';
+const kjColor=()=>kjHex(KJ.col)||kjHex(typeof ACC!=='undefined'&&ACC.col)||'#ff5fa2';
+const kjClean=s=>String(s||'').replace(/[<>&]/g,'').trim().slice(0,14);
+const kjIsAdmin=()=>typeof ACC!=='undefined'&&!!ACC.admin&&!!ACC.user;
+const kjNickVal=()=>kjClean(KJ.nick)||kjClean(typeof ACC!=='undefined'&&ACC.nick)||'Gracz';
+const kjName=i=>{const b=KJ.board;const n=b&&b[i]&&b[i].n;return n||('Postać '+(Number(i)+1))};
+function kjThemeList(){return Object.assign({default:{id:'default',name:'Domyślny (pusty)',icons:kjEmpty()}},KJ.themes)}
+function kjThemeIds(){const o=kjThemeList();return Object.keys(o).sort((a,b)=>a==='default'?-1:b==='default'?1:o[a].name.localeCompare(o[b].name,'pl'))}
+function kjParseThemes(v){const o={};Object.keys(v||{}).forEach(id=>{const t=v[id]||{};let ic=[];try{ic=JSON.parse(t.icons||'[]')}catch(e){}o[id]={id,name:String(t.name||'Motyw').replace(/[<>&]/g,'').slice(0,30),icons:kjFixIcons(ic)}});return o}
+function kjThemesAttach(){
+  if(!kjNet()||KJ.tRef)return;
+  KJ.tRef=fbDB.ref('kjThemes');
+  KJ.tListener=KJ.tRef.on('value',s=>{KJ.themes=kjParseThemes(s.val());if(KJ.themeId!=='default'&&!KJ.themes[KJ.themeId])KJ.themeId='default';if(KJ.screen!=='edit')kjRefresh(true)},e=>{KJ.msg='Nie udało się wczytać motywów: '+e.message;kjRefresh()});
+}
+function kjThemesDetach(){try{if(KJ.tRef&&KJ.tListener)KJ.tRef.off('value',KJ.tListener)}catch(e){}KJ.tRef=null;KJ.tListener=null}
+const KJ_FLIP=600;
+function kjRefresh(keep){
+  const c=document.getElementById('kjc');if(!c)return;
+  const q=s=>c.querySelectorAll?c.querySelectorAll(s):[];
+  const prev={};q('.kjc[data-k]').forEach(e=>{prev[e.dataset.k]=e.classList.contains('cov')});
+  const a=document.activeElement,fid=keep&&a&&a.id&&c.contains(a)?a.id:null,pos=fid?a.selectionStart:0;
+  c.innerHTML=kjScreen();
+  const now=Date.now();
+  q('.kjc[data-k]').forEach(e=>{
+    const k=e.dataset.k,cv=e.classList.contains('cov');
+    if(k in prev&&prev[k]!==cv)KJ.anim[k]={to:cv,t:now};
+    const an=KJ.anim[k];
+    if(an){
+      const el=now-an.t,f=e.querySelector('.kjf');
+      if(el<KJ_FLIP&&f&&an.to===cv)f.style.animation=`${cv?'kjfl1':'kjfl0'} ${KJ_FLIP}ms cubic-bezier(.45,.05,.25,1) ${-el}ms both`;
+      else delete KJ.anim[k];
+    }
+  });
+  if(fid){const e=document.getElementById(fid);if(e){e.focus();try{e.setSelectionRange(pos,pos)}catch(x){}}}
+}
+/* zapamiętujemy ostatni pokój, żeby po wyjściu/odświeżeniu móc wrócić do tej samej gry */
+const KJ_LAST_KEY='dgw_kj_last';
+function kjLastGet(){try{return localStorage.getItem(KJ_LAST_KEY)||''}catch(e){return''}}
+function kjLastSet(c){try{c?localStorage.setItem(KJ_LAST_KEY,c):localStorage.removeItem(KJ_LAST_KEY)}catch(e){}}
+async function kjResume(code,silent){
+  try{
+    const uid=await onlineEnsureAuth(),ref=fbDB.ref('kjRooms/'+code),room=(await ref.once('value')).val();
+    if(!room||!(room.players&&room.players[uid])){kjLastSet('');if(!silent){KJ.msg='Ten pokój już nie istnieje.';kjRefresh()}else kjRefresh();return}
+    if(KJ.ref)return;
+    KJ.leftCode='';kjAttach(ref,code);
+  }catch(e){if(!silent){KJ.msg='Nie udało się wrócić do gry: '+e.message;kjRefresh()}}
+}
+function kjDetach(){try{if(KJ.ref&&KJ.listener)KJ.ref.off('value',KJ.listener)}catch(e){}KJ.ref=null;KJ.listener=null}
+function kjLeave(){
+  const lobby=KJ.status==='lobby';
+  try{if(KJ.ref&&onlinePlayerId)KJ.ref.child('players/'+onlinePlayerId).remove()}catch(e){}
+  if(lobby||(KJ.game&&KJ.game.done))kjLastSet('');else KJ.leftCode=KJ.code;
+  kjDetach();Object.assign(KJ,{screen:'start',players:[],status:null,lastStatus:null,msg:'',ok:'',board:null,picks:{},cover:{},game:null,selPick:null,guessing:false,guessSel:null,draft:''});kjRefresh();
+}
+function kjScreen(){
+  const m=(KJ.msg?`<div class="lgmsg" role="alert">${lgEsc(KJ.msg)}</div>`:'')+(KJ.ok?`<div class="lgnote" role="status">${lgEsc(KJ.ok)}</div>`:'');
+  switch(KJ.screen){
+    case 'start':return kjStartHTML()+m;
+    case 'lobby':return kjLobbyHTML()+m;
+    case 'pick':return kjPickHTML()+m;
+    case 'play':case 'end':return kjPlayHTML()+m;
+    case 'themes':return kjThemesHTML()+m;
+    case 'edit':return kjEditHTML()+m;
+  }
+  return '';
+}
+/* ---------- plansza ---------- */
+function kjInk(c){const h=c.replace('#',''),r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16);return (0.299*r+0.587*g+0.114*b)>150?'#1a1033':'#ffffff'}
+function kjBoardHTML(o){
+  const b=KJ.board||kjEmpty();o=o||{};
+  const bc=kjHex(o.color)||'#ff5fa2',bi=kjInk(bc),bs=bi==='#ffffff'?'0 2px 0 #0006':'0 1px 0 #ffffff66',key=o.key||'x';
+  return `<div class="kjgrid" style="--bc:${bc};--bi:${bi};--bs:${bs}">`+b.map((ic,i)=>{
+    const cls=['kjc',o.cov&&o.cov(i)?'cov':'',o.sel&&o.sel(i)?'sel':''].join(' ');
+    const nm=lgEsc(ic.n||('Postać '+(i+1)));
+    const img=ic.i&&kjImgOk(ic.i)?`<img src="${ic.i}" alt="">`:`<span class="kjph">${i+1}</span>`;
+    return `<button class="${cls}" data-k="${key}${i}" onclick="${o.dis?'kjPrev':'kjClick'}(${i},'${key}${i}')" aria-label="${nm}"><span class="kjf"><span class="kjfr">${img}<span class="kjn">${nm}</span>${o.mine===i?'<b class="kjstar" title="Twoja postać">⭐</b>':''}</span><span class="kjbk" aria-hidden="true"><i>✦</i><b>DGW</b><i>✦</i></span></span></button>`;
+  }).join('')+'</div>';
+}
+/* przytrzymanie karty = powiększony podgląd (znika po puszczeniu) */
+const KJ_HOLD={t:0,x:0,y:0,shown:false,block:false,bound:false};
+function kjPrev(){}
+function kjHoldBind(){
+  if(KJ_HOLD.bound)return;const c=document.getElementById('kjc');if(!c)return;KJ_HOLD.bound=true;
+  const stop=()=>{clearTimeout(KJ_HOLD.t);if(KJ_HOLD.shown){KJ_HOLD.shown=false;KJ_HOLD.block=true;kjZoomClose();setTimeout(()=>{KJ_HOLD.block=false},350)}};
+  c.addEventListener('pointerdown',e=>{
+    const b=e.target.closest&&e.target.closest('.kjc[data-k]');if(!b)return;
+    const m=/^\D*?(\d+)$/.exec(b.dataset.k);if(!m)return;
+    const idx=Number(m[1]);
+    KJ_HOLD.x=e.clientX;KJ_HOLD.y=e.clientY;clearTimeout(KJ_HOLD.t);
+    KJ_HOLD.t=setTimeout(()=>{KJ_HOLD.shown=true;kjZoom(idx)},420);
+  });
+  c.addEventListener('pointermove',e=>{if(!KJ_HOLD.shown&&Math.hypot(e.clientX-KJ_HOLD.x,e.clientY-KJ_HOLD.y)>12)clearTimeout(KJ_HOLD.t)});
+  ['pointerup','pointercancel','pointerleave'].forEach(n=>c.addEventListener(n,stop));
+  document.addEventListener('pointerup',stop);
+  c.addEventListener('click',e=>{if(KJ_HOLD.block){e.stopPropagation();e.preventDefault()}},true);
+  c.addEventListener('contextmenu',e=>{if(e.target.closest&&e.target.closest('.kjc'))e.preventDefault()});
+}
+function kjZoomClose(){const z=document.getElementById('kjzoom');if(z)z.remove();document.removeEventListener('keydown',kjZoomKey)}
+function kjZoomKey(e){if(e.key==='Escape')kjZoomClose()}
+function kjZoom(i){
+  const ic=(KJ.board||kjEmpty())[i];if(!ic)return;
+  kjZoomClose();
+  const z=document.createElement('div');z.id='kjzoom';z.setAttribute('role','dialog');z.setAttribute('aria-modal','true');
+  const img=ic.i&&kjImgOk(ic.i)?`<img src="${ic.i}" alt="">`:`<span class="kjph">${i+1}</span>`;
+  z.innerHTML=`<div class="kjzc">${img}<div class="kjzn">${lgEsc(ic.n||('Postać '+(i+1)))}</div></div>`;
+  document.getElementById('kj').appendChild(z);
+  document.addEventListener('keydown',kjZoomKey);
+}
+function kjClick(i,k){
+  kjClickDo(i);
+}
+function kjClickDo(i){
+  if(!KJ.ref)return;
+  if(KJ.status==='pick'){
+    const me=kjMe();if(me<0||KJ.picks[KJ.players[me].id]!=null)return;
+    KJ.selPick=i;KJ.msg='';kjRefresh(true);return;
+  }
+  if(KJ.status==='play'&&KJ.game&&!KJ.game.done){
+    if(KJ.guessing){KJ.guessSel=i;kjRefresh(true);return}
+    kjToggleCover(i);
+  }
+}
+/* ---------- start / lobby ---------- */
+function kjStartHTML(){
+  const net=kjNet(),T=kjThemeList(),ids=kjThemeIds();
+  return `<h2>Kim jestem?</h2>
+  <p class="lgrules">Gra dla dwóch osób. Każdy w tajemnicy wybiera jedną postać z planszy 6×4. W swojej turze zadajesz przeciwnikowi pytanie, na które odpowie <b>tak</b> albo <b>nie</b> (np. „Czy jestem mężczyzną?”), a potem zakrywasz ikony, które nie pasują. Gdy wiesz, kim jest przeciwnik, kliknij „Zgaduję!” i wskaż postać. Trafisz — wygrywasz. Pomylisz się — ikona zostaje zakryta, a kolej przechodzi na przeciwnika. Cały czas widzisz obie plansze: swoją i przeciwnika.</p>
+  <div class="lgrow"><label>Twój nick <input id="kjnick" maxlength="14" value="${lgEsc(KJ.nick||kjNickVal())}" oninput="KJ.nick=this.value"></label>
+  <label>Kolor <input id="kjcol" type="color" value="${lgEsc(kjColor())}" oninput="KJ.col=this.value"></label></div>
+  <div class="lgrow"><label>Motyw <select id="kjtheme" onchange="KJ.themeId=this.value">${ids.map(id=>`<option value="${lgEsc(id)}" ${id===KJ.themeId?'selected':''}>${lgEsc(T[id].name)}</option>`).join('')}</select></label></div>
+  ${net&&kjLastGet()&&!KJ.ref?`<div class="lgrow"><button class="lgbtn go" onclick="kjResume('${lgEsc(kjLastGet())}')">↩ Wróć do ostatniej gry (${lgEsc(kjLastGet())})</button></div>`:''}
+  <div class="lgrow"><button class="lgbtn go" ${net?'':'disabled'} onclick="kjCreate()">Utwórz pokój</button></div>
+  <div class="lgrow"><input id="kjjoin" maxlength="5" placeholder="Kod pokoju" value="${lgEsc(KJ.joinCode||'')}" oninput="KJ.joinCode=this.value" style="text-transform:uppercase"><button class="lgbtn" ${net?'':'disabled'} onclick="kjJoin()">Dołącz</button></div>
+  ${kjIsAdmin()?'<div class="lgrow"><button class="lgbtn" onclick="kjThemesOpen()">🎨 Motywy (admin)</button></div>':''}
+  ${net?'':'<p class="lgnote">Kim jestem? wymaga pokoju online. Działa po wgraniu gry na własny hosting z Firebase.</p>'}`;
+}
+async function kjCreate(){
+  try{
+    const uid=await onlineEnsureAuth(),code=onlineCode(),ref=fbDB.ref('kjRooms/'+code);
+    await ref.set({host:uid,status:'lobby',theme:KJ.themeId||'default',createdAt:firebase.database.ServerValue.TIMESTAMP,players:{[uid]:{id:uid,name:kjNickVal(),color:kjColor(),order:0}}});
+    kjAttach(ref,code);
+  }catch(e){KJ.msg='Nie udało się utworzyć pokoju: '+e.message;kjRefresh()}
+}
+async function kjJoin(){
+  try{
+    const uid=await onlineEnsureAuth(),code=String(KJ.joinCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);
+    if(code.length!==5)throw new Error('Wpisz pięcioznakowy kod pokoju.');
+    const ref=fbDB.ref('kjRooms/'+code),room=(await ref.once('value')).val();
+    if(!room)throw new Error('Nie znaleziono pokoju o takim kodzie.');
+    const players=Object.values(room.players||{});
+    if(!(room.players&&room.players[uid])){
+      if(room.status!=='lobby')throw new Error('Ta rozgrywka już się rozpoczęła.');
+      if(players.length>=2)throw new Error('Pokój jest pełny (gra dla dwóch osób).');
+      await ref.child('players/'+uid).set({id:uid,name:kjNickVal(),color:kjColor(),order:Math.max(-1,...players.map(p=>Number(p.order)||0))+1});
+    }
+    kjAttach(ref,code);
+  }catch(e){KJ.msg='Nie udało się dołączyć: '+e.message;kjRefresh()}
+}
+function kjAttach(ref,code){
+  kjDetach();KJ.ref=ref;KJ.code=code;KJ.msg='';KJ.ok='';KJ.seenId=null;KJ.lastStatus=null;kjLastSet(code);
+  KJ.listener=ref.on('value',snap=>kjOnRoom(snap.val()),err=>{KJ.msg='Błąd połączenia: '+err.message;kjRefresh()});
+}
+function kjNewGame(){const t=Math.random()<.5?0:1;return {id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),turn:t,first:t,phase:'ask',pending:null,log:[],done:false,winner:null,guess:null}}
+function kjOnRoom(room){
+  if(!room){KJ.msg='Pokój został usunięty.';kjLastSet('');kjDetach();KJ.screen='start';kjRefresh();return}
+  KJ.host=room.host;KJ.status=room.status;KJ.test=!!room.test;KJ.roomTheme=room.theme||'default';
+  KJ.players=Object.values(room.players||{}).sort((a,b)=>(a.order||0)-(b.order||0)).map(p=>({id:p.id,name:String(p.name||'Gracz'),color:p.color}));
+  KJ.picks=room.picks||{};KJ.cover=room.cover||{};
+  try{KJ.board=room.board?kjFixIcons(JSON.parse(room.board)):null}catch(e){KJ.board=null}
+  try{KJ.game=room.game?JSON.parse(room.game):null}catch(e){KJ.game=null}
+  if(room.status==='pick'&&KJ.lastStatus!=='pick'){KJ.selPick=null}
+  KJ.lastStatus=room.status;
+  if(KJ.game&&KJ.game.id!==KJ.seenId){KJ.seenId=KJ.game.id;KJ.guessing=false;KJ.guessSel=null;KJ.draft=''}
+  if(KJ.screen!=='themes'&&KJ.screen!=='edit'){
+    if(room.status==='lobby')KJ.screen='lobby';
+    else if(room.status==='pick')KJ.screen='pick';
+    else if(room.status==='play')KJ.screen=KJ.game&&KJ.game.done?'end':'play';
+  }
+  if(room.status==='pick'&&KJ.players.length===2&&KJ.players.every(p=>KJ.picks[p.id]!=null)&&!KJ.promoting){
+    KJ.promoting=true;
+    KJ.ref.child('status').transaction(s=>s==='pick'?'play':undefined).then(r=>{
+      if(r&&r.committed)return KJ.ref.child('game').set(JSON.stringify(kjNewGame()));
+    }).catch(e=>console.error('Start Kim jestem:',e)).then(()=>{KJ.promoting=false});
+  }
+  if(KJ.game&&KJ.game.done){serverMarkRoomFinished(KJ.ref);statsKj();}
+  kjRefresh(true);
+}
+function kjLobbyHTML(){
+  const isHost=KJ.host===onlinePlayerId,T=kjThemeList(),ids=kjThemeIds(),th=T[KJ.roomTheme]||T.default;
+  const list=KJ.players.map((p,i)=>`<div class="lghist">${lgDot(p.color)}${i+1}. ${lgEsc(p.name)}${p.id===KJ.host?' <b>(host)</b>':''}${p.id===onlinePlayerId?' (Ty)':''}</div>`).join('');
+  const themeRow=isHost
+    ?`<div class="lgrow"><label>Motyw <select id="kjroomtheme" onchange="kjSetTheme(this.value)">${ids.map(id=>`<option value="${lgEsc(id)}" ${id===(T[KJ.roomTheme]?KJ.roomTheme:'default')?'selected':''}>${lgEsc(T[id].name)}</option>`).join('')}</select></label></div>`
+    :`<p class="lgnote">Motyw: <b>${lgEsc(th.name)}</b></p>`;
+  return `<h2>Pokój: <span class="lgcode">${lgEsc(KJ.code)}</span></h2>${themeRow}${list}${tgBox('KJ.ref',KJ.test)}
+  <p class="lgnote">${isHost?(KJ.players.length===2?'Możesz rozpocząć grę.':'Poczekaj, aż dołączy drugi gracz.'):'Czekaj, aż host rozpocznie grę.'} (Gracze: ${KJ.players.length}/2)</p>
+  <div class="lgrow">${isHost?`<button class="lgbtn go" ${KJ.players.length===2?'':'disabled'} onclick="kjHostStart()">Rozpocznij grę</button>`:''}<button class="lgbtn" onclick="navigator.clipboard&&navigator.clipboard.writeText(KJ.code)">Kopiuj kod</button><button class="lgbtn" onclick="kjLeave()">Wyjdź</button></div>`;
+}
+function kjSetTheme(v){if(KJ.host!==onlinePlayerId||!KJ.ref)return;KJ.ref.child('theme').set(String(v||'default'))}
+function kjHostStart(){
+  if(KJ.host!==onlinePlayerId||KJ.players.length!==2||!KJ.ref)return;
+  const T=kjThemeList(),th=T[KJ.roomTheme]||T.default;
+  KJ.ref.update({board:JSON.stringify(th.icons),status:'pick'}).catch(e=>{KJ.msg='Nie udało się rozpocząć gry: '+e.message;kjRefresh()});
+}
+/* ---------- wybór postaci ---------- */
+function kjPickHTML(){
+  const me=kjMe();
+  if(me<0)return '<h2>Kim jestem?</h2><p>Nie jesteś w tym pokoju.</p>';
+  const mine=KJ.picks[KJ.players[me].id],done=mine!=null,opp=KJ.players[1-me];
+  let h='<h2>Wybierz swoją postać</h2>';
+  h+=done
+    ?`<p>Twoja postać: <b>${lgEsc(kjName(mine))}</b>. Czekamy na ${opp?lgEsc(opp.name):'przeciwnika'}…</p>`
+    :`<p class="lgnote">Kliknij postać, którą będzie zgadywał przeciwnik, i zatwierdź wybór.${KJ.selPick!=null?' Wybrano: <b>'+lgEsc(kjName(KJ.selPick))+'</b>.':''}</p>`;
+  h+=kjBoardHTML({sel:i=>done?i===Number(mine):i===KJ.selPick,mine:done?Number(mine):undefined,dis:done,color:KJ.players[me].color,key:'p'});
+  if(!done)h+=`<div class="lgrow"><button class="lgbtn go" ${KJ.selPick==null?'disabled':''} onclick="kjPickConfirm()">Zatwierdź postać</button><button class="lgbtn" onclick="kjLeave()">Wyjdź z pokoju</button></div>`;
+  return h;
+}
+function kjPickConfirm(){
+  if(KJ.selPick==null||!KJ.ref)return;
+  const i=KJ.selPick;KJ.msg='';
+  KJ.ref.child('picks/'+onlinePlayerId).set(i).catch(e=>{KJ.msg='Nie udało się zapisać wyboru: '+e.message;kjRefresh()});
+}
+/* ---------- rozgrywka ---------- */
+function kjTx(fn,errMsg){
+  return KJ.ref.child('game').transaction(cur=>{const g=cur?JSON.parse(cur):null;if(!g||g.done)return;const r=fn(g);return r?JSON.stringify(r):undefined})
+    .then(r=>{if(r&&!r.committed){KJ.msg=errMsg||'Ruch nie został zapisany (zmienił się stan gry).';kjRefresh()}return !!(r&&r.committed)})
+    .catch(e=>{KJ.msg='Błąd: '+e.message;kjRefresh();return false});
+}
+const kjCovStr=uid=>String(KJ.cover[uid]||'').padEnd(KJ_N,'0').slice(0,KJ_N);
+function kjToggleCover(i){const uid=onlinePlayerId;if(!KJ.ref||!uid)return;kjSetCover(i,kjCovStr(uid)[i]==='1'?'0':'1')}
+function kjSetCover(i,val){
+  const uid=onlinePlayerId;if(!KJ.ref||!uid)return;
+  const s=kjCovStr(uid).split('');s[i]=val;
+  const v=s.join('');KJ.cover[uid]=v;kjRefresh(true);
+  KJ.ref.child('cover/'+uid).set(v).catch(e=>{KJ.msg='Nie udało się zapisać planszy: '+e.message;kjRefresh()});
+}
+function kjAsk(){
+  const t=String(KJ.draft||'').trim().replace(/\s+/g,' ').slice(0,120),me=kjMe();
+  if(!t){KJ.msg='Wpisz pytanie.';kjRefresh(true);return}
+  KJ.draft='';KJ.msg='';
+  kjTx(g=>{if(g.turn!==me||g.phase!=='ask')return null;g.pending={t};g.phase='answer';return g});
+  kjRefresh();
+}
+function kjAnswer(v){
+  const me=kjMe();
+  kjTx(g=>{if(g.phase!=='answer'||g.turn===me||!g.pending)return null;g.log.push({p:g.turn,t:g.pending.t,a:v?'Tak':'Nie'});g.pending=null;g.phase='cover';return g});
+}
+function kjEndTurn(){
+  const me=kjMe();
+  kjTx(g=>{if(g.turn!==me||g.phase!=='cover')return null;g.turn=1-g.turn;g.phase='ask';return g});
+}
+function kjGuessStart(){KJ.guessing=true;KJ.guessSel=null;KJ.msg='';kjRefresh(true)}
+function kjGuessCancel(){KJ.guessing=false;KJ.guessSel=null;kjRefresh(true)}
+function kjGuessConfirm(){
+  const me=kjMe(),i=KJ.guessSel;if(i==null||me<0)return;
+  const opp=1-me,target=Number(KJ.picks[KJ.players[opp].id]),ok=i===target;
+  KJ.guessing=false;KJ.guessSel=null;
+  kjTx(g=>{
+    if(g.turn!==me||g.phase!=='ask')return null;
+    g.guess={p:me,i,ok};
+    if(g.final&&g.hit){ /* ostatnia szansa drugiego gracza w rundzie: trafi = remis, pudło = wygrywa pierwszy */
+      g.log.push(ok?{p:me,gi:i,hit:1}:{p:me,gi:i});g.done=true;
+      if(ok){g.winner=null;g.draw=true}else g.winner=g.hit.p;
+    }
+    else if(ok&&g.first===me){ /* pierwszy w rundzie trafił: przeciwnik ma jeszcze jedną turę na odpowiedź */
+      g.hit={p:me,i};g.final=true;g.log.push({p:me,gi:i,hit:1});g.turn=opp;g.phase='ask';
+    }
+    else if(ok){g.done=true;g.winner=me}
+    else{g.log.push({p:me,gi:i});g.turn=opp;g.phase='ask'}
+    g.pending=null;return g;
+  }).then(c=>{if(c&&!ok)kjSetCover(i,'1')});
+  kjRefresh();
+}
+function kjPlayHTML(){
+  const g=KJ.game,pl=KJ.players,me=kjMe();
+  if(!g)return '<h2>Przygotowanie gry…</h2>';
+  if(me<0||pl.length<2)return '<h2>Kim jestem?</h2><p>Brak drugiego gracza w pokoju.</p><div class="lgrow"><button class="lgbtn" onclick="kjLeave()">Wyjdź z pokoju</button></div>';
+  const opp=pl[1-me],myPick=Number(KJ.picks[pl[me].id]),oppPick=Number(KJ.picks[opp.id]),myTurn=g.turn===me;
+  let h=`<div class="lgh"><span>Pokój ${lgEsc(KJ.code)}</span>${g.done?'<b>Koniec gry</b>':''}</div>`;
+  if(g.done){
+    const gs=g.guess;
+    const hitTxt=g.hit?lgEsc(pl[g.hit.p].name)+' zgadł: '+lgEsc(kjName(g.hit.i))+' — trafnie! ':'';
+    h+=`<div class="lgwin">${g.draw?'Remis! 🤝':g.winner===me?'Wygrywasz! 🎉':'Wygrywa '+lgEsc(pl[g.winner].name)+'!'}<small>${g.draw?'Obaj gracze zgadli w tej samej rundzie. '+hitTxt+(gs?lgEsc(pl[gs.p].name)+' zgadł: '+lgEsc(kjName(gs.i))+' — trafnie!':''):hitTxt+(gs?lgEsc(pl[gs.p].name)+' zgadywał: '+lgEsc(kjName(gs.i))+' — '+(gs.ok?'trafnie!':'pudło.'):'')}</small></div>
+    <div class="lgnote">Twoja postać: <b>${lgEsc(kjName(myPick))}</b> · Postać gracza ${lgEsc(opp.name)}: <b>${lgEsc(kjName(oppPick))}</b></div>`;
+  }else{
+    h+=`<div class="lgturn">${lgDot(pl[g.turn].color)}Tura: <b>${lgEsc(pl[g.turn].name)}</b>${myTurn?' (Ty)':''}</div>`;
+    if(g.phase==='ask'){
+      if(myTurn&&KJ.guessing)h+=`<div class="lgnote">Kliknij na planszy postać, którą uważasz za postać gracza ${lgEsc(opp.name)}. Przy pomyłce ikona zostanie zakryta, a kolej przejdzie na przeciwnika.${KJ.guessSel!=null?' Wybrano: <b>'+lgEsc(kjName(KJ.guessSel))+'</b>.':''}</div>
+        <div class="lgrow"><button class="lgbtn go" ${KJ.guessSel==null?'disabled':''} onclick="kjGuessConfirm()">Potwierdź zgadywanie</button><button class="lgbtn" onclick="kjGuessCancel()">Anuluj</button></div>`;
+      else if(myTurn&&g.final)h+=`<div class="lgnote">${lgEsc(opp.name)} już odgadł(a) Twoją postać! To Twoja ostatnia szansa w tej rundzie: zgadnij jego postać, a będzie remis.</div><div class="lgrow"><button class="lgbtn go" onclick="kjGuessStart()">Zgaduję!</button></div>`;
+      else if(!myTurn&&g.final)h+=`<div class="lgnote">Trafiłeś(aś) postać przeciwnika! ${lgEsc(pl[g.turn].name)} ma jeszcze jedną szansę w tej rundzie — jeśli też trafi, będzie remis.</div>`;
+      else if(myTurn)h+=`<div class="lgrow"><input id="kjin" maxlength="120" autocomplete="off" value="${lgEsc(KJ.draft)}" placeholder="Pytanie tak/nie, np. Czy jestem mężczyzną?" oninput="KJ.draft=this.value" onkeydown="if(event.key==='Enter')kjAsk()" aria-label="Pytanie"><button class="lgbtn go" onclick="kjAsk()">Zapytaj</button><button class="lgbtn" onclick="kjGuessStart()">Zgaduję!</button></div>`;
+      else h+=`<div class="lgnote">Czekaj, aż ${lgEsc(pl[g.turn].name)} zada pytanie lub zgadnie…</div>`;
+    }else if(g.phase==='answer'){
+      h+=`<div class="czpend">${lgDot(pl[g.turn].color)}<b>${lgEsc(pl[g.turn].name)}</b> pyta: <b>„${lgEsc(g.pending?g.pending.t:'')}”</b></div>`;
+      if(!myTurn)h+=`<div class="lgrow"><span>Czy to pasuje do Twojej postaci (<b>${lgEsc(kjName(myPick))}</b>)?</span><button class="lgbtn go" onclick="kjAnswer(true)">Tak</button><button class="lgbtn" onclick="kjAnswer(false)">Nie</button></div>`;
+      else h+=`<div class="lgnote">Czekamy na odpowiedź gracza ${lgEsc(opp.name)}…</div>`;
+    }else if(g.phase==='cover'){
+      if(myTurn)h+=`<div class="lgnote">Zakryj na swojej planszy ikony, które nie pasują do odpowiedzi (kliknij ikonę, by ją zakryć lub odkryć), potem zakończ turę.</div><div class="lgrow"><button class="lgbtn go" onclick="kjEndTurn()">Zakończ turę</button></div>`;
+      else h+=`<div class="lgnote">${lgEsc(opp.name)} zakrywa ikony…</div>`;
+    }
+  }
+  const cov=kjCovStr(pl[me].id),ocov=kjCovStr(opp.id);
+  h+=`<div class="kjboards"><div><h3>Twoja plansza <small class="lgnote">⭐ — Twoja postać</small></h3>`+kjBoardHTML({cov:i=>cov[i]==='1',sel:i=>KJ.guessing&&i===KJ.guessSel,mine:myPick,dis:g.done,color:pl[me].color,key:'m'})+`</div><div><h3>Plansza gracza ${lgEsc(opp.name)} <small class="lgnote">${g.done?'⭐ — jego postać':'podgląd'}</small></h3>`+kjBoardHTML({cov:i=>ocov[i]==='1',mine:g.done?oppPick:undefined,dis:true,color:opp.color,key:'o'})+`</div></div>`;
+  const hist=g.log.slice().reverse().map(x=>{const p=pl[x.p];return x.gi!=null?`<div class="lghist">${lgDot(p.color)}<b>${lgEsc(p.name)}</b> zgaduje: „${lgEsc(kjName(x.gi))}” — <b>${x.hit?'trafnie!':'pudło'}</b></div>`:`<div class="lghist">${lgDot(p.color)}<b>${lgEsc(p.name)}</b> pyta: „${lgEsc(x.t)}” — <b>${x.a}</b></div>`}).join('');
+  h+=`<h3>Historia pytań</h3>${hist||'<div class="lgnote">Jeszcze nie było pytań.</div>'}`;
+  if(g.done){
+    const isHost=KJ.host===onlinePlayerId;
+    h+=`<div class="lgrow">${isHost?'<button class="lgbtn go" onclick="kjRematch()">Zagraj ponownie</button>':'<span class="lgnote">Host może rozpocząć kolejną grę.</span>'}<button class="lgbtn" onclick="kjLeave()">Wyjdź z pokoju</button></div>`;
+  }
+  return h;
+}
+function kjRematch(){
+  if(KJ.host!==onlinePlayerId||!KJ.ref)return;
+  KJ.selPick=null;KJ.guessing=false;KJ.guessSel=null;
+  KJ.ref.update({picks:null,cover:null,game:null,status:'pick',serverClosed:null,serverClosedAt:null}).catch(e=>{KJ.msg='Błąd: '+e.message;kjRefresh()});
+}
+function statsKj(){
+  const g=KJ.game;if(!g||!g.done||!g.id||typeof ACC==='undefined'||!ACC.user)return;
+  const me=KJ.players.findIndex(p=>p.id===ACC.user.uid);if(me<0)return;
+  statsRecord('kj_'+g.id,'kj',g.draw?'d':g.winner===me?'w':'l',KJ.players.map(p=>({uid:p.id,name:p.name})),KJ.test);
+}
+/* ---------- panel admina: motywy ---------- */
+function kjThemesOpen(){if(!kjIsAdmin())return;KJ.screen='themes';KJ.edit=null;KJ.msg='';kjThemesAttach();kjRefresh()}
+function kjThemesBack(){KJ.screen=KJ.ref?'lobby':'start';KJ.edit=null;KJ.msg='';KJ.ok='';kjRefresh()}
+function kjThemesHTML(){
+  if(!kjIsAdmin())return '<h2>Motywy</h2><p>Tylko administrator może zarządzać motywami.</p><div class="lgrow"><button class="lgbtn" onclick="kjThemesBack()">← Wróć</button></div>';
+  const T=kjThemeList(),ids=kjThemeIds();
+  return `<h2>Motywy — Kim jestem?</h2><p class="lgnote">Motywy są widoczne dla wszystkich graczy. Motyw domyślny jest pusty — uzupełnij go lub dodaj własne.</p>`
+  +ids.map(id=>{const t=T[id],filled=t.icons.filter(x=>x.n||x.i).length;
+    return `<div class="lghist"><b>${lgEsc(t.name)}</b> <small class="lgnote">(${filled}/${KJ_N} uzupełnionych)</small> <button class="lgbtn" onclick="kjEditTheme('${lgEsc(id)}')">Edytuj</button>${id==='default'?'':`<button class="lgbtn" ${KJ.busy?'disabled':''} onclick="kjDeleteTheme('${lgEsc(id)}')">Usuń</button>`}</div>`}).join('')
+  +`<div class="lgrow"><button class="lgbtn go" onclick="kjNewTheme()">+ Nowy motyw</button><button class="lgbtn" onclick="kjThemesBack()">← Wróć</button></div>`;
+}
+function kjNewTheme(){if(!kjIsAdmin())return;KJ.edit={id:null,name:'Nowy motyw',icons:kjEmpty()};KJ.screen='edit';KJ.msg='';KJ.ok='';kjRefresh()}
+function kjEditTheme(id){
+  if(!kjIsAdmin())return;const t=kjThemeList()[id];if(!t)return;
+  KJ.edit={id,name:t.name,icons:t.icons.map(x=>({n:x.n,i:x.i}))};KJ.screen='edit';KJ.msg='';KJ.ok='';kjRefresh();
+}
+const kjPrevInner=(ic,i)=>ic.i&&kjImgOk(ic.i)?`<img src="${ic.i}" alt="">`:`<span class="kjph">${i+1}</span>`;
+function kjEditHTML(){
+  const e=KJ.edit;if(!e||!kjIsAdmin())return '';
+  return `<h2>${e.id?'Edycja motywu':'Nowy motyw'}</h2>
+  <div class="lgrow"><label>Nazwa motywu <input id="kjename" maxlength="30" value="${lgEsc(e.name)}" oninput="KJ.edit.name=this.value"></label></div>
+  <p class="lgnote">${KJ_N} ikon (plansza 6 × 4). Każda ma nazwę i opcjonalny obrazek (zostanie przycięty do kwadratu 128×128 px). Ikony bez obrazka i nazwy są w grze pokazane jako numerowane karty.</p>
+  <div class="kjegrid">${e.icons.map((ic,i)=>`<div class="kjslot"><div class="kjprev" id="kjprev${i}">${kjPrevInner(ic,i)}</div><input maxlength="24" placeholder="Nazwa ${i+1}" value="${lgEsc(ic.n)}" oninput="KJ.edit.icons[${i}].n=this.value" aria-label="Nazwa ikony ${i+1}"><div class="lgrow"><label class="lgbtn kjfile">Obraz<input type="file" accept="image/*" hidden onchange="kjImgPick(${i},this)"></label><button class="lgbtn" onclick="kjImgClear(${i})" aria-label="Usuń obraz ${i+1}">✕</button></div></div>`).join('')}</div>
+  <div class="lgrow"><button class="lgbtn go" ${KJ.busy?'disabled':''} onclick="kjSaveTheme()">Zapisz motyw</button><button class="lgbtn" onclick="kjThemesOpen()">Anuluj</button></div>`;
+}
+function kjResize(file){
+  return new Promise((res,rej)=>{
+    const fr=new FileReader();
+    fr.onerror=()=>rej(new Error('Nie udało się odczytać pliku.'));
+    fr.onload=()=>{
+      const im=new Image();
+      im.onerror=()=>rej(new Error('To nie jest poprawny obraz.'));
+      im.onload=()=>{
+        const S=128,c=document.createElement('canvas');c.width=c.height=S;
+        const x=c.getContext('2d'),m=Math.min(im.width,im.height),sx=(im.width-m)/2,sy=(im.height-m)/2;
+        x.fillStyle='#fff';x.fillRect(0,0,S,S);x.drawImage(im,sx,sy,m,m,0,0,S,S);
+        res(c.toDataURL('image/jpeg',.82));
+      };
+      im.src=fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+function kjImgPick(i,inp){
+  const f=inp.files&&inp.files[0];if(!f||!KJ.edit)return;
+  kjResize(f).then(d=>{KJ.edit.icons[i].i=d;const p=document.getElementById('kjprev'+i);if(p)p.innerHTML=kjPrevInner(KJ.edit.icons[i],i)})
+    .catch(e=>{KJ.msg=e.message;kjRefresh(true)});
+  inp.value='';
+}
+function kjImgClear(i){if(!KJ.edit)return;KJ.edit.icons[i].i='';const p=document.getElementById('kjprev'+i);if(p)p.innerHTML=kjPrevInner(KJ.edit.icons[i],i)}
+const kjPermMsg=e=>/permission/i.test(String(e&&(e.code||e.message)))?'Brak uprawnień do zapisu. Sprawdź reguły Firebase dla kjThemes (zapis tylko dla administratorów).':'Błąd: '+(e&&e.message||e);
+async function kjSaveTheme(){
+  if(!kjIsAdmin()||KJ.busy||!KJ.edit||!kjNet())return;
+  const e=KJ.edit,name=String(e.name||'').replace(/[<>&]/g,'').trim().slice(0,30);
+  if(!name){KJ.msg='Wpisz nazwę motywu.';kjRefresh(true);return}
+  const id=e.id||('t'+Date.now().toString(36)+Math.random().toString(36).slice(2,5));
+  KJ.busy=true;KJ.msg='';kjRefresh(true);
+  try{
+    await fbDB.ref('kjThemes/'+id).set({name,icons:JSON.stringify(kjFixIcons(e.icons)),by:ACC.user.uid,t:firebase.database.ServerValue.TIMESTAMP});
+    KJ.busy=false;KJ.edit=null;KJ.screen='themes';KJ.ok='Zapisano motyw „'+name+'”.';kjRefresh();
+  }catch(err){KJ.busy=false;KJ.msg=kjPermMsg(err);kjRefresh(true)}
+}
+async function kjDeleteTheme(id){
+  if(!kjIsAdmin()||KJ.busy||id==='default'||!kjNet())return;
+  const t=kjThemeList()[id];if(!t||!confirm('Usunąć motyw „'+t.name+'”?'))return;
+  KJ.busy=true;KJ.msg='';KJ.ok='';
+  try{await fbDB.ref('kjThemes/'+id).remove();KJ.ok='Usunięto motyw.'}catch(err){KJ.msg=kjPermMsg(err)}
+  KJ.busy=false;kjRefresh();
+}
+
+
+
+/* ===== integracja z platformą: wejście do gry / wyjście z gry ===== */
+window.__show=function(){
+  if(!KJ.ref)Object.assign(KJ,{screen:'start',msg:'',ok:''});
+  kjThemesAttach();kjRefresh();kjHoldBind();
+  var last=kjLastGet();
+  if(!KJ.ref&&last&&last!==KJ.leftCode&&kjNet())kjResume(last,true);
+};
+window.__leave=function(){
+  kjZoomClose();if(KJ.ref)kjLeave();
+  kjThemesDetach();
+};
+window.__joinFromHub=async function(c){KJ.joinCode=c;await kjJoin()};
+window.__show();
+</script>
+</body>
+</html>

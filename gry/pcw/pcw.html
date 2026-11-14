@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Prawda czy Wyzwanie 🔥</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Bowlby+One&family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="pcw.css">
+</head>
+<body class="menu">
+<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+<section id="start">
+ <div class="st-bg" aria-hidden="true"></div>
+ <div class="st-wrap">
+  <div class="st-logo" role="img" aria-label="Prawda czy Wyzwanie" id="stLogo">
+   <div class="st-row" id="stR1"></div>
+   <div class="st-czy">czy</div>
+   <div class="st-row w" id="stR2"></div>
+  </div>
+  <div class="st-tiles" aria-hidden="true"><i>💬</i><i>🌶</i><i>🔥</i><i>⚡</i></div>
+  <p class="st-sub">Gra imprezowa 18+ · odwaga mile widziana</p>
+
+  <div class="st-panel">
+   <label class="st-lab" for="stInp">Kto gra?</label>
+   <div class="st-add"><input id="stInp" maxlength="16" placeholder="Imię gracza…" autocomplete="off"><button id="stAdd" type="button">Dodaj</button></div>
+   <div class="st-chips" id="stChips"></div>
+  </div>
+
+  <div class="st-panel">
+   <span class="st-lab" id="stHeatLab">Jak ostro?</span>
+   <div class="st-heat" id="stHeat" role="radiogroup" aria-labelledby="stHeatLab">
+    <button type="button" role="radio" data-l="1"><i>🌶</i>Lekko</button>
+    <button type="button" role="radio" data-l="2"><i>🌶🌶</i>Ostro</button>
+    <button type="button" role="radio" data-l="3"><i>🌶🌶🌶</i>Bez hamulców</button>
+   </div>
+  </div>
+
+  <button class="st-go" id="stGo" type="button">🔥 Zaczynamy</button>
+  <div class="st-rules" id="stRules">
+   <p>Wybierz Prawdę albo Wyzwanie. Karta się odwraca i masz pytanie albo zadanie do wykonania.</p>
+   <p>Dodaj graczy, a gra sama pokaże, czyja kolej. Poziom ostrości możesz zmienić w każdej chwili.</p>
+   <p>Nie chcesz odpowiadać? Pijesz łyk i losujesz inną kartę. Szanuj granice innych.</p>
+  </div>
+  <button class="st-link" id="stRulesBtn" type="button">📜 Jak grać?</button>
+  <p class="st-note">Pij odpowiedzialnie. 💜</p>
+ </div>
+</section>
+<main>
+  <button class="st-back" id="toMenu" type="button">← Menu</button>
+  <h1>Prawda czy Wyzwanie</h1>
+  <div class="sub">Gra imprezowa 18+ · odwaga mile widziana</div>
+  <div class="lv" id="lv"><button data-l="1">🌶 Lekko</button><button data-l="2">🌶🌶 Ostro</button><button data-l="3">🌶🌶🌶 Gorąco</button></div>
+  <div class="who" id="who"></div>
+  <div class="scene"><div class="card" id="card">
+    <div class="face front"><div class="em">🔥</div><p>Wybierz: prawda czy wyzwanie?</p></div>
+    <div class="face back" id="back"><div class="tag" id="tag"></div><div class="txt" id="txt"></div><div class="heat" id="heat"></div></div>
+  </div></div>
+  <div class="acts"><button class="bt" id="bt">💬 Prawda</button><button class="bd" id="bd">⚡ Wyzwanie</button></div>
+  <div class="pl"><input id="inp" placeholder="Dodaj gracza…" maxlength="16"><button id="add">Dodaj</button><button id="clr">Wyczyść</button></div>
+  <div class="foot" id="foot"></div>
+</main>
+<script>
+// [poziom, tekst]
+const T=[
+[1,"Jaka jest Twoja najbardziej wstydliwa randka?"],[1,"Kto w tym pokoju jest Twoim zdaniem najlepiej całującą osobą?"],[1,"Jaki jest Twój najdziwniejszy sekret?"],[1,"Do kogo ostatnio pisałeś/aś, żeby poflirtować?"],[1,"Jaki tekst na podryw jest Twoim największym kryminałem?"],[1,"Pierwszy pocałunek: kiedy, gdzie, jak było?"],[1,"Czy kiedykolwiek zakochałeś/aś się w znajomym z tej imprezy?"],[1,"Jaka część ciała u drugiej osoby przyciąga Cię najbardziej?"],[1,"Najgorsza wpadka na pierwszej randce?"],[1,"Czy kiedyś stalkowałeś/aś byłego/byłą? Jak długo?"],[1,"Co jest Twoim największym turn-offem?"],[1,"Czy zdarzyło Ci się udawać, że kogoś lubisz, dla korzyści?"],
+[2,"Z kim w tym pokoju najchętniej byś się pocałował/a?"],[2,"Ile osób było w Twoim łóżku? Bez kłamania!"],[2,"Najbardziej szalone miejsce, w którym całowałeś/aś się z kimś?"],[2,"Czy kiedykolwiek wysłałeś/aś odważne zdjęcie komuś?"],[2,"Jaki jest Twój ulubiony sposób na rozpoczęcie wieczoru we dwoje?"],[2,"Przyznaj się: kto w tym pokoju Ci się podoba?"],[2,"Czy miałeś/aś romans z kimś, kto był już zajęty?"],[2,"Co Cię najbardziej kręci w łóżku poza oczywistościami?"],[2,"Jaka była Twoja najbardziej niezręczna sytuacja intymna?"],[2,"Czy kiedykolwiek zostałeś/aś przyłapany/a w niezręcznym momencie?"],[2,"Jaka fantazja przychodzi Ci do głowy najczęściej?"],[2,"Najlepszy pocałunek w Twoim życiu — z kim i dlaczego?"],[2,"Czy zdarzyło Ci się całować z kimś na pierwszej randce i żałować?"],[2,"Co zrobisz, żeby kogoś uwieść w 5 minut?"],
+[3,"Opisz swoją najśmielszą noc, bez cenzury."],[3,"Jaką rzecz chciałbyś/chciałabyś wypróbować, a boisz się o to poprosić?"],[3,"Z kim w tym pokoju spędziłbyś/spędziłabyś gorącą noc?"],[3,"Czy kiedykolwiek robiłeś/aś coś, o czym nikt nie wie?"],[3,"Na jakiej skali oceniasz swoje umiejętności w łóżku i dlaczego?"],[3,"Jaki jest Twój największy fetysz, o którym mało kto wie?"],[3,"Czy miałeś/aś przygodę na jedną noc? Jak to wyglądało?"],[3,"Co robisz, gdy chcesz kogoś kompletnie rozpalić?"],[3,"Jakie jest Twoje najśmielsze miejsce, w którym próbowałeś/aś czegoś intymnego?"],[3,"Czy kiedykolwiek byłeś/aś w trójkącie albo o tym marzyłeś/aś?"],[3,"Jaki jest Twój największy sekret z sypialni?"],[3,"Najbardziej szalona rzecz, którą zrobiłeś/aś po alkoholu?"]
+];
+const D=[
+[1,"Zrób swoją najlepszą minę uwodzicielską przez 10 sekund."],[1,"Pokaż ostatnie zdjęcie w telefonie, bez wybierania."],[1,"Zatańcz bez muzyki przez 20 sekund."],[1,"Wypij łyk i powiedz komplement osobie po lewej."],[1,"Zaśpiewaj refren wybranej przez grupę piosenki z pełnym dramatem."],[1,"Pokaż, jak wyglądasz, gdy jesteś zakochany/a."],[1,"Zadzwoń do kogoś i powiedz „tęsknię”, po czym się rozłącz."],[1,"Zrób 10 pompek albo wypij łyk."],[1,"Napisz do ostatniej osoby w czacie: „Śniłaś/eś mi się”."],[1,"Naśladuj kogoś z tego pokoju, grupa zgaduje kogo."],
+[2,"Daj buziaka w policzek osobie, którą wskaże grupa."],[2,"Pozwól komuś napisać jedną wiadomość z Twojego telefonu."],[2,"Zdejmij jedną część garderoby (nie bielizny) do końca rundy."],[2,"Usiądź na kolanach osoby wskazanej przez grupę na 1 rundę."],[2,"Wyszeptaj coś gorącego do ucha osoby naprzeciwko."],[2,"Pokaż swój najbardziej seksowny taniec na 30 sekund."],[2,"Pozwól grupie wybrać Ci nowy status na social mediach."],[2,"Zrób komuś 30-sekundowy masaż ramion."],[2,"Patrz w oczy wybranej osoby 30 sekund bez śmiechu."],[2,"Przeczytaj na głos swoją najbardziej flirciarską wiadomość z telefonu."],
+[3,"Pocałuj w szyję osobę, którą wskaże grupa."],[3,"Zrób komuś lap dance przez 20 sekund (za zgodą)."],[3,"Pozwól komuś narysować coś na Twoim ciele markerem."],[3,"Zdejmij koszulkę lub zrób 3 shoty na raz."],[3,"Namiętnie pocałuj wybraną osobę przez 10 sekund (za zgodą)."],[3,"Ugryź delikatnie ucho osoby po prawej (za zgodą)."],[3,"Zrób striptiz w stylu filmowym do jednej piosenki (do bielizny, jeśli chcesz)."],[3,"Zlizaj coś z ręki wybranej osoby (np. sól lub cukier, za zgodą)."],[3,"Opisz na głos swoją idealną gorącą noc w 30 sekund."],[3,"Wyślij komuś z kontaktów wiadomość: „Muszę Cię zobaczyć dziś wieczorem”."]
+];
+// generator: ~hundreds of extra combos
+const A=[[2,"Wyszeptaj komplement do ucha"],[2,"Zrób masaż karku"],[1,"Zatańcz powoli"],[2,"Patrz w oczy przez 30 sekund"],[1,"Pokaż swój seksowny chód"],[2,"Daj buziaka w dłoń"],[3,"Pocałuj w policzek tuż przy ustach"],[3,"Przytul się mocno przez 20 sekund"]];
+const W=["osobie po Twojej prawej","osobie, którą wskaże grupa","osobie z najciemniejszą koszulką","najstarszej osobie w pokoju","osobie, która najmniej Cię zna","osobie, która ostatnio coś Ci pożyczyła"];
+const S=["",", mówiąc to z kamienną twarzą",", jak aktor z telenoweli",", szepcząc dramatycznie"];
+A.forEach(a=>W.forEach(w=>S.forEach(s=>D.push([a[0],a[1]+" "+w+s+"."]))));
+const E=["wysyła najbardziej dwuznaczne SMS-y","najlepiej całuje","najlepiej wyglądałby/wyglądałaby na randce w ciemno","najbardziej flirtuje po alkoholu","pierwszy/a poszedłby/poszłaby na przygodę na jedną noc","jest największym/ą uwodzicielem/ką","ma najbardziej tajemnicze życie miłosne","najszybciej się zakochuje","najlepiej tańczy zmysłowo","ma najseksowniejszy głos","najbardziej się rumieni","jest najlepszy/a w gierkach wstępnych","najchętniej zostałby/zostałaby po imprezie sam/a z kimś","miałby/miałaby największe szanse w Tinderze","prawdopodobnie ma najśmielsze fantazje"];
+E.forEach((e,i)=>T.push([(i%3)+1,"Kto w tym pokoju "+e+"? Wskaż palcem na „3”!"]));
+// ===== DUŻO WIĘCEJ =====
+const K=["całowałeś/aś się z kimś","wysłałeś/aś komuś flirtującą wiadomość","kogoś stalkowałeś/aś na Instagramie","miałeś/aś gorący sen z kimś znajomym","ktoś Ci się spodobał w pracy lub szkole","flirtowałeś/aś z kimś tylko dla zabawy","zrobiłeś/aś pierwszy krok","wymknąłeś/aś się komuś po randce","rumieniłeś/aś się przy kimś","myślałeś/aś o byłym/byłej w nocy","kłamałeś/aś o swoim wieku lub wyglądzie na randce","ktoś Cię odrzucił","odrzuciłeś/aś kogoś bardzo niezręcznie","obejrzałeś/aś coś tylko dla 18+","ktoś zobaczył Twoją prywatną rozmowę","czułeś/aś motyle w brzuchu","spędziłeś/aś noc poza domem z kimś nowym","całowałeś/aś się w miejscu publicznym","zdradziłeś/aś kogoś lub zostałeś/aś zdradzony/a","pisałeś/aś do kogoś pijany/a"];
+K.forEach((k,i)=>T.push([(i%3)+1,"Kiedy ostatnio "+k+"? Opowiedz szczegóły."]));
+const C=["zakochałeś/aś się od pierwszego wejrzenia","zrobiłeś/aś coś szalonego dla kogoś, kto Ci się podobał","dostałeś/aś propozycję nie do odrzucenia","spotykałeś/aś się z dwiema osobami naraz","całowałeś/aś się z osobą tej samej płci","obudziłeś/aś się obok kogoś, kogo nie pamiętasz","zostałeś/aś przyłapany/a na sexting","pocałowałeś/aś kogoś z tego pokoju","zakochałeś/aś się w przyjacielu lub przyjaciółce","byłeś/aś na randce w ciemno","zerwałeś/aś z kimś przez SMS","płakałeś/aś po zerwaniu przez tydzień","zrobiłeś/aś striptiz lub taniec erotyczny","pocałowałeś/aś kogoś, żeby wygrać zakład","udawałeś/aś, że jesteś w związku","miałeś/aś romans w pracy","wysłałeś/aś wiadomość do niewłaściwej osoby","podglądałeś/aś kogoś","próbowałeś/aś uwieść kogoś, kto był nieosiągalny","miałeś/aś randkę z dwiema osobami w jeden dzień","wymyśliłeś/aś fałszywe imię, żeby kogoś poderwać","ktoś wyznał Ci miłość, a Ty nie czułeś/aś nic","całowałeś/aś się na imprezie z obcą osobą","byłeś/aś zazdrosny/a o kogoś z tego pokoju","poszedłeś/poszłaś na randkę tylko dla jedzenia","użyłeś/aś Tindera, Bumble lub Hinge","odpowiedziałeś/aś „tak” na coś, czego żałowałeś/aś","flirtowałeś/aś z czyimś partnerem lub partnerką","fantazjowałeś/aś o kimś, kogo tu znasz","robiłeś/aś coś w miejscu, gdzie nie wolno"];
+C.forEach((c,i)=>T.push([(i%3)+1,"Czy kiedykolwiek "+c+"? Jeśli tak, opowiedz."]));
+const O=[["pocałunek w deszczu","gorący pocałunek w windzie"],["romantyczna kolacja","szalona noc w klubie"],["odważne SMS-y","odważne spojrzenia"],["powolne całowanie","namiętne całowanie"],["być uwodzonym/ą","uwodzić"],["jedną gorącą noc","tydzień flirtu"],["spać z kimś z tego pokoju","całować się z kimś z tego pokoju"],["dostać masaż od nieznajomego","zrobić masaż komuś z pokoju"],["związek na odległość","przygodę na wakacjach"],["szept do ucha","muśnięcie szyi"],["randka w ciemno","randka z byłym/byłą"],["wiedzieć, o czym myśli Twój crush","żeby crush wiedział, o czym myślisz"],["scena z filmu romantycznego","scena z filmu erotycznego"],["pierwszy raz w hotelu","pierwszy raz w plenerze"],["tańczyć bardzo blisko","patrzeć sobie w oczy"],["powiedzieć komuś, że Ci się podoba","być jedną z tych osób, co wysyła kwiaty"],["być zazdrosnym/ą","być obiektem zazdrości"],["jedzenie z ciała","kąpiel we dwoje"],["sex z zamkniętymi oczami","sex przy zapalonych świecach"],["seksowny SMS na dobranoc","seksowna wiadomość głosowa"]];
+O.forEach((o,i)=>T.push([(i%3)+1,"Wolisz: "+o[0]+" czy "+o[1]+"? Uzasadnij."]));
+T.push(
+[1,"Jaki jest Twój największy sekret z dzieciństwa, który dziś brzmi śmiesznie?"],[1,"Jaki masz talent, który mógłby Cię uwieść w 30 sekund?"],[1,"Co jest Twoim największym kompleksem i jak go ukrywasz?"],[1,"Jaka jest Twoja ulubiona część ciała u siebie?"],[1,"Czy wolisz, kiedy ktoś jest nieśmiały, czy bezpośredni?"],[1,"Jakie imię partnera/partnerki Cię kręci najbardziej?"],[2,"Jakie słowo szeptem rozpala Cię najmocniej?"],[2,"Opisz idealną randkę, która kończy się u kogoś w domu."],[2,"Jak najszybciej poznajesz, że ktoś Cię pociąga?"],[2,"Która strefa na ciele jest u Ciebie najbardziej wrażliwa?"],[2,"Opisz osobę, która by Cię zmiękczyła w sekundę."],[2,"Jaka jest najbardziej niezręczna rzecz, którą powiedziałeś/aś w trakcie flirtu?"],[2,"Do kogo w tym pokoju wysłałbyś/wysłałabyś zalotny SMS?"],[3,"Jaka jest najdziwniejsza rzecz, która Cię podnieca?"],[3,"Opisz jedną rzecz, której nigdy nie powiedziałeś/aś partnerowi/partnerce."],[3,"Co jest Twoim największym guilty pleasure w sypialni?"],[3,"Z kim z tego pokoju zamieniłbyś/zamieniłabyś się na jedną noc rolami?"],[3,"Jaką rzecz zrobiłbyś/zrobiłabyś w łóżku, gdybyś miał/a pewność, że nikt się nie dowie?"],[3,"Jaka jest Twoja najśmielsza wiadomość, jaką wysłałeś/aś?"],[3,"Jak daleko zaszedłeś/zaszłaś na pierwszej randce?"]
+);
+const B=[[1,"Powiedz najbardziej absurdalny komplement"],[1,"Zrób minę zakochanego szczeniaczka do"],[2,"Zatańcz zmysłowo przed"],[2,"Zrób dramatyczne wyznanie miłości do"],[2,"Poprowadź za rękę po pokoju"],[2,"Nakarm winogronem lub chipsem"],[3,"Przeczytaj namiętny wiersz do"],[3,"Przytul się od tyłu do"],[3,"Wyszeptaj swoją największą fantazję do"],[2,"Zrób zdjęcie selfie w seksownej pozie z"]];
+B.forEach(b=>W.forEach(w=>D.push([b[0],b[1]+" "+w+"."])));
+D.push(
+[1,"Zrób najlepszy flirtujący wzrok w stronę wybranej osoby."],[1,"Opowiedz żart w stylu podrywu na ten pokój."],[1,"Napisz na kartce numer telefonu do najlepszego flirtu i podaj komuś."],[1,"Zagraj scenę pierwszej randki z kimś wybranym przez grupę."],[1,"Zrób pozę z okładki magazynu dla singli."],[1,"Zrób sexy-selfie i pokaż je grupie."],[1,"Zagraj rolę zakochanej pary przez 30 sekund."],[1,"Wymyśl przezwisko dla każdej osoby w pokoju, flirciarskie."],[1,"Opisz osobę po prawej trzema słowami, wszystkie muszą brzmieć uwodzicielsko."],[1,"Powiedz najgorszy tekst na podryw, jaki znasz."],
+[2,"Pozwól osobie po lewej wybrać, jak masz usiąść do końca rundy."],[2,"Wypij łyk i powiedz, kto tu ma najseksowniejsze oczy."],[2,"Przez minutę mów szeptem do ucha każdemu, kto podejdzie."],[2,"Wybierz osobę i powiedz jej, co w niej Cię kręci."],[2,"Przytul wybraną osobę mocno przez 15 sekund."],[2,"Poproś kogoś o numer telefonu w najbardziej seksowny sposób."],[2,"Zrób komuś zmysłowy masaż dłoni przez 30 sekund."],[2,"Zagraj scenę pocałunku z filmu z wybraną osobą (bez kontaktu ust)."],[2,"Zrób dwa tańce: jeden niewinny, drugi bardzo gorący."],[2,"Pokaż, jak całujesz się z poduszką."],[2,"Odegraj scenę rozstania w najbardziej dramatyczny sposób."],[2,"Dotknij ręką policzka wybranej osoby i powiedz coś miłego."],[2,"Powiedz trzy rzeczy, które Cię w kimś z pokoju kręcą."],[2,"Napisz do kogoś z kontaktów: „Myślę o Tobie. Dziś.”"],[2,"Zamknij oczy, a grupa zadecyduje, kogo masz przytulić."],
+[3,"Pocałuj osobę po prawej w dłoń, a potem w nadgarstek (za zgodą)."],[3,"Wypij shota z ciała lub dłoni wybranej osoby (za zgodą)."],[3,"Zdejmij skarpetki i pozwól komuś pomasować Ci stopy."],[3,"Weź kostkę lodu w usta i przesuń ją po ręce kogoś (za zgodą)."],[3,"Przeczytaj głośno swoją najbardziej pikantną wiadomość z czatu."],[3,"Zrób tango z wybraną osobą, ciało przy ciele."],[3,"Pozwól komuś zawiązać Ci oczy i zgadnij, kto Cię dotyka w rękę."],[3,"Wyznaj głośno swoją najgorętszą fantazję w jednym zdaniu."],[3,"Siedź na kolanach wybranej osoby przez dwie rundy (za zgodą)."],[3,"Daj komuś gorący, długi pocałunek w szyję (za zgodą)."],[3,"Zdejmij jedną część garderoby i zatańcz z nią w ręku."],[3,"Wybierz osobę i opisz jej szeptem, co byś z nią zrobił/a po imprezie."],[3,"Wypij łyk i pocałuj osobę, którą wskaże koło losu (grupa wybiera)."]
+);
+// ===== PACZKA 3 =====
+const R=["swoje najgorsze doświadczenie z randką","swój styl całowania","swoją idealną randkę","swój pierwszy pocałunek","najlepszy komplement, jaki dostałeś/aś","swoją największą słabość do osób płci przeciwnej","swój typ idealnego partnera lub partnerki","jak wygląda Twoja twarz, gdy ktoś Ci się podoba","swój najgorszy tekst na podryw","swój największy flirt na imprezie","najgorętszy moment z ostatniego roku","swoją największą randkową wpadkę","co robisz, gdy ktoś Cię kręci, a Ty udajesz obojętność","swoje życie miłosne używając tylko nazw filmów","swoje największe zauroczenie","czym kusisz kogoś, kogo chcesz poderwać","swój najbardziej zmysłowy talent","swoją ostatnią randkę trzema słowami","co Cię najbardziej rozpala w drugiej osobie","jaki jesteś, gdy się zakochasz"];
+R.forEach((r,i)=>T.push([(i%3)+1,"Opisz "+r+", bez żadnej cenzury."]));
+const Y=["swoje umiejętności całowania","swoje flirtowanie","swoją odwagę w łóżku","swoje zdolności tańca zmysłowego","swój wygląd w ciemności","swoją zazdrość","swoje szanse na jednorazową przygodę dziś","swoje doświadczenie","swoją wytrwałość w podrywaniu","swoją pewność siebie na pierwszej randce","swój seksowny głos","swój talent do uwodzenia SMS-em","swoją romantyczność","swoją odwagę przy pierwszym ruchu","swój wygląd po kilku drinkach"];
+Y.forEach((y,i)=>T.push([(i%3)+1,"Oceń w skali od 1 do 10 "+y+" i uzasadnij tę ocenę."]));
+const E2=["najszybciej by się rozebrał/a w sytuacji awaryjnej","najbardziej udaje niewinnego/ą","ma najgorętsze sekrety","najlepiej całuje po kilku drinkach","najczęściej robi pierwszy ruch","jest największym romantykiem","jest największym flirciarzem","najbardziej potrzebuje randki","mógłby/mogłaby zagrać w filmie dla dorosłych","najczęściej wysyła pikantne zdjęcia","ma najbardziej uwodzicielski śmiech","najdłużej by wytrzymał/a w grze w kuszenie","ma największe szanse, żeby wylądować w czyimś łóżku dziś","najlepiej wyglądałby/wyglądałaby w czerwonej bieliźnie","zostałby/zostałaby gwiazdą Only Fans","najlepiej się przytula","jest najbardziej zazdrosny/a","jest największym kusicielem/ką","ma najlepszy ukryty talent do uwodzenia","najczęściej pisze do byłych"];
+E2.forEach((e,i)=>T.push([(i%3)+1,"Kto w tym pokoju "+e+"? Wskaż na „3”!"]));
+T.push(
+[1,"Jaką piosenką chciałbyś/chciałabyś uwieść kogoś na parkiecie?"],[1,"Co najbardziej Cię przyciąga w oczach drugiej osoby?"],[1,"Jaki zapach na kimś działa na Ciebie jak magnes?"],[1,"Jakiego prezentu od partnera/partnerki chciałbyś/chciałabyś najbardziej?"],[1,"Jaki gest sprawia, że od razu się zakochujesz?"],[1,"Co Cię najbardziej onieśmiela u osoby, która Ci się podoba?"],[1,"Czy wierzysz w miłość od pierwszego wejrzenia? Miałeś/aś taki moment?"],[1,"Kto w tym pokoju ma Twoim zdaniem największy urok osobisty?"],[1,"Jaką cechę uważasz za najseksowniejszą u kogoś?"],[1,"Jakie jest Twoje największe zakłamanie, które powiedziałeś/aś na randce?"],
+[2,"Z kim w tym pokoju najlepiej by Ci się całowało i dlaczego?"],[2,"Jaki jest Twój najśmielszy ruch na pierwszej randce?"],[2,"Czy wolisz, kiedy to Ty prowadzisz, czy kiedy ktoś prowadzi Ciebie?"],[2,"Jakie ubranie na partnerze/partnerce kręci Cię najbardziej?"],[2,"Jaki jest Twój pierwszy ruch, żeby zwrócić czyjąś uwagę?"],[2,"Czy kiedykolwiek zrobiłeś/aś coś, żeby wzbudzić zazdrość?"],[2,"Jakie jest Twoje najśmielsze marzenie związane z randką?"],[2,"Do kogo w tym pokoju nie oparłbyś/oparłabyś się w ciemnej uliczce?"],[2,"Co lubisz robić po pocałunku?"],[2,"Jaki jest Twój największy sekret, który mógłby zaskoczyć tę grupę?"],
+[3,"Co jest Twoją największą fantazją, którą dotąd ukrywałeś/aś?"],[3,"Opisz idealne, bardzo gorące miejsce na spędzenie nocy."],[3,"Jaką pozycję lub styl lubisz najbardziej? Bez wstydu."],[3,"Co zrobiłbyś/zrobiłabyś, gdybyś został/a sam/a z kimś z tego pokoju na godzinę?"],[3,"Jakie słowa w łóżku Cię najbardziej nakręcają?"],[3,"Czy wolisz delikatność, czy ostre tempo? Opisz."],[3,"Czy robiłeś/aś coś w miejscu, gdzie mogli Cię przyłapać?"],[3,"Jakie jest Twoje najbardziej niegrzeczne wspomnienie?"],[3,"Jaka jest rzecz, którą chciałbyś/chciałabyś, żeby ktoś Ci zrobił w tej chwili?"],[3,"Z kim z całego świata spędziłbyś/spędziłabyś gorącą noc?"]
+);
+const Z=[[1,"Zagraj scenę z komedii romantycznej"],[1,"Zrób minę uwodziciela w stylu Bonda"],[2,"Wyznaj miłość jak w telenoweli"],[2,"Zrób seksowne spojrzenie"],[2,"Wyszeptaj piosenkę o miłości"],[2,"Zrób mini striptiz w kurtce"],[2,"Zagraj poznanie na dancingu"],[3,"Zrób nastrojowy taniec brzucha"],[3,"Powiedz najgorętszy tekst, jaki znasz"],[3,"Zrób najbardziej niegrzeczne spojrzenie"],[2,"Wymów swoje imię bardzo uwodzicielsko"],[3,"Powiedz, co chciałbyś/chciałabyś z nim/nią zrobić po imprezie"]];
+const Q=["przez 15 sekund","przez 30 sekund","przez minutę"];
+Z.forEach(z=>Q.forEach(q=>D.push([z[0],z[1]+" "+q+" — dla wybranej osoby."])));
+const B2=[[1,"Zagraj z uśmiechem rolę kelnera/ki dla"],[1,"Zrób komplement w stylu poety dla"],[1,"Pokaż swój najlepszy ruch podrywu na"],[2,"Zatańcz przytulańca z"],[2,"Szeptem wyznaj sekret do ucha"],[2,"Zrób mini sesję foto z"],[2,"Pozwól sobie rozpiąć lub zapiąć guzik przez"],[3,"Wlej drinka z ust do ręki"],[3,"Pozwól się obwiązać wzrokiem i zgadnij, kim jest"],[3,"Daj gorący, ciągnący się pocałunek w policzek"],[3,"Opisz jednym zdaniem swoją fantazję o"],[2,"Przytul się od tyłu do"]];
+B2.forEach(b=>W.forEach(w=>D.push([b[0],b[1]+" "+w+"."])));
+D.push(
+[1,"Zagraj sexy pozę na zdjęcie dla całej grupy."],[1,"Opowiedz, jak byś poderwał/a osobę po prawej."],[1,"Zrób minę zawstydzenia, a potem uwodzenia."],[1,"Powiedz, jaki kolor bielizny nosisz (lub jakbyś nosił/a)."],[1,"Zrób komplement każdemu w pokoju w ciągu 20 sekund."],[1,"Zagraj flirtującego barmana/barmankę przez minutę."],
+[2,"Pozwól grupie zadecydować, komu masz zrobić komplement w uchu."],[2,"Pocałuj w policzek wszystkich w pokoju (za zgodą)."],[2,"Zatańcz z kimś przytulańca przez całą piosenkę."],[2,"Opowiedz grupie, co by Cię rozpaliło w tej chwili."],[2,"Wypij drinka z dłoni wskazanej osoby (za zgodą)."],[2,"Zrób komuś selfie w pozie jak na ślubnym zdjęciu."],[2,"Przeczytaj głośno ostatnią swoją wiadomość do kogoś, kto Ci się podoba."],[2,"Odegraj scenę swojej pierwszej randki."],
+[3,"Pozwól wybranej osobie wyszeptać Ci coś gorącego do ucha i powtórz to głośno."],[3,"Rozepnij guzik lub zdejmij pasek, i zatańcz przez 20 sekund."],[3,"Daj komuś gorący, wolny pocałunek w rękę, nadgarstek i ramię (za zgodą)."],[3,"Przesuń kostką lodu po szyi wybranej osoby (za zgodą)."],[3,"Pozwól grupie wybrać, które miejsce na Twoim ciele ma być dotknięte (w granicach)."],[3,"Pocałuj osobę wskazaną przez grupę tak, jakbyście byli parą (za zgodą)."],[3,"Przytul się do wybranej osoby i wyszeptaj, co byś z nią zrobił/a."],[3,"Zrób zmysłowy taniec z krzesłem przez 30 sekund."]
+);
+// ===== PACZKA 4: NORMALNE =====
+const N1=["miałeś/aś ochotę zapaść się pod ziemię ze wstydu","zaśmiałeś/aś się w całkiem nieodpowiednim momencie","zgubiłeś/aś coś ważnego","zrobiłeś/aś coś głupiego dla zakładu","kłamałeś/aś, żeby wyjść z kłopotu","płakałeś/aś na filmie","zaśpiewałeś/aś w publicznym miejscu","spóźniłeś/aś się na coś ważnego","zapomniałeś/aś czyjegoś imienia","wysłałeś/aś wiadomość do złej osoby","dostałeś/aś dziwny prezent","wpadłeś/aś w jakąś wpadkę w pracy lub szkole","jadłeś/aś coś, co Ci nie smakowało, żeby nie urazić gospodarza","pomyliłeś/aś kogoś z kimś innym","zgubiłeś/aś telefon lub klucze","o mało nie spadłeś/aś ze schodów","zasnąłeś/ęłaś w nieodpowiednim miejscu","udało Ci się coś, w co nikt nie wierzył","powiedziałeś/aś coś bez zastanowienia i pożałowałeś/aś","usiłowałeś/aś coś ugotować i się nie udało"];
+N1.forEach(n=>T.push([1,"Kiedy ostatnio "+n+"? Opowiedz historię."]));
+const N2=["wygrałeś/aś coś w konkursie","zgubiłeś/aś się w obcym mieście","miałeś/aś nietypowego zwierzaka","spotkałeś/aś kogoś znanego","jechałeś/aś autostopem","skoczyłeś/aś na bungee lub ze spadochronem","zjadłeś/aś coś naprawdę dziwnego","uciekłeś/aś z lekcji lub pracy","zaspałeś/aś na coś ważnego","zepsułeś/aś coś kosztownego","wziąłeś/wzięłaś udział w czymś zaskakującym","miałeś/aś dziwną pracę dorywczą","udawałeś/aś, że znasz jakiś film lub książkę","podrobiłeś/aś podpis rodzica","poszedłeś/poszłaś na koncert, który Cię zawiódł","zjadłeś/aś czyjąś ostatnią porcję","wydałeś/aś całą pensję na głupotę","poznałeś/aś kogoś w dziwnych okolicznościach","spróbowałeś/aś czegoś, co okazało się porażką","wygadałeś/aś czyjąś tajemnicę"];
+N2.forEach(n=>T.push([1,"Czy kiedykolwiek "+n+"? Opowiedz, jak to było."]));
+const N3=[["morze","góry"],["kawa","herbata"],["pizza","burger"],["lato","zima"],["film w domu","kino"],["książka","serial"],["poranek","noc"],["słodkie","słone"],["pies","kot"],["impreza","spokojny wieczór"],["podróże","komfort domu"],["gotować","zamówić"],["słuchać muzykę","słuchać podcastów"],["wiedzieć wszystko","być niesamowicie szczęśliwym/ą"],["umieć latać","być niewidzialnym/ą"],["dał się cofnąć w czasie","zajrzeć w przyszłość"],["wygrać milion","mieć pracę marzeń"],["mówić wszystkimi językami","grać na wszystkich instrumentach"],["być sławnym/ą","być bogatym/ą w tajemnicy"],["współlokator bałaganiarz","współlokator maniak czystości"]];
+N3.forEach(o=>T.push([1,"Wolisz: "+o[0]+" czy "+o[1]+"? Dlaczego?"]));
+const N4=["film","piosenkę","potrawę","miejsce na ziemi","wspomnienie z dzieciństwa","książkę","porę roku","zwierzę","grę","memy z internetu","zajęcie w wolnym czasie","sklep lub aplikację","wakacyjną historię","serial","smak lodów"];
+N4.forEach(n=>T.push([1,"Jaki/jaka/jakie jest Twój ulubiony/a "+n+" i dlaczego?"]));
+const N5=["wygrał/a milion złotych","miał/a jeden dzień wolny od wszystkiego","mogł/a spotkać dowolną osobę","miał/a niewidzialność na dobę","został/a prezydentem na jeden dzień","dostał/a bilet w jedną stronę w dowolne miejsce","musiał/a zamieszkać w innym kraju","został/a gwiazdą rocka","miał/a możliwość zmienić jedno wydarzenie z przeszłości","obudził/a się jako ktoś z tego pokoju"];
+N5.forEach(n=>T.push([1,"Co byś zrobił/a, gdybyś "+n+"?"]));
+T.push(
+[1,"Jaki jest Twój największy strach, z którego się śmiejesz?"],[1,"Jaka jest najdziwniejsza rzecz, którą lubisz jedzą razem z czymś innym?"],[1,"Jakiej umiejętności chciałbyś/chciałabyś się nauczyć w tym roku?"],[1,"Jaki jest Twój najlepszy moment z ostatnich 12 miesięcy?"],[1,"Jaką radę dałbyś/dałabyś sobie sprzed 10 lat?"],[1,"Jaki jest Twój najbardziej bezużyteczny talent?"],[1,"Czego najbardziej brakuje Ci w obecnym życiu?"],[1,"Kto w Twoim życiu jest Twoim największym autorytetem?"],[1,"Jaka jest najlepsza rada, jaką kiedykolwiek dostałeś/aś?"],[1,"Co zawsze robisz, gdy jesteś sam/a w domu?"],[1,"Jaka jest Twoja najdziwniejsza nawyk, którego nikt nie zna?"],[1,"O co się najczęściej kłócisz z bliskimi?"],[1,"Jaki jest Twój największy sukces, z którego jesteś dumny/a?"],[1,"Jaka była Twoja najgorsza fryzura w życiu?"],[1,"Co było Twoją pierwszą pracą?"],[1,"Jakie zdanie ciągle powtarzasz?"],[1,"Jaki jest Twój ulubiony cytat z filmu?"],[1,"Jaką głupotę zrobiłeś/aś jako dziecko?"],[1,"Czego nigdy nie zjesz, cokolwiek by się stało?"],[1,"Jakie jest Twoje największe marzenie, o którym mówisz po raz pierwszy?"],[1,"Co najbardziej Cię w sobie śmieszy?"],[1,"Jaki prezent był najlepszym, jaki dostałeś/aś?"],[1,"Jaka jest Twoja największa wymówka, kiedy się spóźniasz?"],[1,"Kto w tym pokoju ma najlepsze poczucie humoru?"],[1,"Kto tutaj najlepiej gotuje? Kto najgorzej?"],[1,"Kto w tym pokoju najbardziej się spóźnia?"],[1,"Kto tutaj ma najlepszy gust muzyczny?"],[1,"Kto w tej grupie by przeżył najdłużej w lesie?"],[1,"Kto tu jest największym optymistą, a kto pesymistą?"]
+);
+const M=["Zatańcz taniec kurczaka","Naśladuj znane zwierzę tak, by grupa zgadła","Pokaż, jak chodzi robot","Zagraj scenę z ulubionego filmu","Zaspiewaj refren dowolnej piosenki operowym głosem","Powiedz zdanie po angielsku z akcentem pirata","Zrób najzabawniejszą minę, jaką potrafisz","Pokaż najlepszy ruch taneczny z lat 90.","Opowiedz krótki żart","Zrób wyraźnie twarzy zaskoczonej gwiazdy filmowej"];
+M.forEach(m=>Q.forEach(q=>D.push([1,m+" "+q+"."])));
+const M2=["Pochwal się przed","Zrób komplement bez uśmiechu dla","Opowiedz zabawną historię dla","Przedstaw się jak prezenter telewizyjny przed","Podaruj wyobrażony prezent","Zagraj sceny z ulubionej bajki przed","Zaprezentuj talent przed","Pokaż, jak wygląda Twój poranek, dla","Przekaz jakąś radę życiową","Pochwal najlepszą cechę"];
+M2.forEach(m=>W.forEach(w=>D.push([1,m+" "+w+"."])));
+D.push(
+[1,"Zrób 10 przysiadów i licz po cichu po francusku."],[1,"Powiedz alfabet od tyłu, ile dasz radę."],[1,"Wypij szklankę wody bez użycia rąk."],[1,"Mów tylko pytaniami przez najbliższe 2 minuty."],[1,"Zamień się z kimś ubraniem na jedną rundę (jedną rzecz)."],[1,"Pokaż najdziwniejsze zdjęcie ze swojej galerii."],[1,"Zaprezentuj reklamę dowolnego przedmiotu z pokoju."],[1,"Opowiedz bajkę, każde zdanie zaczynając od kolejnej litery alfabetu."],[1,"Zagraj pantomimę swojego ulubionego filmu, grupa zgaduje."],[1,"Zaprezentuj pogodę jak prezenter w telewizji."],[1,"Zaśpiewaj kołysankę dla osoby po prawej."],[1,"Zrób selfie z minami, jakich jeszcze nie robiłeś/aś."],[1,"Zrób stand-up o swoim dniu, 30 sekund."],[1,"Zrób mini wykład o tym, dlaczego kaczki są najlepsze."],[1,"Wymyśl nazwę dla każdej osoby w pokoju, zabawną i niewinną."],[1,"Opowiedz historię z życia, ale w stylu horroru."],[1,"Powiedz zdanie, a grupa musi je powtórzyć z Twoją intonacją."],[1,"Wybierz osobę i zrób jej komplement w trzech różnych językach."],[1,"Zrób 5 pompek lub 10 skoków, grupa liczy."],[1,"Zaprezentuj, jak chodzi Twoja najlepsza „gwiazda” na czerwonym dywanie."],[1,"Rozmawiaj akcentem z innego regionu przez 2 minuty."],[1,"Zagraj scenkę „pierwszy dzień w nowej pracy”."],[1,"Pokaż grupie swój najlepszy taniec weselny."],[1,"Zrób wspólne zdjęcie z całą grupą w najzabawniejszej pozie."],[1,"Opowiedz, jak wyglądałby Twój idealny wieczór, ale w stylu reklamy."],[1,"Przeczytaj głośno wiadomość z telefonu, ale głosem robota."],[1,"Pokaż, jak wygląda Twój najlepszy taniec na weselu cioci."],[1,"Wymieniaj w 20 sekund jak najwięcej krajów na literę wybraną przez grupę."],[1,"Wymieniaj miasta na literę wybraną przez grupę, w 20 sekund."],[1,"Powiedz jeden fakt o sobie, o którym nikt tu nie wie."]
+);
+const $=id=>document.getElementById(id);
+let lvl=3,used={t:new Set(),d:new Set()},players=[],pi=0,flipped=false;
+function pick(arr,kind){
+  let pool=arr.map((x,i)=>[x,i]).filter(([x,i])=>x[0]<=lvl&&!used[kind].has(i));
+  if(!pool.length){used[kind].clear();return pick(arr,kind)}
+  const [x,i]=pool[Math.floor(Math.random()*pool.length)];used[kind].add(i);return x;
+}
+function show(kind){
+  const arr=kind==="t"?T:D,item=pick(arr,kind);
+  const go=()=>{
+    const b=$("back");b.className="face back "+(kind==="t"?"truth":"dare");
+    $("tag").textContent=kind==="t"?"PRAWDA":"WYZWANIE";
+    $("txt").textContent=item[1];
+    $("heat").textContent=["","🌶","🌶🌶","🌶🌶🌶"][item[0]];
+    $("card").classList.add("flip");flipped=true;
+    if(players.length){pi=(pi+1)%players.length}
+    who();
+  };
+  if(flipped){$("card").classList.remove("flip");setTimeout(go,450)}else go();
+}
+function who(){
+  $("who").innerHTML=players.length?"Teraz: <b>"+players[pi%players.length]+"</b>":"";
+}
+function foot(){$("foot").textContent="W talii: "+T.length+" pytań i "+D.length+" wyzwań. Pij odpowiedzialnie, szanuj granice. 💜"}
+$("bt").onclick=()=>show("t");$("bd").onclick=()=>show("d");
+$("add").onclick=()=>{const v=$("inp").value.trim();if(v){players.push(v);$("inp").value="";pi=players.length-1;who()}};
+$("inp").onkeydown=e=>{if(e.key==="Enter")$("add").click()};
+$("clr").onclick=()=>{players=[];pi=0;who()};
+foot();
+
+// ===== EKRAN STARTOWY =====
+(function(){
+  const bg=document.querySelector('.st-bg'),em=['🔥','💬','⚡','🌶','💋','🎲','😈','💜','🔥','⚡','💬','🌶'];
+  em.forEach((e,i)=>{const s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)});
+  [['stR1','PRAWDA',0],['stR2','WYZWANIE',6]].forEach(([id,t,o])=>{const r=$(id);t.split('').forEach((c,i)=>{const e=document.createElement('b');e.style.setProperty('--i',i+o);e.textContent=c;r.appendChild(e)})});
+  const chips=$('stChips');
+  function renderChips(){
+    chips.innerHTML='';
+    if(!players.length){const h=document.createElement('span');h.className='st-hint';h.textContent='Możesz grać bez imion. Dodasz je też w trakcie gry.';chips.append(h);return}
+    players.forEach((n,i)=>{
+      const c=document.createElement('span');c.className='st-chip';c.append(n);
+      const x=document.createElement('button');x.type='button';x.textContent='✕';x.setAttribute('aria-label','Usuń gracza '+n);
+      x.onclick=()=>{players.splice(i,1);pi=0;renderChips()};
+      c.append(x);chips.append(c);
+    });
+  }
+  function addP(){const v=$('stInp').value.trim();if(!v)return;players.push(v);$('stInp').value='';renderChips();$('stInp').focus()}
+  $('stAdd').onclick=addP;
+  $('stInp').onkeydown=e=>{if(e.key==='Enter')addP()};
+  function setLvl(n){
+    lvl=n;
+    document.querySelectorAll('#stHeat button,#lv button').forEach(b=>{
+      const on=+b.dataset.l===n;b.classList.toggle('on',on);b.setAttribute('aria-checked',on)});
+  }
+  document.querySelectorAll('#stHeat button,#lv button').forEach(b=>b.onclick=()=>setLvl(+b.dataset.l));
+  $('stRulesBtn').onclick=()=>$('stRules').classList.toggle('on');
+  $('stGo').onclick=()=>{
+    document.body.classList.remove('menu');
+    $('card').classList.remove('flip');flipped=false;
+    pi=players.length?players.length-1:0;
+    who();window.scrollTo(0,0);
+  };
+  $('toMenu').onclick=()=>{document.body.classList.add('menu');renderChips()};
+  setLvl(lvl);renderChips();
+})();
+</script>
+</body>
+</html>

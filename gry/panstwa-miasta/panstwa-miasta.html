@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Państwa Miasta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="panstwa-miasta.css">
+</head>
+<body>
+<div id="pm"><div id="pmc"></div></div>
+<script>
+/* ===== most do platformy (index.html): konto, Firebase, statystyki ===== */
+(function(){
+  var PB=null;try{PB=window.parent&&window.parent!==window?window.parent.PLATFORM_BRIDGE:null}catch(e){PB=null}
+  function def(n,g){Object.defineProperty(window,n,{get:g,configurable:true})}
+  def('ACC',function(){return PB?PB.ACC:{user:null,nick:'',col:'',admin:false}});
+  def('fbDB',function(){return PB?PB.fbDB:null});
+  def('firebase',function(){return PB?PB.firebase:undefined});
+  def('onlinePlayerId',function(){return PB?PB.onlinePlayerId:null});
+  def('ISL',function(){return PB?PB.ISL:{board:'isla-petit'}});
+  window.onlineEnsureAuth=function(){return PB?PB.onlineEnsureAuth():Promise.reject(new Error('Brak połączenia z platformą — otwórz grę przez index.html.'))};
+  window.onlineCode=function(){return Math.random().toString(36).slice(2,7).toUpperCase()};
+  window.onlineNick=function(){var A=window.ACC,n=(A&&(A.nick||(A.user&&A.user.displayName)))||'Gracz';return String(n).replace(/[<>&]/g,'').trim().slice(0,14)||'Gracz'};
+  window.statsRecord=function(){if(PB)return PB.statsRecord.apply(null,arguments)};
+  window.lbMeta=function(){return PB?PB.lbMeta.apply(null,arguments):{}};
+  window.lbRecord=function(){if(PB)return PB.lbRecord.apply(null,arguments)};
+  window.tgBox=function(refExpr,isTest){
+    if(typeof ACC!=='undefined'&&ACC.admin)return '<label class="lgnote tgbox" style="display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer"><input type="checkbox" '+(isTest?'checked':'')+' onchange="tgSet('+refExpr+',this.checked)"><span>🧪 <b>Gra testowa</b> (admin) – wyniki nie liczą się do statystyk</span></label>';
+    return isTest?'<div class="lgnote tgbox">🧪 <b>Gra testowa</b> – wyniki nie liczą się do statystyk</div>':'';
+  };
+  window.tgSet=function(ref,v){
+    if(!ref||typeof ACC==='undefined'||!ACC.admin)return;
+    ref.child('test').set(v?true:null).catch(function(e){alert('Nie udało się zmienić trybu gry testowej: '+(e&&e.message||e))});
+  };
+})();
+const lgEsc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function lgDot(c){return '<i class="lgd" style="background:'+(/^#[0-9a-f]{6}$/i.test(c)?c:'#888')+'"></i>'}
+</script>
+<script>
+/* ===== PAŃSTWA MIASTA ===== */
+const PM_CATS=[['panstwa','Państwa'],['miasta','Miasta'],['imie_m','Imię męskie'],['imie_z','Imię żeńskie'],['zwierze','Zwierzę'],['rzecz','Rzecz'],['roslina','Roślina'],['piosenka','Tytuł piosenki'],['osoba','Znana osoba'],['kolor','Kolor'],['zawod','Zawód'],['film','Film'],['jedzenie','Jedzenie'],['aplikacja','Aplikacja'],['spoznienie','Powód spóźnienia'],['cialo','Część ciała'],['emocja','Emocja'],['ubranie','Ubranie']];
+const PM_NAME=Object.fromEntries(PM_CATS);
+const PM_LETTERS='ABCDEFGHIJKLMNOPRSTUWZ'.split('');
+const PM_SEC=30,PM_COUNT=4000,PM_GRACE=6000,PM_MAXP=8;
+let PM={screen:'start',ref:null,listener:null,code:'',host:null,players:[],status:null,cats:[],rounds:3,cur:0,rd:{},gid:'',msg:'',nick:'',col:'#2a9df4',joinCode:'',off:0,offRef:null,offL:null,my:[],phase:'',tick:null,saveT:null,sel:['panstwa','miasta','imie_m','imie_z','zwierze','rzecz'],selRounds:3,key:'',finR:-1,advancing:false};
+const pmNet=()=>typeof fbDB!=='undefined'&&!!fbDB&&typeof onlineEnsureAuth==='function';
+const pmNow=()=>Date.now()+PM.off;
+const pmClean=s=>String(s||'').replace(/[<>&]/g,'').trim().slice(0,14);
+const pmCatList=s=>String(s||'').split(',').filter(id=>PM_NAME[id]);
+const pmOrder=ids=>PM_CATS.map(c=>c[0]).filter(id=>ids.includes(id));
+const pmTimeTxt=n=>{const t=n*PM_SEC;return Math.floor(t/60)+':'+String(t%60).padStart(2,'0')};
+const pmMe=()=>typeof onlinePlayerId!=='undefined'?onlinePlayerId:null;
+const pmRound=n=>PM.rd['r'+n]||null;
+function pmNorm(s){return String(s||'').toLocaleLowerCase('pl').replace(/ł/g,'l').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim()}
+const pmStarts=(w,L)=>String(w).trim().charAt(0).toLocaleLowerCase('pl')===String(L).toLowerCase();
+function pmAns(r,uid){
+  let a=[];try{a=JSON.parse(r&&r.ans&&r.ans[uid]||'[]')}catch(e){}
+  return PM.cats.map((_,i)=>typeof a[i]==='string'?a[i].slice(0,30):'');
+}
+function pmScoreRound(n){
+  const r=pmRound(n)||{},L=r.letter||'',np=PM.players.length;
+  const ans={},tot={};PM.players.forEach(p=>{ans[p.id]=pmAns(r,p.id);tot[p.id]=0});
+  const cells=PM.cats.map((c,ci)=>{
+    const row=PM.players.map(p=>{
+      const w=String(ans[p.id][ci]||'').trim(),fl=(r.fl&&r.fl[p.id+'_'+ci])||{};
+      const flags=Object.keys(fl).filter(v=>v!==p.id&&fl[v]);
+      let st='ok';
+      if(!w)st='empty';
+      else if(!pmStarts(w,L)||pmNorm(w).length<2)st='wrong';
+      else if(flags.length*2>np-1)st='rej';
+      return {id:p.id,w,st,pts:0,flags};
+    });
+    const good=row.filter(x=>x.st==='ok');
+    good.forEach(x=>{const same=good.filter(y=>pmNorm(y.w)===pmNorm(x.w)).length;x.st=same>1?'dup':'uniq';x.pts=same>1?5:10});
+    row.forEach(x=>{
+      if(!x.w||x.st==='wrong')return;
+      const votes=(r.pt&&r.pt[x.id+'_'+ci])||{},counts={5:0,10:0};
+      Object.entries(votes).forEach(([voter,value])=>{if(voter!==x.id&&(value===5||value===10))counts[value]++});
+      if(counts[5]*2>np-1)x.pts=5;
+      else if(counts[10]*2>np-1)x.pts=10;
+      else if(x.flags.length*2>np-1)x.pts=0;
+      tot[x.id]+=x.pts;
+    });
+    return row;
+  });
+  return {cells,tot};
+}
+function pmTotals(){
+  const tot={},per=[];PM.players.forEach(p=>tot[p.id]=0);
+  const last=PM.status==='play'?PM.cur-1:PM.cur;
+  for(let n=0;n<=last;n++){if(!pmRound(n))continue;const s=pmScoreRound(n);per.push(s.tot);PM.players.forEach(p=>{tot[p.id]+=s.tot[p.id]||0})}
+  return {tot,per};
+}
+function pmRender(keep){
+  const c=document.getElementById('pmc');if(!c)return;
+  const a=document.activeElement,fid=keep&&a&&a.id&&c.contains(a)?a.id:null,pos=fid?a.selectionStart:0;
+  c.innerHTML=pmScreen();
+  if(fid){const e=document.getElementById(fid);if(e){e.focus();try{e.setSelectionRange(pos,pos)}catch(x){}}}
+}
+function pmAccountProfile(){
+  const user=(typeof ACC!=='undefined'&&ACC.user)?ACC.user:null;
+  const nick=(typeof ACC!=='undefined'&&ACC.nick)|| (user&&user.displayName) || (user&&user.email?user.email.split('@')[0]:'') || (typeof onlineNick==='function'?onlineNick():'') || 'Gracz';
+  const color=(typeof ACC!=='undefined'&&/^#[0-9a-f]{6}$/i.test(ACC.col||''))?ACC.col:'#2a9df4';
+  PM.nick=pmClean(nick)||'Gracz';
+  PM.col=color;
+}
+function pmDetach(){
+  try{if(PM.ref&&PM.listener)PM.ref.off('value',PM.listener)}catch(e){}
+  try{if(PM.offRef&&PM.offL)PM.offRef.off('value',PM.offL)}catch(e){}
+  clearInterval(PM.tick);clearTimeout(PM.saveT);
+  PM.ref=null;PM.listener=null;PM.offRef=null;PM.offL=null;PM.tick=null;
+}
+function pmLeave(){
+  try{if(PM.ref&&pmMe()&&PM.status==='lobby')PM.ref.child('players/'+pmMe()).remove()}catch(e){}
+  pmDetach();
+  Object.assign(PM,{screen:'start',players:[],status:null,rd:{},msg:'',my:[],phase:'',key:'',finR:-1});
+  pmRender();
+}
+function pmScreen(){
+  const m=PM.msg?`<div class="lgmsg" role="alert">${lgEsc(PM.msg)}</div>`:'';
+  switch(PM.screen){
+    case 'start':return pmStartHTML()+m;
+    case 'lobby':return pmLobbyHTML()+m;
+    case 'play':return pmPlayHTML()+m;
+    case 'review':return pmReviewHTML()+m;
+    case 'end':return pmEndHTML()+m;
+  }
+  return '';
+}
+function pmChips(sel,editable,fn){
+  return `<div class="pmchips">${PM_CATS.map(c=>`<button class="lgbtn ${sel.includes(c[0])?'on':''}" ${editable?'':'disabled'} onclick="${fn}('${c[0]}')">${c[1]}</button>`).join('')}</div>`;
+}
+function pmStartHTML(){
+  const net=pmNet(),n=PM.sel.length;
+  return `<h2>Państwa Miasta</h2>
+  <p class="lgrules">Przed każdą rundą losujemy literę. Masz wpisać słowo na tę literę w każdej wybranej kategorii. Na każdą kategorię przypada <b>30 sekund</b> do wspólnego czasu rundy. Po czasie porównujemy odpowiedzi: słowo, którego nikt inny nie ma, daje <b>10 punktów</b>, a słowo powtórzone u kogoś innego daje <b>po 5 punktów</b> każdemu. Wygrywa gracz z największą sumą po wszystkich rundach.</p>
+  <p class="lgnote">Grasz jako <b>${lgEsc(PM.nick||'Gracz')}</b> — nick i kolor są pobierane automatycznie z Twojego konta.</p>
+  <h3>Kategorie w rozgrywce</h3>
+  ${pmChips(PM.sel,true,'pmToggleSel')}
+  <div class="lgrow"><button class="lgbtn" onclick="PM.sel=PM_CATS.map(c=>c[0]);pmRender()">Wszystkie</button><button class="lgbtn" onclick="PM.sel=[];pmRender()">Wyczyść</button><span class="lgnote">Wybrano: ${n} · czas rundy: ${n?pmTimeTxt(n):'—'}</span></div>
+  <div class="lgrow">Liczba rund: ${[1,2,3,4,5].map(k=>`<button class="lgbtn ${k===PM.selRounds?'on':''}" onclick="PM.selRounds=${k};pmRender()">${k}</button>`).join('')}</div>
+  <div class="lgrow"><button class="lgbtn go" ${net&&n?'':'disabled'} onclick="pmCreate()">Utwórz pokój</button></div>
+  <div class="lgrow"><input id="pmjoin" maxlength="5" placeholder="Kod pokoju" value="${lgEsc(PM.joinCode||'')}" oninput="PM.joinCode=this.value" style="text-transform:uppercase"><button class="lgbtn" ${net?'':'disabled'} onclick="pmJoin()">Dołącz</button></div>
+  ${net?'':'<p class="lgnote">Państwa Miasta wymagają pokoju online, bo każdy wpisuje słowa na swoim urządzeniu. Działa po wgraniu gry na własny hosting z Firebase.</p>'}`;
+}
+function pmToggleSel(id){PM.sel=PM.sel.includes(id)?PM.sel.filter(x=>x!==id):pmOrder(PM.sel.concat(id));pmRender()}
+async function pmCreate(){
+  try{
+    pmAccountProfile();
+    if(!PM.sel.length)throw new Error('Wybierz co najmniej jedną kategorię.');
+    const uid=await onlineEnsureAuth(),code=onlineCode(),ref=fbDB.ref('pmRooms/'+code);
+    await ref.set({host:uid,status:'lobby',cats:pmOrder(PM.sel).join(','),rounds:PM.selRounds,cur:0,createdAt:firebase.database.ServerValue.TIMESTAMP,players:{[uid]:{id:uid,name:pmClean(PM.nick)||'Gracz',color:PM.col||'#2a9df4',order:0}}});
+    pmAttach(ref,code);
+  }catch(e){PM.msg='Nie udało się utworzyć pokoju: '+e.message;pmRender()}
+}
+async function pmJoin(){
+  try{
+    pmAccountProfile();
+    const uid=await onlineEnsureAuth(),code=String(PM.joinCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);
+    if(code.length!==5)throw new Error('Wpisz pięcioznakowy kod pokoju.');
+    const ref=fbDB.ref('pmRooms/'+code),room=(await ref.once('value')).val();
+    if(!room)throw new Error('Nie znaleziono pokoju o takim kodzie.');
+    ISL.board=room.board||'isla-petit';
+    const players=Object.values(room.players||{});
+    if(!(room.players&&room.players[uid])){
+      if(room.status!=='lobby')throw new Error('Ta rozgrywka już się rozpoczęła.');
+      if(players.length>=PM_MAXP)throw new Error('Pokój jest pełny (maksymalnie '+PM_MAXP+' osób).');
+      await ref.child('players/'+uid).set({id:uid,name:pmClean(PM.nick)||'Gracz',color:PM.col||'#2a9df4',order:Math.max(-1,...players.map(p=>Number(p.order)||0))+1});
+    }
+    pmAttach(ref,code);
+  }catch(e){PM.msg='Nie udało się dołączyć: '+e.message;pmRender()}
+}
+function pmAttach(ref,code){
+  pmDetach();PM.ref=ref;PM.code=code;PM.msg='';PM.key='';PM.finR=-1;PM.my=[];PM.phase='';
+  PM.offRef=fbDB.ref('.info/serverTimeOffset');PM.offL=PM.offRef.on('value',s=>{PM.off=Number(s.val())||0});
+  PM.listener=ref.on('value',snap=>pmOnRoom(snap.val()),err=>{PM.msg='Błąd połączenia: '+err.message;pmRender()});
+  PM.tick=setInterval(pmTick,250);
+}
+function pmOnRoom(room){
+  if(!room){PM.msg='Pokój został usunięty.';pmDetach();PM.screen='start';pmRender();return}
+  PM.host=room.host;PM.status=room.status;PM.test=!!room.test;
+  PM.players=Object.values(room.players||{}).sort((a,b)=>(a.order||0)-(b.order||0)).map(p=>({id:p.id,name:String(p.name||'Gracz'),color:p.color}));
+  PM.cats=pmCatList(room.cats);PM.rounds=Math.max(1,Number(room.rounds)||1);PM.cur=Number(room.cur)||0;PM.rd=room.rd||{};PM.gid=room.gid||'';
+  const st=room.status;
+  PM.screen=st==='lobby'?'lobby':st==='play'?'play':st==='review'?'review':st==='end'?'end':PM.screen;
+  if(st==='lobby'){PM.finR=-1;PM.my=[];PM.phase='';PM.key=''}
+  if(st==='play'){
+    const key=PM.gid+':'+PM.cur+':'+(pmRound(PM.cur)?1:0);
+    if(key===PM.key){pmWaitUpdate();return}
+    if(PM.key.split(':').slice(0,2).join(':')!==key.split(':').slice(0,2).join(':')){PM.my=[];PM.finR=-1}
+    PM.key=key;PM.phase='';
+  }else PM.key='';
+  if(st==='end')statsPm();
+  pmRender(true);
+}
+function pmLobbyHTML(){
+  const isHost=PM.host===pmMe(),n=PM.cats.length;
+  const list=PM.players.map((p,i)=>`<div class="lghist">${lgDot(p.color)}${i+1}. ${lgEsc(p.name)}${p.id===PM.host?' <b>(host)</b>':''}${p.id===pmMe()?' (Ty)':''}</div>`).join('');
+  return `<h2>Pokój: <span class="lgcode">${lgEsc(PM.code)}</span></h2>${list}${tgBox('PM.ref',PM.test)}
+  <h3>Kategorie${isHost?' (kliknij, aby zmienić)':''}</h3>
+  ${pmChips(PM.cats,isHost,'pmToggleRoom')}
+  <div class="lgrow">Liczba rund: ${[1,2,3,4,5].map(k=>`<button class="lgbtn ${k===PM.rounds?'on':''}" ${isHost?'':'disabled'} onclick="pmSetRounds(${k})">${k}</button>`).join('')}</div>
+  <p class="lgnote">Kategorie: ${n} · czas na rundę: ${n?pmTimeTxt(n):'—'} · ${isHost?(PM.players.length>=2?'Możesz rozpocząć grę.':'Poczekaj, aż dołączy co najmniej jeden gracz.'):'Czekaj, aż host rozpocznie grę.'} (Gracze: ${PM.players.length}/${PM_MAXP})</p>
+  <div class="lgrow">${isHost?`<button class="lgbtn go" ${PM.players.length>=2&&n?'':'disabled'} onclick="pmHostStart()">Rozpocznij grę</button>`:''}<button class="lgbtn" onclick="navigator.clipboard&&navigator.clipboard.writeText(PM.code)">Kopiuj kod</button><button class="lgbtn" onclick="pmLeave()">Wyjdź</button></div>`;
+}
+function pmToggleRoom(id){
+  if(PM.host!==pmMe()||PM.status!=='lobby')return;
+  const next=PM.cats.includes(id)?PM.cats.filter(x=>x!==id):pmOrder(PM.cats.concat(id));
+  if(!next.length)return;
+  PM.ref.child('cats').set(next.join(',')).catch(e=>{PM.msg=e.message;pmRender()});
+}
+function pmSetRounds(k){if(PM.host!==pmMe()||PM.status!=='lobby')return;PM.ref.child('rounds').set(k)}
+const pmRandLetter=()=>{const used=Object.values(PM.rd||{}).map(r=>r&&r.letter);const pool=PM_LETTERS.filter(l=>!used.includes(l));const p=pool.length?pool:PM_LETTERS;return p[Math.floor(Math.random()*p.length)]};
+function pmHostStart(){
+  if(PM.host!==pmMe()||PM.players.length<2||!PM.cats.length||PM.status!=='lobby')return;
+  PM.rd={};
+  PM.ref.update({status:'play',cur:0,gid:Date.now().toString(36)+Math.random().toString(36).slice(2,5),rd:{r0:{letter:pmRandLetter(),startAt:pmNow()+PM_COUNT}}}).catch(e=>{PM.msg=e.message;pmRender()});
+}
+function pmNext(){
+  if(PM.host!==pmMe()||PM.status!=='review')return;
+  const n=PM.cur+1;
+  if(n>=PM.rounds){PM.ref.child('status').set('end');return}
+  const u={status:'play',cur:n};u['rd/r'+n]={letter:pmRandLetter(),startAt:pmNow()+PM_COUNT};
+  PM.ref.update(u).catch(e=>{PM.msg=e.message;pmRender()});
+}
+function pmRematch(){if(PM.host!==pmMe())return;PM.ref.update({status:'lobby',cur:0,rd:null})}
+const pmTimes=()=>{const r=pmRound(PM.cur);if(!r||!r.startAt)return null;return {s:r.startAt,e:r.startAt+PM.cats.length*PM_SEC*1000}};
+function pmPhase(){
+  if(PM.status!=='play')return PM.status;
+  const t=pmTimes();if(!t)return 'wait';
+  const n=pmNow();
+  if(n<t.s)return 'count';
+  return n<t.e&&PM.finR!==PM.cur?'run':'done';
+}
+function pmCollect(){return PM.cats.map((_,i)=>String(PM.my[i]||'').replace(/[<>]/g,'').trim().slice(0,30))}
+function pmType(i,v){
+  PM.my[i]=v;clearTimeout(PM.saveT);PM.saveT=setTimeout(pmSaveDraft,1200);
+}
+function pmSaveDraft(){
+  if(!PM.ref||PM.status!=='play'||PM.finR===PM.cur||!pmMe())return;
+  PM.ref.child('rd/r'+PM.cur+'/ans/'+pmMe()).set(JSON.stringify(pmCollect())).catch(()=>{});
+}
+function pmKey(e,i){
+  if(e.key!=='Enter')return;e.preventDefault();
+  const nx=document.getElementById('pmin'+(i+1));if(nx)nx.focus();
+}
+function pmFinish(){
+  if(!PM.ref||PM.status!=='play'||PM.finR===PM.cur||!pmMe())return;
+  PM.finR=PM.cur;clearTimeout(PM.saveT);
+  const base='rd/r'+PM.cur,uid=pmMe(),ref=PM.ref;
+  ref.child(base+'/ans/'+uid).set(JSON.stringify(pmCollect())).then(()=>ref.child(base+'/fin/'+uid).set(true)).catch(e=>console.error('Państwa Miasta:',e));
+  PM.phase='done';pmRender();
+}
+function pmAdvance(){
+  if(PM.advancing||!PM.ref)return;PM.advancing=true;
+  const cur=PM.cur;
+  PM.ref.child('status').transaction(s=>s==='play'&&PM.cur===cur?'review':undefined).catch(()=>{}).then(()=>{PM.advancing=false});
+}
+function pmWaitUpdate(){
+  const el=document.getElementById('pmwait');if(!el)return;
+  const r=pmRound(PM.cur)||{},f=PM.players.filter(p=>r.fin&&r.fin[p.id]).length;
+  el.textContent='Gotowi: '+f+' z '+PM.players.length;
+}
+function pmTick(){
+  if(!PM.ref||PM.status!=='play')return;
+  const t=pmTimes();if(!t)return;
+  const n=pmNow(),ph=pmPhase();
+  if(ph!==PM.phase){PM.phase=ph;pmRender(true)}
+  const el=document.getElementById('pmtimer'),bar=document.getElementById('pmbari');
+  if(el){
+    if(n<t.s){el.textContent=Math.max(1,Math.ceil((t.s-n)/1000));el.classList.remove('low')}
+    else{const left=Math.max(0,t.e-n),sec=Math.ceil(left/1000);el.textContent=Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0');el.classList.toggle('low',left<10000)}
+  }
+  if(bar){const tot=t.e-t.s;bar.style.width=(n<t.s?100:Math.max(0,Math.min(100,(t.e-n)/tot*100)))+'%'}
+  if(n>=t.e&&PM.finR!==PM.cur)pmFinish();
+  const r=pmRound(PM.cur)||{};
+  const all=PM.players.length&&PM.players.every(p=>r.fin&&r.fin[p.id]);
+  if(n>=t.s&&(all||n>=t.e+PM_GRACE))pmAdvance();
+}
+function pmPlayHTML(){
+  const r=pmRound(PM.cur),head=`<h2>Runda ${PM.cur+1} z ${PM.rounds}</h2>`;
+  if(!r||!r.letter)return head+'<p>Losowanie litery…</p>';
+  const L=lgEsc(r.letter),ph=pmPhase();
+  if(ph==='count')return `${head}<p>Litera tej rundy:</p><div class="pmbig"><span class="pmletter">${L}</span></div><p>Start za…</p><div class="pmtimer" id="pmtimer"></div><p class="lgnote">Kategorie: ${PM.cats.length} · czas rundy: ${pmTimeTxt(PM.cats.length)}</p>`;
+  const bar=`<div class="pmtimer" id="pmtimer"></div><div class="pmbar"><i id="pmbari"></i></div>`;
+  if(ph==='done')return `${head}<p>Litera: <span class="pmletter">${L}</span></p>${bar}<p>Odpowiedzi wysłane. Czekamy na pozostałych graczy…</p><p class="lgnote" id="pmwait"></p>`;
+  const rows=PM.cats.map((id,i)=>`<label>${lgEsc(PM_NAME[id])}<input id="pmin${i}" maxlength="30" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="${lgEsc(PM_NAME[id])} na ${L}…" value="${lgEsc(PM.my[i]||'')}" oninput="pmType(${i},this.value)" onkeydown="pmKey(event,${i})"></label>`).join('');
+  return `${head}<p>Litera: <span class="pmletter">${L}</span></p>${bar}<div class="pmgrid">${rows}</div>
+  <div class="lgrow"><button class="lgbtn go" onclick="pmFinish()">Gotowe</button><span class="lgnote" id="pmwait"></span></div>`;
+}
+function pmRankHTML(tot,roundTot){
+  const sorted=PM.players.map((p,i)=>({p,i,t:tot[p.id]||0})).sort((a,b)=>b.t-a.t||a.i-b.i);
+  return sorted.map((x,k)=>`<div class="lghist">${k+1}. ${lgDot(x.p.color)}<b>${lgEsc(x.p.name)}</b>${x.p.id===pmMe()?' (Ty)':''} — razem <b>${x.t}</b> pkt${roundTot?` <span class="lgnote">(w tej rundzie +${roundTot[x.p.id]||0})</span>`:''}</div>`).join('');
+}
+function pmReviewHTML(){
+  const r=pmRound(PM.cur)||{},sc=pmScoreRound(PM.cur),T=pmTotals(),isHost=PM.host===pmMe(),np=PM.players.length,last=PM.cur+1>=PM.rounds;
+  const lab={uniq:'unikat',dup:'powtórka',rej:'odrzucone',wrong:'zła litera',empty:'brak odpowiedzi'};
+  const cards=PM.cats.map((id,ci)=>{
+    const rows=sc.cells[ci].map(x=>{
+      const p=PM.players.find(q=>q.id===x.id),mine=x.id===pmMe(),can=!mine&&x.w&&(x.st==='uniq'||x.st==='dup'||x.st==='rej'),iflag=x.flags.includes(pmMe()),votes=(r.pt&&r.pt[x.id+'_'+ci])||{},myVote=votes[pmMe()]||0;
+      const voteCount=v=>Object.entries(votes).filter(([uid,val])=>uid!==x.id&&val===v).length;
+      return `<div class="pma">${lgDot(p.color)}<span>${lgEsc(p.name)}:</span> <b>${x.w?lgEsc(x.w):'—'}</b> <span class="pmst ${x.pts===0&&x.w?'bad':x.pts===10?'good':''}">${x.w?x.pts+' pkt · '+(x.st==='rej'&&x.pts>0?'zmienione głosowaniem':lab[x.st]):'—'}</span>${x.flags.length?`<span class="lgnote">(${x.flags.length} z ${np-1} głosów za 0)</span>`:''}${can?`<span class="pmvotes"><button class="pmflag ${iflag?'on':''}" onclick="pmVote(${ci},'${x.id}',0)">0 pkt${iflag?' ✓':''}</button><button class="pmflag ${myVote===5?'on':''}" onclick="pmVote(${ci},'${x.id}',5)">5 pkt${myVote===5?' ✓':''}</button><button class="pmflag ${myVote===10?'on':''}" onclick="pmVote(${ci},'${x.id}',10)">10 pkt${myVote===10?' ✓':''}</button></span><span class="lgnote">Głosy: 0=${x.flags.length}, 5=${voteCount(5)}, 10=${voteCount(10)} (wymagana większość)</span>`:''}</div>`;
+    }).join('');
+    return `<div class="lgcard"><b>${lgEsc(PM_NAME[id])}</b>${rows}</div>`;
+  }).join('');
+  return `<h2>Podsumowanie rundy ${PM.cur+1} z ${PM.rounds} · litera <span class="pmletter">${lgEsc(r.letter||'?')}</span></h2>
+  <p class="lgnote">Unikalne słowo: 10 pkt, powtórzone: po 5 pkt. Słowo, które nie pasuje do kategorii, możesz odrzucić. Znika z punktacji, gdy odrzuci je większość pozostałych graczy.</p>
+  <h3>Wyniki</h3>${pmRankHTML(T.tot,sc.tot)}
+  <div class="lgrow">${isHost?`<button class="lgbtn go" onclick="pmNext()">${last?'Zakończ grę':'Następna runda'}</button>`:'<span class="lgnote">Host przechodzi dalej.</span>'}</div>
+  <div class="lgcards">${cards}</div>`;
+}
+function pmVote(ci,owner,points){
+  if(!PM.ref||PM.status!=='review'||owner===pmMe()||![0,5,10].includes(points))return;
+  const base='rd/r'+PM.cur,flRef=PM.ref.child(base+'/fl/'+owner+'_'+ci+'/'+pmMe()),ptRef=PM.ref.child(base+'/pt/'+owner+'_'+ci+'/'+pmMe()),r=pmRound(PM.cur)||{};
+  const current=(r.pt&&r.pt[owner+'_'+ci]&&r.pt[owner+'_'+ci][pmMe()])||0,zeroOn=!!(r.fl&&r.fl[owner+'_'+ci]&&r.fl[owner+'_'+ci][pmMe()]);
+  let job;
+  if(points===0){job=zeroOn?flRef.remove():flRef.set(true);job=Promise.all([job,ptRef.remove()]);}
+  else{job=Promise.all([flRef.remove(),current===points?ptRef.remove():ptRef.set(points)]);}
+  job.catch(e=>{PM.msg=e.message;pmRender()});
+}
+function pmFlag(ci,owner){pmVote(ci,owner,0)}
+function pmEndHTML(){
+  const T=pmTotals(),isHost=PM.host===pmMe();
+  const max=Math.max(0,...PM.players.map(p=>T.tot[p.id]||0)),top=PM.players.filter(p=>(T.tot[p.id]||0)===max);
+  const perRound=PM.players.map(p=>`<div class="lghist">${lgDot(p.color)}<b>${lgEsc(p.name)}</b>: ${T.per.map((t,i)=>`R${i+1} ${t[p.id]||0}`).join(' · ')}</div>`).join('');
+  return `<h2>Koniec gry</h2><div class="lgwin">🏆 ${top.length>1?'Remis: ':'Zwycięzca: '}${top.map(p=>lgEsc(p.name)).join(', ')}<small>${max} pkt</small></div>
+  <h3>Ranking</h3>${pmRankHTML(T.tot)}
+  <h3>Punkty w rundach</h3>${perRound}
+  <div class="lgrow">${isHost?'<button class="lgbtn go" onclick="pmRematch()">Zagraj ponownie</button>':'<span class="lgnote">Host może rozpocząć kolejną grę.</span>'}<button class="lgbtn" onclick="pmLeave()">Wyjdź</button></div>`;
+}
+function statsPm(){
+  if(PM.status!=='end'||!PM.gid||typeof ACC==='undefined'||!ACC.user)return;
+  const me=PM.players.findIndex(p=>p.id===ACC.user.uid);if(me<0)return;
+  const T=pmTotals(),max=Math.max(0,...PM.players.map(p=>T.tot[p.id]||0)),top=PM.players.filter(p=>(T.tot[p.id]||0)===max);
+  const won=top.some(p=>p.id===ACC.user.uid);
+  if(!PM.test)lbRecord('panstwa','pm_'+PM.gid+'_'+ACC.user.uid,T.tot[ACC.user.uid]||0,PM.players[me].name,lbMeta('online',PM.players.map(p=>p.name)));
+  statsRecord('pm_'+PM.gid,'panstwa',won?(top.length>1?'d':'w'):'l',PM.players.map(p=>({uid:p.id,name:p.name})),PM.test);
+}
+
+
+
+/* ===== integracja z platformą: wejście do gry / wyjście z gry ===== */
+window.__show=function(){
+  pmAccountProfile();
+  if(!PM.ref)Object.assign(PM,{screen:'start',msg:''});
+  pmRender();
+};
+window.__leave=function(){
+  
+};
+window.__joinFromHub=async function(c){PM.joinCode=c;await pmJoin()};
+window.__show();
+</script>
+</body>
+</html>

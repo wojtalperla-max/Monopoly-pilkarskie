@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="pl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>GuessR</title>
+<link rel="stylesheet" href="guessr.css"></head><body>
+<div class="bg"><i></i><i></i><i></i></div><canvas id="cv"></canvas>
+<div class="wrap">
+<h1>GUESS<b>R</b></h1><div class="sub">Zgadnij, co to jest – sam albo ze znajomymi!</div>
+<div class="row" id="tabs"></div>
+
+<div id="lobby" class="gz">
+<div class="gz-bg" aria-hidden="true"><span style="left:5%;animation-duration:14s;animation-delay:-0s">❓</span><span style="left:17%;animation-duration:19s;animation-delay:-4s">🎯</span><span style="left:29%;animation-duration:24s;animation-delay:-8s">🔍</span><span style="left:41%;animation-duration:18s;animation-delay:-12s">🧩</span><span style="left:53%;animation-duration:23s;animation-delay:-3s">💡</span><span style="left:65%;animation-duration:17s;animation-delay:-7s">❔</span><span style="left:77%;animation-duration:22s;animation-delay:-11s">🏆</span><span style="left:89%;animation-duration:16s;animation-delay:-2s">🎲</span></div>
+<div class="gz-wrap">
+<h1 class="gz-logo" aria-label="GuessR"><b style="--i:0">G</b><b style="--i:1">U</b><b style="--i:2">E</b><b style="--i:3">S</b><b style="--i:4">S</b><b style="--i:5">R</b></h1>
+<div class="gz-tiles" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+<p class="gz-sub">Zgadnij, co to jest – sam albo ze znajomymi!</p>
+<div class="gz-card"><div class="pick"><input id="nick" placeholder="Twój nick…" maxlength="14" autocomplete="off"><input type="color" id="col" aria-label="Twój kolor"></div></div>
+<div class="gz-main">
+<button class="gz-btn gz-gold" id="bSolo"><span class="gz-ic">▶</span>GRA SOLO</button>
+<button class="gz-btn gz-white" id="bCreate"><span class="gz-ic">＋</span>UTWÓRZ POKÓJ</button>
+<button class="gz-btn gz-ghost" id="bJoinToggle" type="button"><span class="gz-ic">🔑</span>DOŁĄCZ DO POKOJU</button>
+</div>
+<div class="gz-pane" id="joinPane"><h3>Kod pokoju</h3><div class="in"><input id="jc" placeholder="Kod pokoju" maxlength="4" autocomplete="off" style="text-transform:uppercase"><button id="bJoin" class="gz-btn gz-gold gz-small">Dołącz</button></div></div>
+<small id="lobinfo"></small>
+</div>
+</div>
+
+<div id="game" class="hid">
+<div class="card" id="roomBox"><div class="code" id="rc"></div><div class="pl" id="pl"></div><div class="feed" id="feed"></div></div>
+<div class="card">
+<div class="in"><input id="q" placeholder="Wpisz nazwę…" autocomplete="off"><button class="pri" id="bG">Zgaduję</button><div class="dd hid" id="dd"></div></div>
+<div class="ctl" style="margin-top:8px"><button class="gh" id="bH">Podpowiedź</button><button class="dng" id="bU">Poddaję się</button></div>
+<div class="info" id="inf"></div><div id="ban"></div>
+<div class="row"><button id="bN" class="pri">⟳ Nowa runda</button><button id="bE">✎ Edytuj bazę</button><button id="bL">⎋ Wyjdź</button></div>
+</div>
+<div class="card sc"><table><thead id="th"></thead><tbody id="tb"></tbody></table>
+<div class="leg"><span style="--c:var(--g)">Trafione</span><span style="--c:var(--y)">Blisko</span><span style="--c:var(--r)">Pudło</span></div></div>
+</div>
+</div>
+
+<div id="ed"><div class="card" id="edc"></div></div>
+
+<script>document.getElementById("bJoinToggle").onclick=function(){var p=document.getElementById("joinPane");p.classList.toggle("open");if(p.classList.contains("open"))document.getElementById("jc").focus()};</script>
+<script>
+/* most do hosta (index.html): pokoje online przez Firebase + nick + kolor + statystyki */
+(function(){
+var P=window.parent;
+function G(){try{return P&&P!==window&&P.guessrBridge?P.guessrBridge():null}catch(e){return null}}
+window.__grNick=function(){try{var b=G();return b&&b.nick()||''}catch(e){return''}};
+window.__grCol=function(){try{var b=G();return b&&b.col()||''}catch(e){return''}};
+window.__grStats=function(code,gid,players,r){try{var b=G();if(b)b.stats(code,gid,players,r)}catch(e){}};
+window.__grNet=function(){try{var b=G();return !!(b&&b.net())}catch(e){return false}};
+window.__grJoin=async function(name){
+  var B=G();
+  if(!B||!B.net())throw new Error('Brak połączenia z Firebase');
+  var uid=await B.auth();
+  var path='tttRooms/'+String(name).toLowerCase().replace(/[^a-z0-9-]/g,'').slice(0,40);
+  var ref=B.db.ref(path),pr=ref.child('peers'),ms=ref.child('msgs');
+  var cache={},pc=[],rc=[],h={},gone=false,first=true,firstC=true;
+  var startKey=ms.push().key;
+  await pr.child(uid).set({t:B.ts});
+  try{pr.child(uid).onDisconnect().remove()}catch(e){}
+  function fire(c){pc.forEach(function(f){try{f(c)}catch(e){console.error(e)}})}
+  var onVal=pr.on('value',function(s){
+    var v=s.val()||{},joined=[],left=[],changed=[];
+    Object.keys(v).forEach(function(k){var p=v[k]&&v[k].p||{};
+      if(!cache[k]&&!first&&k!==uid)joined.push({peer:k});
+      else if(cache[k]&&k!==uid&&JSON.stringify(cache[k])!==JSON.stringify(p))changed.push({peer:k});
+      cache[k]=p});
+    Object.keys(cache).forEach(function(k){if(!v[k]){delete cache[k];if(k!==uid)left.push({peer:k})}});
+    first=false;fire({joined:joined,left:left,changed:changed});
+  });
+  /* po zerwaniu i wznowieniu połączenia odnawiamy obecność i prosimy o stan */
+  var cref=B.db.ref('.info/connected');
+  var onConn=cref.on('value',function(s){
+    if(s.val()!==true)return;
+    if(firstC){firstC=false;return}
+    if(gone)return;
+    try{pr.child(uid).set({t:B.ts});pr.child(uid).onDisconnect().remove()}catch(e){}
+    rc.forEach(function(f){try{f()}catch(e){console.error(e)}});
+  });
+  await pr.once('value').then(function(s){var v=s.val()||{};Object.keys(v).forEach(function(k){cache[k]=v[k]&&v[k].p||{}})});
+  var q=ms.orderByKey().startAt(startKey);
+  var onMsg=q.on('child_added',function(s){var v=s.val();if(!v||!v.t)return;var fs=h[v.t];if(!fs)return;
+    var m={peer:v.peer,isMe:v.peer===uid,ts:+v.ts||Date.now(),data:v.data===undefined?null:v.data};
+    fs.slice().forEach(function(f){try{f(m)}catch(e){console.error(e)}})});
+  return{
+    uid:uid,
+    peers:function(){return Object.keys(cache).map(function(k){return{peer:k,isMe:k===uid,presence:cache[k]||{}}})},
+    presence:function(o){cache[uid]=o;return pr.child(uid).set({t:B.ts,p:o})},
+    on:function(t,f){(h[t]=h[t]||[]).push(f);return function(){h[t]=(h[t]||[]).filter(function(x){return x!==f})}},
+    onPeers:function(f){pc.push(f);return function(){pc=pc.filter(function(x){return x!==f})}},
+    onReconnect:function(f){rc.push(f)},
+    emit:function(t,d){if(gone)return Promise.resolve();var r=ms.push();var p=r.set({t:t,peer:uid,data:d===undefined?null:d,ts:B.ts});setTimeout(function(){r.remove().catch(function(){})},20000);return p},
+    leave:function(){if(gone)return Promise.resolve();gone=true;try{pr.off('value',onVal);q.off('child_added',onMsg);cref.off('value',onConn)}catch(e){}
+      try{pr.child(uid).onDisconnect().cancel()}catch(e){}
+      return pr.child(uid).remove().then(function(){return pr.once('value')}).then(function(s){if(!s.val())return ref.remove()}).catch(function(){})}
+  };
+};
+})();
+</script>
+<script>
+const $=s=>document.querySelector(s),E=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+const HEX=/^#[0-9a-f]{6}$/i;
+const cleanN=v=>String(v||'').replace(/[\u0000-\u001f\u200b-\u200f\u2028-\u202f<>&]/g,'').trim().slice(0,14);
+const PAL=['#ff5fa2','#5ee6c8','#7aa2ff','#ffd23f','#ff8a3d','#b58cff','#6be56b','#ff6b6b'];
+const rndCol=PAL[Math.random()*PAL.length|0];
+const colOf=c=>HEX.test(c||'')?c.toLowerCase():'#a99d8c';
+const accNick=()=>{try{return cleanN(window.__grNick&&window.__grNick())}catch(e){return''}};
+const accCol=()=>{try{const c=window.__grCol&&window.__grCol();return HEX.test(c||'')?c.toLowerCase():''}catch(e){return''}};
+const netOk=()=>{try{return !!(window.__grNet&&window.__grNet())}catch(e){return false}};
+
+const P=(id,name,emoji,cols,rows)=>({id,name,emoji,cols:cols.split(',').map(c=>({l:c.replace('#',''),n:c.endsWith('#')})),items:rows.trim().split('\n').map(r=>{const a=r.split('|');return{name:a[0],v:a.slice(1)}})});
+const clr=()=>{clearTimeout(S.wait);clearTimeout(S.wait2)};
+const S={themes:{},cur:'dino',room:null,code:'',target:null,round:0,startMsg:null,guesses:[],over:false,winner:null,rev:false,nick:'',col:'',score:0,wins:0,wait:0,wait2:0};
+S.themes.dino=P('dino','Dinozaury','🦖','Okres,Dieta,Kontynent,Klad,Długość (m)#',`Tyrannosaurus rex|Late Cretaceous|Carnivore|North America|Theropoda|12
+Triceratops horridus|Late Cretaceous|Herbivore|North America|Ceratopsia|9
+Velociraptor mongoliensis|Late Cretaceous|Carnivore|Asia|Theropoda|2
+Stegosaurus stenops|Late Jurassic|Herbivore|North America|Thyreophora|9
+Brachiosaurus altithorax|Late Jurassic|Herbivore|North America|Sauropoda|22
+Spinosaurus aegyptiacus|Late Cretaceous|Carnivore|Africa|Theropoda|14
+Allosaurus fragilis|Late Jurassic|Carnivore|North America|Theropoda|9
+Ankylosaurus magniventris|Late Cretaceous|Herbivore|North America|Thyreophora|7
+Diplodocus carnegii|Late Jurassic|Herbivore|North America|Sauropoda|24
+Iguanodon bernissartensis|Early Cretaceous|Herbivore|Europe|Ornithopoda|10
+Giganotosaurus carolinii|Late Cretaceous|Carnivore|South America|Theropoda|12
+Parasaurolophus walkeri|Late Cretaceous|Herbivore|North America|Ornithopoda|10
+Carnotaurus sastrei|Late Cretaceous|Carnivore|South America|Theropoda|8
+Compsognathus longipes|Late Jurassic|Carnivore|Europe|Theropoda|1
+Therizinosaurus cheloniformis|Late Cretaceous|Herbivore|Asia|Theropoda|10`);
+S.themes.foot=P('foot','Piłkarze','⚽','Pozycja,Kraj,Klub,Liga,Rok urodzenia#',`Lionel Messi|Forward|Argentina|Inter Miami|MLS|1987
+Cristiano Ronaldo|Forward|Portugal|Al Nassr|Saudi League|1985
+Robert Lewandowski|Forward|Poland|FC Barcelona|La Liga|1988
+Kylian Mbappé|Forward|France|Real Madrid|La Liga|1998
+Erling Haaland|Forward|Norway|Manchester City|Premier League|2000
+Virgil van Dijk|Defender|Netherlands|Liverpool|Premier League|1991
+Manuel Neuer|Goalkeeper|Germany|Bayern Munich|Bundesliga|1986
+Mohamed Salah|Forward|Egypt|Liverpool|Premier League|1992
+Jude Bellingham|Midfielder|England|Real Madrid|La Liga|2003
+Wojciech Szczęsny|Goalkeeper|Poland|FC Barcelona|La Liga|1990
+Lamine Yamal|Forward|Spain|FC Barcelona|La Liga|2007
+Harry Kane|Forward|England|Bayern Munich|Bundesliga|1993
+Rodri|Midfielder|Spain|Manchester City|Premier League|1996
+Luka Modrić|Midfielder|Croatia|AC Milan|Serie A|1985`);
+S.themes.zoo=P('zoo','Zwierzęta','🦁','Gromada,Dieta,Kontynent,Środowisko,Waga (kg)#',`Lion|Mammal|Carnivore|Africa|Savanna|190
+African elephant|Mammal|Herbivore|Africa|Savanna|6000
+Blue whale|Mammal|Carnivore|Global|Ocean|150000
+Giant panda|Mammal|Herbivore|Asia|Forest|110
+Polar bear|Mammal|Carnivore|Arctic|Tundra|450
+Emperor penguin|Bird|Carnivore|Antarctica|Ice|30
+Bald eagle|Bird|Carnivore|North America|Forest|5
+Kangaroo|Mammal|Herbivore|Australia|Grassland|60
+Nile crocodile|Reptile|Carnivore|Africa|River|500
+Komodo dragon|Reptile|Carnivore|Asia|Island|70
+Great white shark|Fish|Carnivore|Global|Ocean|1100
+Gorilla|Mammal|Herbivore|Africa|Forest|160
+Tiger|Mammal|Carnivore|Asia|Forest|220
+Giraffe|Mammal|Herbivore|Africa|Savanna|1200
+Ostrich|Bird|Herbivore|Africa|Savanna|110`);
+const BI={};Object.keys(S.themes).forEach(k=>BI[k]=JSON.stringify(S.themes[k]));
+const T=()=>S.themes[S.cur];
+const toast=t=>{const e=E('div','toast',t);document.body.append(e);setTimeout(()=>e.remove(),2600)};
+
+/* ---------- motywy: walidacja + zapis w tej przeglądarce ---------- */
+function cleanTheme(t){try{
+ if(!t||typeof t!=='object')return null;
+ const id=String(t.id||'').replace(/[^a-z0-9_-]/gi,'').slice(0,24);if(!id)return null;
+ if(!Array.isArray(t.cols)||!t.cols.length||t.cols.length>8||!Array.isArray(t.items)||t.items.length>400)return null;
+ const cols=t.cols.map(c=>({l:String(c&&c.l||'').slice(0,24),n:!!(c&&c.n)}));
+ const items=t.items.map(i=>{const v=Array.isArray(i&&i.v)?i.v:[];return{name:String(i&&i.name||'').slice(0,60),v:cols.map((_,k)=>String(v[k]==null?'':v[k]).slice(0,60))}})
+  .filter(i=>i.name&&cols.every((c,k)=>!c.n||(i.v[k]!==''&&!isNaN(+i.v[k]))));
+ return{id,name:String(t.name||id).slice(0,24),emoji:Array.from(String(t.emoji||'🎯')).slice(0,3).join(''),cols,items};
+}catch(e){return null}}
+const isCustom=id=>!BI[id]||JSON.stringify(S.themes[id])!==BI[id];
+function saveCustom(){try{localStorage.setItem('guessr_themes',JSON.stringify(Object.values(S.themes).filter(t=>isCustom(t.id))))}catch(e){}}
+function loadCustom(){try{const a=JSON.parse(localStorage.getItem('guessr_themes')||'[]');if(Array.isArray(a))a.forEach(x=>{const t=cleanTheme(x);if(t&&t.items.length)S.themes[t.id]=t})}catch(e){}}
+loadCustom();
+
+/* ---------- confetti ---------- */
+const cv=$('#cv'),cx=cv.getContext('2d');let ps=[];
+function boom(){cv.width=innerWidth;cv.height=innerHeight;for(let i=0;i<140;i++)ps.push({x:innerWidth/2,y:innerHeight/3,vx:(Math.random()-.5)*16,vy:-Math.random()*14-4,s:4+Math.random()*6,c:`hsl(${Math.random()*360},85%,60%)`,r:Math.random()*6});if(ps.length<=140)tick()}
+function tick(){cx.clearRect(0,0,cv.width,cv.height);ps.forEach(p=>{p.vy+=.35;p.x+=p.vx;p.y+=p.vy;p.r+=.2;cx.fillStyle=p.c;cx.save();cx.translate(p.x,p.y);cx.rotate(p.r);cx.fillRect(-p.s/2,-p.s/2,p.s,p.s*.6);cx.restore()});ps=ps.filter(p=>p.y<cv.height+20);if(ps.length)requestAnimationFrame(tick);else cx.clearRect(0,0,cv.width,cv.height)}
+
+/* ---------- zakładki motywów ---------- */
+function tabs(){const b=$('#tabs');b.replaceChildren();Object.values(S.themes).forEach(t=>{const x=E('button','tab'+(t.id===S.cur?' on':''),t.emoji+' '+t.name);x.onclick=()=>{if(t.items.length<2)return toast('Za mało pozycji w bazie');S.cur=t.id;tabs();newRound()};b.append(x)});const n=E('button','tab','＋ Nowy motyw');n.onclick=()=>openEd(null);b.append(n)}
+
+/* ---------- logika gry ---------- */
+function cmp(c,g,t){if(c.n){const a=+g,b=+t;if(a===b)return['g',a];const tol=a>1800?4:Math.max(a,b)*.2;return[Math.abs(a-b)<=tol?'y':'r',a+(a<b?' ↑':' ↓')]}
+ if(g===t)return['g',g];const w=String(t).toLowerCase().split(/\s+/);return[String(g).toLowerCase().split(/\s+/).some(x=>x.length>2&&w.includes(x))?'y':'r',g]}
+function buildTable(){const th=T(),h=$('#th');h.replaceChildren();const r=E('tr');['Nazwa',...th.cols.map(c=>c.l)].forEach(x=>r.append(E('th',0,x)));h.append(r);$('#tb').replaceChildren();$('#ban').replaceChildren();$('#inf').textContent='Prób: 0';$('#q').value='';$('#q').disabled=false}
+function newRound(){const th=T();if(th.items.length<2)return toast('Dodaj więcej pozycji');const it=th.items[Math.random()*th.items.length|0];
+ const m={round:Date.now(),theme:S.cur,target:it.name};
+ if(isCustom(S.cur))m.def=JSON.stringify(th);   /* własny motyw jedzie razem z rundą, więc reszta pokoju też go zobaczy */
+ apply(m);if(S.room)S.room.emit('start',m).catch(()=>{})}
+function apply(m){
+ if(m.def){try{const t=cleanTheme(JSON.parse(m.def));if(t&&t.items.length>=2)S.themes[t.id]=t}catch(e){}}
+ if(!S.themes[m.theme])return;
+ const it=S.themes[m.theme].items.find(i=>i.name===m.target);if(!it)return;
+ S.cur=m.theme;S.target=it;S.round=m.round;S.startMsg=m;S.guesses=[];S.over=false;S.winner=null;S.rev=false;S.t0=Date.now();
+ clr();buildTable();tabs();pres();$('#q').focus()}
+function row(it){const th=T(),tr=E('tr');let g=0;const n=E('td','nm c '+(it===S.target?'g':'r'),it.name);tr.append(n);
+ th.cols.forEach((c,i)=>{const[k,x]=cmp(c,it.v[i],S.target.v[i]);if(k==='g')g++;const td=E('td',k,x);td.style.setProperty('--d',(i+1)*150+'ms');tr.append(td)});$('#tb').prepend(tr);return g}
+
+/* obecność w pokoju: nick, kolor, punkty, liczba prób */
+function pres(){if(!S.room)return;players();S.room.presence({nick:S.nick,col:S.col,score:S.score,tries:S.guesses.length}).catch(()=>{})}
+
+/* statystyki: tylko pokoje (min. 2 graczy), jeden wpis na rundę; wygrywa ten, kto trafił pierwszy */
+function recStats(r){
+ if(!S.room||!S.round||!window.__grStats)return;
+ const pl=S.room.peers().filter(p=>p.presence&&p.presence.nick);
+ if(pl.length<2||!pl.some(p=>p.isMe))return;
+ window.__grStats(S.code,String(S.round),pl.map(p=>({uid:p.peer,name:cleanN(p.presence.nick)})),r)}
+
+function guess(name){if(S.over||!S.target)return;const it=T().items.find(i=>i.name.toLowerCase()===name.trim().toLowerCase());
+ if(!it||S.guesses.includes(it)){$('#q').classList.remove('sh');void $('#q').offsetWidth;$('#q').classList.add('sh');return}
+ S.guesses.push(it);const g=row(it),th=T();$('#inf').textContent='Prób: '+S.guesses.length;$('#q').value='';dd();
+ if(S.room)S.room.emit('guess',{nick:S.nick,col:S.col,name:it.name,g,n:th.cols.length}).catch(()=>{});
+ if(it===S.target){
+  S.over=true;$('#q').disabled=true;
+  const tries=S.guesses.length,sec=((Date.now()-S.t0)/1000).toFixed(1);
+  S.winner={nick:S.nick,col:S.col,tries,sec,me:true};S.score++;S.wins++;
+  if(S.room)S.room.emit('win',{round:S.round,nick:S.nick,col:S.col,tries,sec}).catch(()=>{});
+  pres();recStats('w');
+  setTimeout(()=>showWin(S.winner),th.cols.length*150+500);
+ }else pres()}
+function showWin(w){
+ const b=$('#ban');b.replaceChildren();
+ const d=E('div','ban w',(w.me?'🏆 Wygrywasz! ':'🏆 '+w.nick+' wygrywa! ')+w.tries+' prób, '+w.sec+' s');
+ d.style.boxShadow='inset 6px 0 0 '+colOf(w.col);b.append(d);if(w.me)boom()}
+$('#bG').onclick=()=>guess($('#q').value);
+$('#bH').onclick=()=>{if(S.target)$('#inf').textContent='Podpowiedź: '+S.target.name.length+' znaków, zaczyna się na „'+S.target.name[0]+'”'};
+$('#bU').onclick=()=>{if(S.over||!S.target)return;S.over=true;S.rev=true;$('#q').disabled=true;row(S.target);$('#ban').replaceChildren(E('div','ban l','Odpowiedź: '+S.target.name))};
+$('#bN').onclick=newRound;
+
+/* autouzupełnianie */
+let sel=-1;function dd(list){const d=$('#dd');d.replaceChildren();if(!list||!list.length)return d.classList.add('hid');sel=-1;list.forEach(it=>{const x=E('div',0,it.name);x.onmousedown=e=>{e.preventDefault();guess(it.name)};d.append(x)});d.classList.remove('hid')}
+$('#q').oninput=e=>{const v=e.target.value.trim().toLowerCase();dd(v?T().items.filter(i=>i.name.toLowerCase().includes(v)&&!S.guesses.includes(i)).slice(0,6):null)};
+$('#q').onkeydown=e=>{const c=[...$('#dd').children];if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();sel=(sel+(e.key==='ArrowDown'?1:-1)+c.length)%(c.length||1);c.forEach((x,i)=>x.classList.toggle('s',i===sel))}
+ if(e.key==='Enter'){if(c[sel])guess(c[sel].textContent);else if(c.length===1)guess(c[0].textContent);else guess($('#q').value)}}
+$('#q').onblur=()=>setTimeout(()=>dd(),120);
+
+/* ---------- nick i kolor (z konta albo wpisane / wybrane) ---------- */
+function initPrefs(){
+ const an=accNick(),ac=accCol(),n=$('#nick'),c=$('#col');
+ if(an){n.value=an;n.readOnly=true;n.title='Nick z Twojego konta'}
+ else{n.readOnly=false;n.title='';if(!n.value){try{const v=cleanN(localStorage.getItem('guessr_nick'));if(v)n.value=v}catch(e){}}}
+ if(ac){c.value=ac;c.disabled=true;c.title='Kolor z Twojego konta'}
+ else{c.disabled=false;c.title='Wybierz swój kolor';if(!c.dataset.set){let v='';try{v=localStorage.getItem('guessr_col')||''}catch(e){}c.value=HEX.test(v)?v:rndCol;c.dataset.set='1'}}
+ $('#lobinfo').textContent=!netOk()?'Pokoje online są niedostępne (brak połączenia z Firebase). Możesz zagrać solo.'
+  :an?'Grasz jako '+an+' – wyniki z pokoi (min. 2 graczy) trafią do Twoich statystyk.'
+  :'Zaloguj się na konto, aby nick i kolor pochodziły z konta, a wyniki z pokoi liczyły się do statystyk.'}
+function readPrefs(){
+ const an=accNick(),ac=accCol(),typed=cleanN($('#nick').value);
+ S.nick=an||typed||'Gracz'+(Math.random()*90+10|0);
+ S.col=ac||(HEX.test($('#col').value)?$('#col').value.toLowerCase():rndCol);
+ if(!an){try{if(typed)localStorage.setItem('guessr_nick',typed);if(!ac)localStorage.setItem('guessr_col',S.col)}catch(e){}}}
+
+/* ---------- ekrany ---------- */
+function showGame(code){$('#lobby').classList.add('hid');$('#game').classList.remove('hid');$('#roomBox').classList.toggle('hid',!code);$('#rc').textContent=code?'Pokój: '+code:'';$('#feed').replaceChildren();$('#ban').replaceChildren();tabs()}
+function resetState(){clr();S.rev=false;S.target=null;S.round=0;S.startMsg=null;S.guesses=[];S.over=false;S.winner=null;S.score=0;S.wins=0}
+function toLobby(){
+ clr();
+ if(S.room){const r=S.room;S.room=null;r.leave().catch(()=>{})}
+ S.code='';resetState();
+ $('#game').classList.add('hid');$('#lobby').classList.remove('hid');
+ $('#feed').replaceChildren();$('#pl').replaceChildren();$('#ban').replaceChildren();$('#tb').replaceChildren();$('#th').replaceChildren();
+ initPrefs()}
+
+/* ---------- pokoje (Firebase przez hub) ---------- */
+$('#bSolo').onclick=()=>{readPrefs();resetState();S.room=null;S.code='';showGame(null);newRound()};
+
+async function enter(code,create){
+ if(!netOk()){toast('Pokoje online są niedostępne');return'err'}
+ readPrefs();
+ let r;
+ try{r=await window.__grJoin('guessr-'+code.toLowerCase())}catch(e){toast('Nie udało się wejść do pokoju');return'err'}
+ const others=r.peers().filter(p=>!p.isMe).length;
+ if(create&&others>0){await r.leave().catch(()=>{});return'busy'}
+ if(!create&&others===0){await r.leave().catch(()=>{});toast('Nie ma takiego pokoju');return'none'}
+ resetState();S.room=r;S.code=code;
+ r.on('start',m=>{if(S.room!==r||m.isMe||!m.data)return;if(m.data.round!==S.round)apply(m.data)});
+ r.on('req',m=>{if(S.room!==r||m.isMe||!S.startMsg)return;setTimeout(()=>{if(S.room===r&&S.startMsg)r.emit('sync',S.startMsg).catch(()=>{})},Math.random()*500)});
+ r.on('sync',m=>{if(S.room!==r||m.isMe||!m.data||S.target)return;apply(m.data)});
+ r.on('guess',m=>{if(S.room!==r||m.isMe||!m.data)return;const d=m.data,f=$('#feed'),l=E('div');
+  const nm=E('b',0,cleanN(d.nick));nm.style.color=colOf(d.col);
+  l.append(nm,document.createTextNode(' → '+String(d.name||'').slice(0,60)+' ('+(+d.g||0)+'/'+(+d.n||0)+' trafione)'));
+  f.prepend(l);while(f.children.length>4)f.lastChild.remove()});
+ r.on('win',m=>{if(S.room!==r||m.isMe||!m.data)return;const d=m.data;
+  if(d.round!==S.round||S.winner)return;   /* pierwsza wiadomość o wygranej w rundzie rozstrzyga */
+  S.winner={nick:cleanN(d.nick)||'Gracz',col:colOf(d.col),tries:+d.tries||0,sec:(+d.sec||0).toFixed(1),me:false};
+  S.over=true;$('#q').disabled=true;if(!S.guesses.includes(S.target)&&!S.rev){S.rev=true;row(S.target)}
+  showWin(S.winner);recStats('l')});
+ r.onPeers(()=>{if(S.room===r)players()});
+ r.onReconnect(()=>{if(S.room!==r)return;pres();r.emit('req',{}).catch(()=>{})});
+ try{await r.presence({nick:S.nick,col:S.col,score:0,tries:0})}catch(e){}
+ showGame(code);players();
+ if(create)newRound();
+ else{   /* dołączamy do trwającej gry: prosimy o aktualną rundę, a gdy nikt nie odpowie – losujemy własną */
+  r.emit('req',{}).catch(()=>{});
+  S.wait=setTimeout(()=>{if(S.room===r&&!S.target)r.emit('req',{}).catch(()=>{})},1300);
+  S.wait2=setTimeout(()=>{if(S.room===r&&!S.target)newRound()},3200)}
+ return'ok'}
+function players(){const b=$('#pl');b.replaceChildren();if(!S.room)return;
+ S.room.peers().filter(p=>p.presence&&p.presence.nick).sort((a,b)=>(+b.presence.score||0)-(+a.presence.score||0)).forEach(p=>{
+  const c=E('div','chip'+(p.isMe?' me':''));c.style.setProperty('--pc',colOf(p.presence.col));
+  c.append(E('i','dot'),E('span',0,cleanN(p.presence.nick)+' '),E('b',0,'⭐'+(+p.presence.score||0)),E('small',0,' · '+(+p.presence.tries||0)+' prób'));b.append(c)})}
+const newCode=()=>{const A='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';return Array.from({length:4},()=>A[Math.random()*A.length|0]).join('')};
+let busy=false;
+$('#bCreate').onclick=async()=>{if(busy)return;busy=true;try{let res='busy';for(let i=0;i<8&&res==='busy';i++)res=await enter(newCode(),true);if(res==='busy')toast('Nie udało się utworzyć pokoju')}finally{busy=false}};
+$('#bJoin').onclick=async()=>{if(busy)return;const c=$('#jc').value.trim().toUpperCase();if(c.length<4)return toast('Wpisz 4-znakowy kod');busy=true;try{await enter(c,false)}finally{busy=false}};
+$('#jc').onkeydown=e=>{if(e.key==='Enter')$('#bJoin').click()};
+$('#bL').onclick=toLobby;
+
+/* ---------- edytor bazy ---------- */
+let D;
+function openEd(id){$('#ed').classList.add('on');if(id)D=JSON.parse(JSON.stringify(S.themes[id]));else D=null;drawEd()}
+function drawEd(){const c=$('#edc');c.replaceChildren();
+ if(!D){c.append(E('h3',0,'Nowy motyw'));const n=E('input'),em=E('input'),co=E('input');n.placeholder='Nazwa (np. Samochody)';em.placeholder='Emoji (np. 🚗)';co.placeholder='Kolumny po przecinku, liczby z # (np. Marka,Kraj,Moc KM#)';[n,em,co].forEach(i=>{i.style.margin='4px 0';c.append(i)});
+  const b=E('button','pri','Utwórz');b.onclick=()=>{const cols=co.value.split(',').map(x=>x.trim()).filter(Boolean);if(!n.value.trim()||!cols.length)return toast('Podaj nazwę i kolumny');D={id:'t'+Date.now().toString(36),name:n.value.trim(),emoji:em.value.trim()||'🎯',cols:cols.map(x=>({l:x.replace('#',''),n:x.endsWith('#')})),items:[]};drawEd()};
+  const x=E('button','gh','Anuluj');x.onclick=closeEd;c.append(E('div','row'));c.lastChild.append(b,x);return}
+ c.append(E('h3',0,D.emoji+' '+D.name+' – edycja bazy'));const w=E('div','sc'),t=E('table'),h=E('tr');['Nazwa',...D.cols.map(x=>x.l+(x.n?' #':'')),''].forEach(x=>h.append(E('th',0,x)));t.append(h);
+ const add=it=>{const tr=E('tr');[it.name,...D.cols.map((_,i)=>it.v[i]??'')].forEach(v=>{const td=E('td'),i=E('input');i.value=v;td.append(i);tr.append(td)});const td=E('td'),d=E('button','dng','✕');d.onclick=()=>tr.remove();td.append(d);tr.append(td);t.append(tr)};
+ D.items.forEach(add);w.append(t);c.append(w);
+ const a=E('button','pri','＋ Dodaj pozycję');a.onclick=()=>add({name:'',v:[]});
+ const s=E('button','pri','💾 Zapisz');s.onclick=()=>{const items=[...t.querySelectorAll('tr')].slice(1).map(tr=>{const v=[...tr.querySelectorAll('input')].map(i=>i.value.trim());return{name:v[0],v:v.slice(1)}}).filter(i=>i.name);
+  for(const it of items)for(let i=0;i<D.cols.length;i++)if(D.cols[i].n&&(it.v[i]===''||isNaN(+it.v[i])))return toast('Kolumna „'+D.cols[i].l+'” musi być liczbą: '+it.name);
+  const nt=cleanTheme({...D,items});if(!nt)return toast('Niepoprawny motyw (max 8 kolumn i 400 pozycji)');
+  S.themes[nt.id]=nt;S.cur=nt.id;closeEd();saveCustom();
+  toast(S.room?'Zapisano – reszta pokoju dostanie motyw z nową rundą':'Zapisano w tej przeglądarce');
+  tabs();newRound()};
+ const x=E('button','gh','Anuluj');x.onclick=closeEd;const r=E('div','row');r.append(a,s,x);c.append(r)}
+function closeEd(){$('#ed').classList.remove('on')}
+$('#bE').onclick=()=>openEd(S.cur);
+
+/* ---------- hooki huba ---------- */
+window.__guessrLeave=()=>{try{if(S.room||!$('#game').classList.contains('hid'))toLobby()}catch(e){}};
+window.__guessrRefresh=()=>{try{if(!S.room&&$('#game').classList.contains('hid'))initPrefs()}catch(e){}};
+initPrefs();
+
+</script></body></html>

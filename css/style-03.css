@@ -1,0 +1,39 @@
+
+/* ===== KIM JESTEM? ===== */
+#kjbar{display:flex;align-items:center;gap:14px;padding:10px 16px;background:#1a1033dd;backdrop-filter:blur(8px);border-bottom:3px dashed #ffffff33;position:sticky;top:0;z-index:2}
+#kjbar b{font-size:1.2em;color:var(--acc)}
+@keyframes kjfl1{0%{transform:rotateY(0) scale(1)}50%{transform:rotateY(90deg) scale(1.1)}100%{transform:rotateY(180deg) scale(1)}}
+@keyframes kjfl0{0%{transform:rotateY(180deg) scale(1)}50%{transform:rotateY(90deg) scale(1.1)}100%{transform:rotateY(0) scale(1)}}
+
+/* ===== LOGI ZMIAN ===== */
+.logbtn{position:fixed;left:12px;bottom:calc(env(safe-area-inset-bottom,0px) + 12px);z-index:20010;padding:10px 18px;font-weight:800;letter-spacing:.08em;border:1px solid #ffffff55;border-radius:8px;background:#183c2b;color:#fff;box-shadow:0 3px 12px #0006;cursor:pointer}
+.accbox select{font:inherit;font-size:1.05em;padding:7px 12px;border-radius:6px;border:2px solid #52715d;background:#07150f;color:#fff}.frseen{flex:0 0 100%;font-size:.75em;opacity:.7}.chatlist{height:min(50vh,420px);overflow-y:auto;display:flex;flex-direction:column;gap:6px;padding:8px;background:#07150f;border:2px solid #52715d;border-radius:8px;margin:8px 0}.chatm{max-width:80%;padding:6px 10px;border-radius:12px;background:#ffffff1a;align-self:flex-start;word-break:break-word;white-space:pre-wrap;line-height:1.25}.chatm.me{align-self:flex-end;background:var(--acc,#4ade80);color:#10231a}.chatm small{display:block;opacity:.6;font-size:.7em;margin-top:2px}.chatdot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#ff5a5a;margin-left:6px;vertical-align:middle}
+.ideatxt{margin:0 0 12px;font-size:1.1em}#ideabox{margin:-4px 0 12px}.ideabtn{padding:4px 14px;font-size:.85em}.ideares{display:inline-flex;align-items:center;gap:8px}
+.fs-s{font-size:.8em}.fs-b{font-size:1.3em;line-height:1.15}.fs-h{font-size:1.7em;line-height:1.1}
+.rtbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}.rtbar .lgbtn{padding:4px 14px;min-width:42px}.rtbar select{font:inherit;padding:5px 8px;border-radius:6px;border:2px solid #52715d;background:#07150f;color:#fff}
+.logbox{width:min(100%,760px)!important;background:linear-gradient(180deg,#183c2b,#10271d 220px)!important;margin-top:0!important;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain}
+.logbox .lghead{position:sticky;top:0;z-index:5;margin:-16px -18px 8px;padding:14px 18px 10px;background:#183c2b;border-bottom:1px solid #ffffff33;border-radius:8px 8px 0 0}
+.logbox .lgsave{position:sticky;bottom:0;z-index:4;margin:10px -12px -12px;padding:10px 12px;background:#14301f;border-top:1px solid #ffffff33;border-radius:0 0 8px 8px}
+.lghead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px}.lghead h2{margin:0!important}
+.lgpost{padding:16px 0 18px;border-bottom:1px solid #ffffff22}.lgpost:last-of-type{border-bottom:0}
+.lgtag{font-size:.78em;letter-spacing:.05em;text-transform:uppercase;font-weight:800;color:#4aa3ff}.lgwhen{font-size:.78em;letter-spacing:.05em;text-transform:uppercase;opacity:.6;margin-left:6px}
+.lgpost h3.lgtitle{margin:4px 0 10px;font-size:1.9em;line-height:1.1;color:#fff;font-weight:600}
+.lgpost h4{margin:18px 0 6px;font-size:1.55em;line-height:1.1;color:#fff}
+.lgpost p{margin:6px 0;line-height:1.35;color:#d3dcd5;word-break:break-word}
+.lgpost ul{margin:6px 0 6px;padding-left:1.4em;color:#d3dcd5;line-height:1.35}.lgpost li{margin:7px 0;word-break:break-word}
+.lgpost .lgadm{margin-top:10px}.lgadm .lgbtn{padding:4px 12px;font-size:.85em}
+.lgempty{opacity:.7;padding:24px 0;text-align:center}
+.lged{background:#ffffff12;border-radius:8px;padding:12px;margin:10px 0}
+.lged label{display:block;margin:6px 0 2px;opacity:.85;font-size:.9em}
+#msgpop .accbox .lged input,#msgpop .accbox .lged textarea{font:inherit;width:100%;max-width:100%;padding:7px 12px;border-radius:6px;border:2px solid #52715d;background:#07150f;color:#fff}
+#msgpop .accbox .lged textarea{min-height:12em;resize:vertical;line-height:1.35}
+
+/* ===== UNO ===== */
+#unobar{display:flex;align-items:center;gap:14px;padding:10px 16px;background:#1a1033dd;backdrop-filter:blur(8px);border-bottom:3px dashed #ffffff33;position:sticky;top:0;z-index:2}
+#unobar b{font-size:1.2em;color:var(--acc)}
+/* karta (awers) */
+/* rewers = jak w „Kim jestem?”, w kolorze gracza */
+/* stół */
+@keyframes unpulse2{to{transform:scale(1.07)}}
+@keyframes unpulse{50%{filter:drop-shadow(0 0 14px #ffe066)}}
+@keyframes unpop{from{transform:translateY(120px) rotate(40deg) scale(.7);opacity:0}}

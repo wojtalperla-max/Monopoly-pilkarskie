@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Łamanie kodu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="lamanie-kodu.css">
+</head>
+<body>
+<div id="kod"><div id="kodc"></div></div>
+<script>
+/* ===== most do platformy (index.html): konto, Firebase, statystyki ===== */
+(function(){
+  var PB=null;try{PB=window.parent&&window.parent!==window?window.parent.PLATFORM_BRIDGE:null}catch(e){PB=null}
+  function def(n,g){Object.defineProperty(window,n,{get:g,configurable:true})}
+  def('ACC',function(){return PB?PB.ACC:{user:null,nick:'',col:'',admin:false}});
+  def('fbDB',function(){return PB?PB.fbDB:null});
+  def('firebase',function(){return PB?PB.firebase:undefined});
+  def('onlinePlayerId',function(){return PB?PB.onlinePlayerId:null});
+  window.onlineEnsureAuth=function(){return PB?PB.onlineEnsureAuth():Promise.reject(new Error('Brak połączenia z platformą — otwórz grę przez index.html.'))};
+  window.onlineCode=function(){return Math.random().toString(36).slice(2,7).toUpperCase()};
+  window.statsRecord=function(){if(PB)return PB.statsRecord.apply(null,arguments)};
+  window.serverMarkRoomFinished=function(r){if(PB)PB.serverMarkRoomFinished(r)};
+  window.serverReopenRoom=function(r){if(PB)PB.serverReopenRoom(r)};
+  window.tgBox=function(refExpr,isTest){
+    if(typeof ACC!=='undefined'&&ACC.admin)return '<label class="lgnote tgbox" style="display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer"><input type="checkbox" '+(isTest?'checked':'')+' onchange="tgSet('+refExpr+',this.checked)"><span>🧪 <b>Gra testowa</b> (admin) – wyniki nie liczą się do statystyk</span></label>';
+    return isTest?'<div class="lgnote tgbox">🧪 <b>Gra testowa</b> – wyniki nie liczą się do statystyk</div>':'';
+  };
+  window.tgSet=function(ref,v){
+    if(!ref||typeof ACC==='undefined'||!ACC.admin)return;
+    ref.child('test').set(v?true:null).catch(function(e){alert('Nie udało się zmienić trybu gry testowej: '+(e&&e.message||e))});
+  };
+})();
+const LG_COLS=['#e63946','#2a9df4','#f2c230','#3a9b62','#b04fe0','#ff8c42'];
+const lgEsc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function lgDot(c){return '<i class="lgd" style="background:'+(/^#[0-9a-f]{6}$/i.test(c)?c:'#888')+'"></i>'}
+</script>
+<script>
+/* ===== ŁAMANIE KODU ===== */
+let KOD={screen:'start',mode:null,names:[],n:3,wi:0,players:[],codes:{},game:null,msg:'',ref:null,status:null,code:'',host:null,listener:null,promoting:false,showHistory:false,slots:[null,null,null,null],act:0,hide:false,turnKey:'',nick:'',col:'',joinCode:''};
+const kodEmpty=()=>[null,null,null,null];
+const kodMeId=()=>typeof onlinePlayerId!=='undefined'?onlinePlayerId:null;
+const kodNewGame=()=>({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),turn:0,round:1,seq:0,guessed:false,guesses:[],solved:[],done:false,winners:[]});
+const kodFb=(secret,guess)=>[...guess].map((c,i)=>c===secret[i]?1:0);
+// Jedna próba w turze: zapisuje wynik (dobre/złe cyfry), ale nie oddaje tury.
+function kodGuessStep(game,secret,guess){
+  const g=JSON.parse(JSON.stringify(game)),p=g.turn,fb=kodFb(secret,guess);
+  g.guesses.push({p,g:guess,fb});
+  if(fb.every(x=>x===1))g.solved.push(p);
+  g.guessed=true;g.seq=(g.seq||0)+1;
+  return g;
+}
+// Koniec tury: przekazuje ruch dalej. Po ostatnim graczu runda jest zamykana (jak w literkach).
+function kodEndStep(game,n){
+  const g=JSON.parse(JSON.stringify(game));
+  g.turn=(g.turn+1)%n;g.guessed=false;g.seq=(g.seq||0)+1;
+  if(g.turn===0){if(g.solved.length){g.done=true;g.winners=g.solved.slice()}else g.round++}
+  return g;
+}
+// Wiedza gracza p o cudzym kodzie: trafione pola (lock) i odrzucone cyfry w każdym polu (ban).
+function kodKnow(game,p){
+  const lock=kodEmpty(),ban=[[],[],[],[]];
+  (game.guesses||[]).filter(x=>x.p===p).forEach(x=>{
+    for(let i=0;i<4;i++){
+      const d=x.g[i];
+      if(x.fb[i])lock[i]=d;
+      else if(!ban[i].includes(d))ban[i].push(d);
+    }
+  });
+  return {lock,ban,solved:(game.solved||[]).includes(p)};
+}
+const kodNextEmpty=(lock,slots,from)=>{for(let k=1;k<=4;k++){const i=(from+k+8)%4;if(lock[i]==null&&slots[i]==null)return i}return from};
+const kodRefresh=(keepFocus)=>{
+  const c=document.getElementById('kodc');if(!c)return;
+  const a=document.activeElement,fid=keepFocus&&a&&a.id&&c.contains(a)?a.id:null,pos=fid?a.selectionStart:0;
+  c.innerHTML=kodScreen();
+  if(fid){const e=document.getElementById(fid);if(e){e.focus();try{e.setSelectionRange(pos,pos)}catch(x){}}}
+};
+function kodLeaveRoom(){try{if(KOD.ref&&onlinePlayerId)KOD.ref.child('players/'+onlinePlayerId).remove();if(KOD.ref&&KOD.listener)KOD.ref.off('value',KOD.listener)}catch(e){}KOD.ref=null;KOD.listener=null}
+function kodGo(s,extra){
+  KOD.screen=s;KOD.msg='';
+  if(s==='codes'){KOD.slots=kodEmpty();KOD.act=0;KOD.hide=KOD.mode==='local'}
+  if(extra)Object.assign(KOD,extra);
+  kodRefresh();
+}
+function kodView(){
+  const me=KOD.mode==='online'?KOD.players.findIndex(p=>p.id===kodMeId()):null;
+  return {players:KOD.players,codes:KOD.codes,game:KOD.game,me};
+}
+// Kontekst edycji: w grze blokujemy trafione pola i odrzucone cyfry gracza, który ma turę.
+function kodCtx(){
+  if(KOD.screen==='play'&&KOD.game&&!KOD.game.done){const k=kodKnow(KOD.game,KOD.game.turn);return {lock:k.lock,ban:k.ban}}
+  return {lock:kodEmpty(),ban:[[],[],[],[]]};
+}
+function kodEditable(){
+  const g=KOD.game;
+  if(KOD.screen==='codes')return KOD.mode==='local'||!KOD.codes[kodMeId()];
+  if(KOD.screen==='play'&&g&&!g.done&&!g.guessed)return (KOD.mode==='local'?g.turn:kodView().me)===g.turn;
+  return false;
+}
+// Nowa tura = nowy szkic: puste pola, a trafione wcześniej cyfry wpisane i zablokowane.
+function kodSyncDraft(g,act){
+  const key=g?g.id+':'+g.round+':'+g.turn:'';
+  if(KOD.turnKey===key)return;
+  KOD.turnKey=key;KOD.slots=kodEmpty();KOD.act=0;
+  if(g&&act>=0){
+    const k=kodKnow(g,act);
+    k.lock.forEach((d,i)=>{if(d!=null)KOD.slots[i]=d});
+    KOD.act=Math.max(0,kodNextEmpty(k.lock,KOD.slots,-1));
+  }
+}
+function kodSel(i){
+  if(!kodEditable())return;
+  if(kodCtx().lock[i]!=null)return;
+  KOD.act=i;kodRefresh();
+}
+function kodPick(d){
+  if(!kodEditable())return;
+  const {lock,ban}=kodCtx(),i=KOD.act;
+  if(i<0||i>3||lock[i]!=null||ban[i].includes(d))return;
+  KOD.slots[i]=d;KOD.msg='';
+  KOD.act=kodNextEmpty(lock,KOD.slots,i);
+  kodRefresh();
+}
+function kodClear(){
+  if(!kodEditable())return;
+  const {lock}=kodCtx(),i=KOD.act;
+  if(lock[i]!=null)return;
+  KOD.slots[i]=null;kodRefresh();
+}
+function kodMove(dir){
+  const {lock}=kodCtx();
+  for(let k=1;k<=4;k++){const i=(KOD.act+dir*k+8)%4;if(lock[i]==null){KOD.act=i;break}}
+  kodRefresh();
+}
+function kodToggleHide(){KOD.hide=!KOD.hide;kodRefresh()}
+function kodToggleHistory(){KOD.showHistory=!KOD.showHistory;kodRefresh()}
+document.addEventListener('keydown',e=>{
+  const el=document.getElementById('kod');if(!el||el.hidden)return;
+  const t=e.target;if(t&&/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))return;
+  if(e.ctrlKey||e.metaKey||e.altKey||!kodEditable())return;
+  if(/^[0-9]$/.test(e.key)){kodPick(e.key);e.preventDefault()}
+  else if(e.key==='Backspace'||e.key==='Delete'){kodClear();e.preventDefault()}
+  else if(e.key==='ArrowRight'||e.key==='ArrowLeft'){kodMove(e.key==='ArrowRight'?1:-1);e.preventDefault()}
+});
+function kodScreen(){
+  const m=KOD.msg?`<div class="lgmsg" role="alert">${lgEsc(KOD.msg)}</div>`:'';
+  switch(KOD.screen){
+    case 'start':return kodStartHTML();
+    case 'lsetup':return kodSetupHTML()+m;
+    case 'codes':return m+kodCodesHTML();
+    case 'olobby':return kodLobbyHTML()+m;
+    case 'play':case 'end':return m+kodPlayHTML();
+  }
+  return '';
+}
+function kodSlotsHTML(o){
+  const {slots,lock,fb,editable,mask}=o;
+  return '<div class="kds">'+[0,1,2,3].map(i=>{
+    const d=slots[i],locked=!!lock&&lock[i]!=null&&!fb;
+    let cls='kdsl';
+    if(locked)cls+=' ok';
+    if(fb)cls+=fb[i]?' ok':' bad';
+    const canSel=editable&&!locked;
+    if(canSel&&KOD.act===i)cls+=' sel';
+    const mark=fb?(fb[i]?'✔':'✘'):(locked?'✔':'');
+    const inner=`<span>${d==null?'?':(mask?'•':lgEsc(d))}</span>${mark?`<small>${mark}</small>`:''}`;
+    return canSel?`<button class="${cls}" onclick="kodSel(${i})" aria-label="Pole ${i+1}">${inner}</button>`:`<div class="${cls}" aria-label="Pole ${i+1}">${inner}</div>`;
+  }).join('')+'</div>';
+}
+function kodPadHTML(ban){
+  const b=(ban&&ban[KOD.act])||[];
+  return '<div class="kdp">'+'0123456789'.split('').map(d=>b.includes(d)
+    ?`<span class="kdd no" aria-label="Cyfra ${d} odpadła">${d}</span>`
+    :`<button class="kdd" onclick="kodPick('${d}')">${d}</button>`).join('')+'</div>';
+}
+function kodStartHTML(){
+  const online=typeof fbDB!=='undefined'&&fbDB&&typeof onlineEnsureAuth==='function';
+  return `<h2>Łamanie kodu</h2>
+  <p class="lgrules">Każdy gracz ustawia swój tajny, 4-cyfrowy kod. Potem gracze zgadują po kolei: pierwszy kod drugiego, drugi kod trzeciego… a ostatni kod pierwszego. W swojej turze klikasz każde z czterech pól osobno i wybierasz cyfrę od 0 do 9. Gdy wpiszesz wszystkie cztery, wciskasz <b>Zgaduj</b> i dowiadujesz się, które cyfry są <b>dobre</b> (zielone), a które <b>złe</b> (czerwone). Po próbie tura automatycznie przechodzi do następnego gracza. W kolejnej turze trafione pola są już zablokowane, a w pozostałych odpadają cyfry, które były złe — tak jak w zgadywaniu literek. Kto pierwszy złamie kod, wygrywa (runda jest dokańczana, więc każdy ma tyle samo prób).</p>
+  <div class="lgrow"><button class="lgbtn" onclick="kodGo('lsetup',{mode:'local',names:[],n:3})">Gra lokalna (jedno urządzenie)</button>
+  <button class="lgbtn" ${online?'':'disabled'} onclick="kodGo('olobby',{mode:'online'})">Gra online</button></div>
+  ${online?'':'<p class="lgnote">Tryb online działa tylko po wgraniu gry na własny hosting (z Firebase).</p>'}`;
+}
+function kodSetupHTML(){
+  const n=KOD.n;
+  const rows=[...Array(n)].map((_,i)=>`<div class="lgrow"><i class="lgd" style="background:${LG_COLS[i]}"></i><input id="kodname${i}" maxlength="14" value="${lgEsc(KOD.names[i]||'Gracz '+(i+1))}" oninput="KOD.names[${i}]=this.value" aria-label="Nick gracza ${i+1}"></div>`).join('');
+  return `<h2>Gra lokalna</h2><div class="lgrow">Liczba graczy: ${[2,3,4,5,6].map(k=>`<button class="lgbtn ${k===n?'on':''}" onclick="KOD.n=${k};kodRefresh()">${k}</button>`).join('')}</div>
+  ${rows}<div class="lgrow"><button class="lgbtn" onclick="kodGo('start')">Wstecz</button><button class="lgbtn go" onclick="kodLocalStart()">Dalej — ustawianie kodów</button></div>`;
+}
+function kodLocalStart(){
+  const n=KOD.n;
+  KOD.players=[...Array(n)].map((_,i)=>({id:'p'+i,name:(String(KOD.names[i]||'').replace(/[<>&]/g,'').trim().slice(0,14))||('Gracz '+(i+1)),color:LG_COLS[i]}));
+  KOD.codes={};KOD.wi=0;KOD.game=null;kodGo('codes');
+}
+function kodCodesHTML(){
+  const local=KOD.mode==='local',full=KOD.slots.every(s=>s!=null);
+  let head,foot;
+  if(local){
+    const p=KOD.players[KOD.wi];
+    head=`<h2>${lgDot(p.color)}${lgEsc(p.name)}, ustaw swój kod</h2><p class="lgnote">Pozostali gracze nie powinni patrzeć na ekran. Kod ma 4 cyfry (0–9, mogą się powtarzać). Kliknij pole i wybierz cyfrę.</p>`;
+    foot=`<p class="lgnote">Gracz ${KOD.wi+1} z ${KOD.players.length}</p>`;
+  }else{
+    const waiting=KOD.players.filter(p=>!KOD.codes[p.id]).map(p=>lgEsc(p.name)).join(', ');
+    if(KOD.codes[kodMeId()])return `<h2>Kod zapisany</h2><p>Czekamy na pozostałych graczy${waiting?': <b>'+waiting+'</b>':''}…</p>`;
+    head=`<h2>Ustaw swój kod</h2><p class="lgnote">Kod ma 4 cyfry (0–9, mogą się powtarzać). Kliknij pole i wybierz cyfrę.</p>`;
+    foot=`<p class="lgnote">Czekamy jeszcze na: ${waiting||'—'}</p>`;
+  }
+  return head+kodSlotsHTML({slots:KOD.slots,editable:true,mask:KOD.hide})
+    +`<div class="lgal"><div class="lgalh">Pole nr ${KOD.act+1} — wybierz cyfrę:</div>${kodPadHTML(null)}</div>
+    <div class="lgrow"><button class="lgbtn" onclick="kodClear()">Wyczyść pole</button><button class="lgbtn" onclick="kodToggleHide()">${KOD.hide?'Pokaż kod':'Ukryj kod'}</button><button class="lgbtn go" ${full?'':'disabled'} onclick="kodSubmitCode()">Zatwierdź kod</button></div>`+foot;
+}
+function kodSubmitCode(){
+  if(KOD.slots.some(s=>s==null)){KOD.msg='Uzupełnij wszystkie cztery pola kodu.';kodRefresh();return}
+  const c=KOD.slots.join('');
+  if(!/^[0-9]{4}$/.test(c)){KOD.msg='Kod musi składać się z 4 cyfr.';kodRefresh();return}
+  if(KOD.mode==='local'){
+    KOD.codes[KOD.players[KOD.wi].id]=c;KOD.msg='';KOD.wi++;
+    KOD.slots=kodEmpty();KOD.act=0;KOD.hide=true;
+    if(KOD.wi>=KOD.players.length){KOD.game=kodNewGame();KOD.turnKey='';KOD.screen='play'}
+    kodRefresh();return;
+  }
+  const uid=kodMeId();KOD.msg='';
+  KOD.ref.child('codes/'+uid).set(c).catch(e=>{KOD.msg='Nie udało się zapisać kodu: '+e.message;kodRefresh()});
+  kodRefresh();
+}
+function kodPlayHTML(){
+  const v=kodView(),g=v.game,pl=v.players,n=pl.length;
+  if(!g)return '<h2>Przygotowanie gry…</h2>';
+  const act=g.done?-1:g.turn,tgt=act>=0?(act+1)%n:-1,my=KOD.mode==='local'?act:v.me,mine=act>=0&&my===act;
+  kodSyncDraft(g,act);
+  let h=`<div class="lgh"><span>Runda ${g.round}</span>${g.done?'<b>Koniec gry</b>':''}</div>`;
+  if(g.done){
+    const w=g.winners.map(i=>lgEsc(pl[i].name));
+    h+=`<div class="lgwin">${w.length>1?'Remis! Złamali kod w tej samej rundzie: <b>'+w.join(', ')+'</b>':'Wygrywa <b>'+w[0]+'</b>!'}<small>Liczba prób: ${g.round}</small></div>`;
+  }else{
+    const k=kodKnow(g,act),last=g.guessed?g.guesses[g.guesses.length-1]:null;
+    h+=`<div class="lgturn">${lgDot(pl[act].color)}<b>${lgEsc(pl[act].name)}</b> zgaduje kod gracza <b>${lgEsc(pl[tgt].name)}</b></div>`;
+    if(last){
+      const ok=last.fb.filter(Boolean).length;
+      h+=kodSlotsHTML({slots:[...last.g],fb:last.fb});
+      h+=`<div class="lgturn">${ok===4?'<b>Kod złamany!</b>':'Trafione pola: <b>'+ok+' z 4</b>'}</div>`;
+    }else if(mine){
+      const full=KOD.slots.every(s=>s!=null);
+      h+=kodSlotsHTML({slots:KOD.slots,lock:k.lock,editable:true});
+      h+=`<div class="lgal"><div class="lgalh">Pole nr ${KOD.act+1} — wybierz cyfrę (przekreślone odpadły${k.lock.some(d=>d!=null)?', trafione pola są zablokowane':''}):</div>${kodPadHTML(k.ban)}</div>`;
+      h+=`<div class="lgrow"><button class="lgbtn" onclick="kodClear()">Wyczyść pole</button><button class="lgbtn go" ${full?'':'disabled'} onclick="kodGuess()">Zgaduj</button></div>`;
+    }else h+=`<div class="lgnote">Czekaj na ruch gracza ${lgEsc(pl[act].name)}…</div>`;
+  }
+  h+='<div class="lgcards">'+pl.map((p,i)=>{
+    const t=pl[(i+1)%n],k=kodKnow(g,i),got=k.lock.filter(d=>d!=null).length;
+    const boxes=[0,1,2,3].map(j=>`<div class="kdcb ${k.lock[j]!=null?'ok':''}"><b>${k.lock[j]!=null?lgEsc(k.lock[j]):'?'}</b><small>${k.lock[j]!=null||!k.ban[j].length?'&nbsp;':'✘ '+lgEsc(k.ban[j].slice().sort().join(' '))}</small></div>`).join('');
+    const hint=k.solved?'<b>Złamane!</b>':'Trafione pola: '+got+' z 4';
+    const reveal=g.done?`<div class="lgrev">Kod: <b>${lgEsc(v.codes[t.id]||'')}</b></div>`:'';
+    return `<div class="lgcard ${act===i?'act':''}">${lgDot(p.color)}<b>${lgEsc(p.name)}</b> → kod: ${lgEsc(t.name)}<div class="kdcs">${boxes}</div><div class="lghint">${hint}</div>${reveal}</div>`;
+  }).join('')+'</div>';
+  const myHistory=!!KOD.showHistory;
+  const historyOwner=KOD.mode==='online'?v.me:(g.done?null:act);
+  const items=g.guesses.slice().reverse().filter(x=>!myHistory||historyOwner==null||x.p===historyOwner);
+  const hist=items.map(x=>{const p=pl[x.p],t=pl[(x.p+1)%n],ok=x.fb.filter(Boolean).length;
+    return `<div class="lghist">${lgDot(p.color)}<b>${lgEsc(p.name)}</b> → ${lgEsc(t.name)}: <span class="kdh">${[...x.g].map((c,i)=>`<i class="${x.fb[i]?'ok':'bad'}">${lgEsc(c)}</i>`).join('')}</span> — ${ok===4?'<b>złamane!</b>':ok+' z 4'}</div>`}).join('');
+  h+=`<div class="lgrow" style="margin-top:16px"><h3 style="margin:0">${myHistory?'Moja historia':'Historia'}</h3><button class="lgbtn" onclick="kodToggleHistory()">${myHistory?'Pokaż całą historię':'Moja historia'}</button></div>${hist||(myHistory?'<div class="lgnote">Nie masz jeszcze żadnych prób.</div>':'<div class="lgnote">Jeszcze nie było prób.</div>')}`;
+  if(g.done){
+    const canAgain=KOD.mode==='local'||KOD.host===kodMeId();
+    h+=`<div class="lgrow">${canAgain?'<button class="lgbtn go" onclick="kodRematch()">Zagraj ponownie</button>':'<span class="lgnote">Host może rozpocząć kolejną grę.</span>'}<button class="lgbtn" onclick="kodExit()">Menu główne</button></div>`;
+  }
+  return h;
+}
+function kodGuess(){
+  const g=KOD.game,n=KOD.players.length;
+  if(!g||g.done||g.guessed||!kodEditable())return;
+  if(KOD.slots.some(s=>s==null)){KOD.msg='Wpisz cyfry we wszystkich czterech polach.';kodRefresh();return}
+  const guess=KOD.slots.join('');
+  KOD.msg='';
+  if(KOD.mode==='local'){
+    const t=KOD.players[(g.turn+1)%n];
+    KOD.game=kodEndStep(kodGuessStep(g,KOD.codes[t.id],guess),n);
+    if(KOD.game.done)KOD.screen='end';
+    kodRefresh();return;
+  }
+  const me=KOD.players.findIndex(p=>p.id===kodMeId());
+  if(me!==g.turn){KOD.msg='To nie twoja tura.';kodRefresh();return}
+  const target=KOD.players[(me+1)%n],secret=KOD.codes[target.id],seq=g.seq||0;
+  if(!secret){KOD.msg='Brak kodu przeciwnika — spróbuj za chwilę.';kodRefresh();return}
+  KOD.ref.child('game').transaction(cur=>{
+    const cg=cur?JSON.parse(cur):null;
+    if(!cg||cg.done||cg.guessed||cg.turn!==me||(cg.seq||0)!==seq)return;
+    return JSON.stringify(kodEndStep(kodGuessStep(cg,secret,guess),n));
+  }).then(r=>{if(r&&!r.committed){KOD.msg='Próba nie została zapisana (zmienił się stan gry).';kodRefresh()}})
+   .catch(e=>{KOD.msg='Nie udało się wysłać próby: '+e.message;kodRefresh()});
+  kodRefresh();
+}
+function kodRematch(){
+  if(KOD.mode==='local'){KOD.codes={};KOD.wi=0;KOD.game=null;KOD.showHistory=false;KOD.turnKey='';kodGo('codes');return}
+  if(KOD.host!==kodMeId())return;
+  const r=KOD.ref;serverReopenRoom(r);
+  r.child('codes').remove();r.child('game').remove();
+  r.child('status').set('codes');
+}
+/* ---- online ---- */
+function kodLobbyHTML(){
+  if(!KOD.ref){
+    return `<h2>Gra online</h2>
+    <div class="lgrow"><label>Twój nick <input id="kodnick" maxlength="14" value="${lgEsc(KOD.nick||'Gracz')}" oninput="KOD.nick=this.value"></label>
+    <label>Kolor <input id="kodcol" type="color" value="${lgEsc(KOD.col||'#2a9df4')}" oninput="KOD.col=this.value"></label></div>
+    <div class="lgrow"><button class="lgbtn go" onclick="kodCreate()">Utwórz pokój</button></div>
+    <div class="lgrow"><input id="kodjoin" maxlength="5" placeholder="Kod pokoju" value="${lgEsc(KOD.joinCode||'')}" oninput="KOD.joinCode=this.value" style="text-transform:uppercase"><button class="lgbtn" onclick="kodJoin()">Dołącz</button></div>
+    <div class="lgrow"><button class="lgbtn" onclick="kodGo('start')">Wstecz</button></div>`;
+  }
+  const me=kodMeId();
+  const list=KOD.players.map((p,i)=>`<div class="lghist">${lgDot(p.color)}${i+1}. ${lgEsc(p.name)}${p.id===KOD.host?' <b>(host)</b>':''}${p.id===me?' (Ty)':''}</div>`).join('');
+  const isHost=KOD.host===me;
+  return `<h2>Pokój: <span class="lgcode">${lgEsc(KOD.code)}</span></h2>${list}${tgBox('KOD.ref',KOD.test)}
+  <p class="lgnote">${isHost?(KOD.players.length>=2?'Możesz rozpocząć grę.':'Poczekaj, aż dołączy co najmniej jeden gracz.'):'Czekaj, aż host rozpocznie grę.'} (Gracze: ${KOD.players.length}/6)</p>
+  <div class="lgrow">${isHost?`<button class="lgbtn go" ${KOD.players.length>=2?'':'disabled'} onclick="kodHostStart()">Rozpocznij grę</button>`:''}<button class="lgbtn" onclick="navigator.clipboard&&navigator.clipboard.writeText(KOD.code)">Kopiuj kod</button></div>`;
+}
+const kodNick=()=>(KOD.nick||'Gracz').replace(/[<>&]/g,'').trim().slice(0,14)||'Gracz';
+async function kodCreate(){
+  try{
+    const uid=await onlineEnsureAuth(),code=onlineCode(),ref=fbDB.ref('kodRooms/'+code);
+    await ref.set({status:'lobby',host:uid,createdAt:firebase.database.ServerValue.TIMESTAMP,players:{[uid]:{id:uid,name:kodNick(),color:KOD.col||'#2a9df4',order:0}}});
+    kodAttach(ref,code);
+  }catch(e){KOD.msg='Nie udało się utworzyć pokoju: '+e.message;kodRefresh()}
+}
+async function kodJoin(){
+  try{
+    const uid=await onlineEnsureAuth(),code=String(KOD.joinCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);
+    if(code.length!==5)throw new Error('Wpisz pięcioznakowy kod pokoju.');
+    const ref=fbDB.ref('kodRooms/'+code),room=(await ref.once('value')).val();
+    if(!room)throw new Error('Nie znaleziono pokoju o takim kodzie.');
+    if(room.status!=='lobby'&&!(room.players&&room.players[uid]))throw new Error('Ta rozgrywka już się rozpoczęła.');
+    const players=Object.values(room.players||{});
+    if(!(room.players&&room.players[uid])){
+      if(players.length>=6)throw new Error('Pokój jest pełny (maksymalnie 6 osób).');
+      await ref.child('players/'+uid).set({id:uid,name:kodNick(),color:KOD.col||'#2a9df4',order:Math.max(-1,...players.map(p=>Number(p.order)||0))+1});
+    }
+    kodAttach(ref,code);
+  }catch(e){KOD.msg='Nie udało się dołączyć: '+e.message;kodRefresh()}
+}
+function kodAttach(ref,code){
+  kodLeaveRoom();KOD.ref=ref;KOD.code=code;KOD.msg='';
+  KOD.listener=ref.on('value',snap=>kodOnRoom(snap.val()),err=>{KOD.msg='Błąd połączenia: '+err.message;kodRefresh()});
+  kodRefresh();
+}
+function kodOnRoom(room){
+  if(!room){KOD.msg='Pokój został usunięty.';kodRefresh();return}
+  const prev=KOD.screen;
+  KOD.host=room.host;KOD.status=room.status;KOD.test=!!room.test;
+  KOD.players=Object.values(room.players||{}).sort((a,b)=>(a.order||0)-(b.order||0)).map(p=>({id:p.id,name:String(p.name||'Gracz'),color:p.color}));
+  KOD.codes=room.codes||{};
+  try{KOD.game=room.game?JSON.parse(room.game):null}catch(e){KOD.game=null}
+  if(room.status==='lobby')KOD.screen='olobby';
+  else if(room.status==='codes')KOD.screen='codes';
+  else if(room.status==='play')KOD.screen=KOD.game&&KOD.game.done?'end':'play';
+  if(KOD.screen==='codes'&&prev!=='codes'){KOD.slots=kodEmpty();KOD.act=0;KOD.hide=false;KOD.showHistory=false;KOD.turnKey=''}
+  if(room.status==='codes'&&KOD.players.length&&KOD.players.every(p=>KOD.codes[p.id])&&!KOD.promoting){
+    KOD.promoting=true;
+    KOD.ref.child('status').transaction(s=>s==='codes'?'play':undefined).then(r=>{
+      if(r&&r.committed)return KOD.ref.child('game').set(JSON.stringify(kodNewGame()));
+    }).catch(e=>console.error('Start gry:',e)).then(()=>{KOD.promoting=false});
+  }
+  if(KOD.game&&KOD.game.done){serverMarkRoomFinished(KOD.ref);statsKod();}
+  kodRefresh(true);
+}
+function kodHostStart(){
+  if(KOD.host!==kodMeId()||KOD.players.length<2)return;
+  KOD.ref.child('status').set('codes');
+}
+
+function statsKod(){
+  const g=KOD.game;if(!g||!g.done||!g.id||typeof ACC==='undefined'||!ACC.user)return;
+  const me=KOD.players.findIndex(p=>p.id===ACC.user.uid);if(me<0)return;
+  const w=g.winners||[];
+  statsRecord('kod_'+g.id,'kod',w.includes(me)?(w.length>1?'d':'w'):'l',KOD.players.map(p=>({uid:p.id,name:p.name})),KOD.test);
+}
+
+
+/* ===== integracja z platformą: wejście do gry / wyjście z gry ===== */
+window.__show=function(){
+  Object.assign(KOD,{screen:'start',mode:null,msg:'',players:[],codes:{},game:null,status:null,slots:kodEmpty(),act:0,hide:false,turnKey:'',showHistory:false});kodRefresh();
+};
+window.__leave=function(){
+  kodLeaveRoom();
+};
+window.__setNick=function(n){KOD.nick=n};
+window.__setCol=function(c){KOD.col=c};
+window.__joinFromHub=async function(c){KOD.joinCode=c;await kodJoin()};
+window.__show();
+</script>
+</body>
+</html>

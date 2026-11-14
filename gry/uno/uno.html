@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>UNO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="uno.css">
+</head>
+<body>
+<div id="uno"><div id="unoc"></div></div>
+<script>
+/* ===== most do platformy (index.html): konto, Firebase, statystyki ===== */
+(function(){
+  var PB=null;try{PB=window.parent&&window.parent!==window?window.parent.PLATFORM_BRIDGE:null}catch(e){PB=null}
+  function def(n,g){Object.defineProperty(window,n,{get:g,configurable:true})}
+  def('ACC',function(){return PB?PB.ACC:{user:null,nick:'',col:'',admin:false}});
+  def('fbDB',function(){return PB?PB.fbDB:null});
+  def('firebase',function(){return PB?PB.firebase:undefined});
+  def('onlinePlayerId',function(){return PB?PB.onlinePlayerId:null});
+  window.onlineEnsureAuth=function(){return PB?PB.onlineEnsureAuth():Promise.reject(new Error('Brak połączenia z platformą — otwórz grę przez index.html.'))};
+  window.onlineCode=function(){return Math.random().toString(36).slice(2,7).toUpperCase()};
+  window.statsRecord=function(){if(PB)return PB.statsRecord.apply(null,arguments)};
+  window.tgBox=function(refExpr,isTest){
+    if(typeof ACC!=='undefined'&&ACC.admin)return '<label class="lgnote tgbox" style="display:flex;align-items:center;gap:8px;margin:8px 0;cursor:pointer"><input type="checkbox" '+(isTest?'checked':'')+' onchange="tgSet('+refExpr+',this.checked)"><span>🧪 <b>Gra testowa</b> (admin) – wyniki nie liczą się do statystyk</span></label>';
+    return isTest?'<div class="lgnote tgbox">🧪 <b>Gra testowa</b> – wyniki nie liczą się do statystyk</div>':'';
+  };
+  window.tgSet=function(ref,v){
+    if(!ref||typeof ACC==='undefined'||!ACC.admin)return;
+    ref.child('test').set(v?true:null).catch(function(e){alert('Nie udało się zmienić trybu gry testowej: '+(e&&e.message||e))});
+  };
+})();
+const lgEsc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function lgDot(c){return '<i class="lgd" style="background:'+(/^#[0-9a-f]{6}$/i.test(c)?c:'#888')+'"></i>'}
+</script>
+<script>
+/* ===== UNO (pokoje online + boty, nick i kolor z konta, rewers w kolorze gracza, statystyki) ===== */
+const UNO_COLS={R:'#e53935',Y:'#f9b208',G:'#2e9e4a',B:'#1e7be0'};
+const UNO_CN={R:'czerwony',Y:'żółty',G:'zielony',B:'niebieski'};
+const UNO_SYM={S:'⊘',R:'⇄','+2':'+2',W:'★','+4':'+4'};
+const UNO_BOTCOL=['#8b6bff','#5ee6c8','#ffb347'];
+const UNO_BOTN=['Ola','Kuba','Zosia'];
+const UNO_LAST_KEY='dgw_uno_last';
+let UNO={screen:'start',ref:null,listener:null,code:'',host:null,players:[],status:null,msg:'',ok:'',nick:'',col:'',joinCode:'',game:null,test:false,local:false,wild:null,topKey:'',bt:null,nbots:2,leftCode:'',busy:false};
+const unoNet=()=>typeof fbDB!=='undefined'&&!!fbDB&&typeof onlineEnsureAuth==='function';
+const unoMyId=()=>UNO.local?'me':(typeof onlinePlayerId!=='undefined'?onlinePlayerId:null);
+const unoHex=c=>/^#[0-9a-f]{6}$/i.test(c||'')?c:'';
+const unoColor=()=>unoHex(UNO.col)||unoHex(typeof ACC!=='undefined'&&ACC.col)||'#ff5fa2';
+const unoClean=s=>String(s||'').replace(/[<>&]/g,'').trim().slice(0,14);
+const unoNickVal=()=>unoClean(UNO.nick)||unoClean(typeof ACC!=='undefined'&&ACC.nick)||'Gracz';
+const unoPl=id=>UNO.players.find(p=>p.id===id)||{id,name:'Gracz',color:'#888888'};
+const unoNm=id=>unoPl(id).name;
+function unoInk(c){const h=String(c||'#888888').replace('#',''),r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16);return (0.299*r+0.587*g+0.114*b)>150?'#1a1033':'#ffffff'}
+function unoLastGet(){try{return localStorage.getItem(UNO_LAST_KEY)||''}catch(e){return''}}
+function unoLastSet(c){try{c?localStorage.setItem(UNO_LAST_KEY,c):localStorage.removeItem(UNO_LAST_KEY)}catch(e){}}
+
+/* ---------- logika gry (czyste funkcje na stanie g) ---------- */
+function unoShuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function unoDeck(){const d=[];for(const c of 'RYGB'){d.push(c+'0');for(let n=1;n<=9;n++)d.push(c+n,c+n);for(const v of ['S','R','+2'])d.push(c+v,c+v)}for(let i=0;i<4;i++)d.push('KW','K+4');return unoShuffle(d)}
+function unoTake(g,n){const out=[];while(n-->0){if(!g.deck.length){const top=g.disc.pop();g.deck=unoShuffle(g.disc);g.disc=[top];if(!g.deck.length)break}out.push(g.deck.pop())}return out}
+const unoTop=g=>g.disc[g.disc.length-1];
+const unoOk=(c,g)=>{const v=c.slice(1);if((g.pend||0)>0)return v==='+2'||v==='+4';return c[0]==='K'||c[0]===g.color||v===unoTop(g).slice(1)};
+const unoNext=(g,from,k)=>{const n=g.order.length;return ((from+g.dir*(k||1))%n+n)%n};
+function unoNew(order,nm){
+  const n=order.length,g={id:Date.now().toString(36)+Math.random().toString(36).slice(2,5),order:order.slice(),deck:unoDeck(),disc:[],hands:{},turn:0,dir:1,color:'R',drawn:null,log:'Gra się zaczyna!',done:false,winner:null};
+  order.forEach(id=>{g.hands[id]=unoTake(g,7)});
+  let f=null;do{f=g.deck.pop();if(f[0]==='K'){g.deck.unshift(f);f=null}}while(!f);
+  g.disc=[f];g.color=f[0];
+  const v=f.slice(1);
+  if(v==='S'){g.turn=1%n;g.log='Pierwsza karta: stop — '+nm(order[0])+' traci kolejkę'}
+  else if(v==='R'){g.dir=-1;g.turn=n===2?0:n-1;g.log='Pierwsza karta: zmiana kierunku'}
+  else if(v==='+2'){g.hands[order[0]].push(...unoTake(g,2));g.turn=1%n;g.log='Pierwsza karta: +2 — '+nm(order[0])+' bierze 2'}
+  return g;
+}
+function unoPlayMany(g,uid,cards,chosen,nm){
+  if(g.done||g.order[g.turn]!==uid||!cards.length)return false;
+  if(g.drawn&&(cards.length!==1||cards[0]!==g.drawn))return false;
+  const h=g.hands[uid]||[],v=cards[0].slice(1),k=cards.length,n=g.order.length,left=h.slice();
+  for(const c of cards){const i=left.indexOf(c);if(i<0||c.slice(1)!==v)return false;left.splice(i,1)}
+  if(!unoOk(cards[0],g))return false;
+  const last=cards[k-1];
+  if(last[0]==='K'&&!/^[RYGB]$/.test(chosen||''))return false;
+  g.hands[uid]=left;g.disc.push(...cards);g.color=last[0]==='K'?chosen:last[0];g.drawn=null;
+  const sym=UNO_SYM[v]||v;let msg=nm(uid)+(k>1?' zagrywa '+k+'× '+sym:' zagrywa kartę');
+  if(last[0]==='K')msg+=' · kolor: '+UNO_CN[chosen];
+  if(!left.length){g.done=true;g.winner=uid;g.log=nm(uid)+' wygrywa!';return true}
+  if(v==='S'){const sk=[];for(let j=1;j<=k;j++)sk.push(nm(g.order[unoNext(g,g.turn,j)]));msg+=' · '+[...new Set(sk)].join(', ')+' traci kolejkę';g.turn=unoNext(g,g.turn,k+1)}
+  else if(v==='R'){if(k%2)g.dir*=-1;msg+=' · zmiana kierunku';g.turn=n===2?g.turn:unoNext(g,g.turn)}
+  else if(v==='+2'||v==='+4'){g.pend=(g.pend||0)+(v==='+2'?2:4)*k;g.turn=unoNext(g,g.turn);msg+=' · kara: +'+g.pend+' — '+nm(g.order[g.turn])+' dokłada +2/+4 albo bierze'}
+  else g.turn=unoNext(g,g.turn);
+  if(left.length===1)msg+=' · UNO! 🔔';
+  g.log=msg;return true;
+}
+function unoPlayFn(g,uid,card,chosen,nm){return unoPlayMany(g,uid,[card],chosen,nm)}
+function unoDrawFn(g,uid,nm){
+  if(g.done||g.order[g.turn]!==uid||g.drawn)return false;
+  if((g.pend||0)>0){const cs=unoTake(g,g.pend);g.hands[uid].push(...cs);g.log=nm(uid)+' bierze '+cs.length+' (kara)';g.pend=0;g.turn=unoNext(g,g.turn);return true}
+  const c=unoTake(g,1)[0];
+  if(!c){g.log=nm(uid)+' nie ma z czego dobrać — pasuje';g.turn=unoNext(g,g.turn);return true}
+  g.hands[uid].push(c);g.log=nm(uid)+' dobiera kartę';
+  if(unoOk(c,g))g.drawn=c;else g.turn=unoNext(g,g.turn);
+  return true;
+}
+function unoPassFn(g,uid,nm){
+  if(g.done||g.order[g.turn]!==uid||!g.drawn)return false;
+  g.drawn=null;g.log=nm(uid)+' pasuje';g.turn=unoNext(g,g.turn);return true;
+}
+
+/* ---------- widok ---------- */
+function unoRefresh(){const c=document.getElementById('unoc');if(c)c.innerHTML=unoScreen()}
+function unoScreen(){
+  const m=(UNO.msg?`<div class="lgmsg" role="alert">${lgEsc(UNO.msg)}</div>`:'')+(UNO.ok?`<div class="lgnote" role="status">${lgEsc(UNO.ok)}</div>`:'');
+  switch(UNO.screen){
+    case 'lobby':return unoLobbyHTML()+m;
+    case 'play':return unoPlayHTML()+m;
+    default:return unoStartHTML()+m;
+  }
+}
+function unoFace(c,cls,st,at){
+  const t=c[0],v=c.slice(1),s=UNO_SYM[v]||v;
+  return `<div class="unc ${cls||''}" ${at||''} style="--c:${t==='K'?'#111':UNO_COLS[t]};${st||''}"><div class="unin ${t==='K'?'K':''}"><span class="uncn a">${s}</span><span class="unv">${s}</span><span class="uncn b">${s}</span></div></div>`;
+}
+/* rewers: taki sam jak w „Kim jestem?”, w kolorze gracza */
+function unoBack(color){
+  const bc=unoHex(color)||'#ff5fa2',bi=unoInk(bc),bs=bi==='#ffffff'?'0 2px 0 #0006':'0 1px 0 #ffffff66';
+  return `<div class="unc unbk" style="--bc:${bc};--bi:${bi};--bs:${bs}"><i>✦</i><b>DGW</b><i>✦</i></div>`;
+}
+function unoStartHTML(){
+  const net=unoNet(),last=unoLastGet();
+  return `<h2>UNO</h2>
+  <p class="lgrules">Do 6 graczy w pokoju online albo solo z botami. Zagrywasz kartę w tym samym kolorze lub z tym samym symbolem/liczbą co karta na stosie. Karty specjalne: ⊘ stop, ⇄ zmiana kierunku, +2, ★ zmiana koloru i +4 (zmiana koloru + 4 karty). Stackowanie: gdy ktoś rzuci +2 lub +4, możesz dołożyć własne +2 lub +4 (kara rośnie) — kto nie ma, bierze całą karę. Kilka kart o tym samym znaku (np. dwie piątki w różnych kolorach) możesz zagrać w jednym ruchu: pierwsza musi pasować, ostatnia zostaje na wierzchu i wyznacza kolor. Nie masz co zagrać? Dobierz kartę — jeśli pasuje, możesz ją od razu zagrać, jeśli nie, tracisz kolejkę. Kto pierwszy pozbędzie się wszystkich kart, wygrywa. Rewers kart każdego gracza ma jego kolor.</p>
+  <div class="lgrow"><label>Twój nick <input id="unonick" maxlength="14" value="${lgEsc(UNO.nick||unoNickVal())}" oninput="UNO.nick=this.value"></label>
+  <label>Kolor <input id="unocol" type="color" value="${lgEsc(unoColor())}" oninput="UNO.col=this.value"></label></div>
+  ${net&&last&&!UNO.ref?`<div class="lgrow"><button class="lgbtn go" onclick="unoResume('${lgEsc(last)}')">↩ Wróć do ostatniej gry (${lgEsc(last)})</button></div>`:''}
+  <div class="lgrow"><button class="lgbtn go" ${net?'':'disabled'} onclick="unoCreate()">Utwórz pokój</button></div>
+  <div class="lgrow"><input id="unojoin" maxlength="5" placeholder="Kod pokoju" value="${lgEsc(UNO.joinCode||'')}" oninput="UNO.joinCode=this.value" style="text-transform:uppercase"><button class="lgbtn" ${net?'':'disabled'} onclick="unoJoin()">Dołącz</button></div>
+  <h3>Solo</h3>
+  <div class="lgrow"><label>Boty <select id="unobots" class="unbots" onchange="UNO.nbots=+this.value">${[1,2,3].map(n=>`<option value="${n}" ${n===UNO.nbots?'selected':''}>${n}</option>`).join('')}</select></label><button class="lgbtn" onclick="unoLocal()">Graj z botami</button></div>
+  ${net?'':'<p class="lgnote">Pokoje online działają po wgraniu gry na własny hosting z Firebase. Z botami możesz grać bez sieci.</p>'}`;
+}
+function unoLobbyHTML(){
+  const me=unoMyId(),isHost=UNO.host===me,n=UNO.players.length,mine=UNO.players.find(p=>p.id===me);
+  const list=UNO.players.map((p,i)=>`<div class="lghist">${lgDot(p.color)}${i+1}. ${lgEsc(p.name)}${p.id===UNO.host?' <b>(host)</b>':''}${p.id===me?' (Ty)':''}</div>`).join('');
+  return `<h2>Pokój: <span class="lgcode">${lgEsc(UNO.code)}</span></h2>${list}
+  ${mine?`<div class="lgrow"><label>Twój kolor <input type="color" value="${lgEsc(mine.color)}" onchange="unoSetColor(this.value)"></label></div>`:''}
+  ${tgBox('UNO.ref',UNO.test)}
+  <p class="lgnote">${isHost?(n>=2?'Możesz rozpocząć grę.':'Poczekaj, aż dołączy co najmniej jeden gracz.'):'Czekaj, aż host rozpocznie grę.'} (Gracze: ${n}/6)</p>
+  <div class="lgrow">${isHost?`<button class="lgbtn go" ${n>=2?'':'disabled'} onclick="unoHostStart()">Rozpocznij grę</button>`:''}<button class="lgbtn" onclick="navigator.clipboard&&navigator.clipboard.writeText(UNO.code)">Kopiuj kod</button><button class="lgbtn" onclick="unoLeave()">Wyjdź</button></div>`;
+}
+function unoPlayHTML(){
+  const g=UNO.game;if(!g)return '<h2>UNO</h2><p class="lgnote">Wczytywanie gry…</p>';
+  const me=unoMyId(),mi=g.order.indexOf(me);
+  if(mi<0)return '<h2>UNO</h2><p>Nie bierzesz udziału w tej partii.</p><div class="lgrow"><button class="lgbtn" onclick="unoLeave()">Wyjdź</button></div>';
+  const hand=g.hands[me]||[],cur=g.order[g.turn],myTurn=cur===me&&!g.done;
+  if(!myTurn)UNO.wild=null;
+  const top=unoTop(g),key=top+'|'+g.disc.length+'|'+g.id,pop=UNO.topKey!==key;UNO.topKey=key;
+  const opps=[];for(let k=1;k<g.order.length;k++)opps.push(g.order[(mi+k)%g.order.length]);
+  const myPl=unoPl(me),deckCol=unoPl(UNO.host).color,can=c=>myTurn&&((selv&&c.slice(1)===selv)||(unoOk(c,g)&&(!g.drawn||c===g.drawn)));
+  const ord={R:0,Y:1,G:2,B:3,K:4},vo=v=>/^\d$/.test(v)?+v:10+['S','R','+2','W','+4'].indexOf(v);
+  const sorted=unoSorted(hand),selK=g.id+'|'+hand.length+'|'+g.disc.length+'|'+(g.pend||0);if(!myTurn||UNO.selK!==selK){UNO.sel=[];UNO.selK=selK}const sel=UNO.sel||[],selv=sel.length?sorted[sel[0]].slice(1):null;
+  const n=sorted.length,mid=(n-1)/2,ang=Math.min(5,60/Math.max(n,1));
+  const oppH=opps.map(id=>{const o=unoPl(id),k=(g.hands[id]||[]).length;
+    return `<div class="unopp ${cur===id&&!g.done?'on':''}" style="--oc:${o.color}"><div class="unnm"><span class="unav" style="background:${o.color};color:${unoInk(o.color)}">${lgEsc(o.name.slice(0,1).toUpperCase())}</span><span class="t">${lgEsc(o.name)}</span><span class="unct">${k}</span></div><div class="unfan">${Array(Math.min(k,10)).fill(0).map(()=>unoBack(o.color)).join('')}</div></div>`}).join('');
+  const turnTxt=g.done?'':myTurn?(g.drawn?'Zagraj dobraną kartę albo pasuj':(g.pend>0?'Dołóż +2/+4 albo dobierz '+g.pend:'TWOJA KOLEJ!')):'Kolej: '+lgEsc(unoNm(cur));
+  const canDraw=myTurn&&!g.drawn;
+  const handH=sorted.map((c,i)=>{const d=i-mid;return unoFace(c,(can(c)?'ok':'')+(sel.indexOf(i)>=0?' sel':''),'--r:'+(d*ang)+'deg;--y:'+(d*d*1.6)+'px',`onclick="unoClickCard(${i})"`)}).join('');
+  let h=`<div class="untable"><div class="unmeta"><span>${UNO.local?'GRA Z BOTAMI':'POKÓJ '+lgEsc(UNO.code)}</span><span>${g.dir>0?'↻':'↺'}</span></div>
+  <div class="untop">${oppH}</div>
+  <div class="unmid"><div class="unturn ${myTurn?'me':''}">${turnTxt}</div>
+   <div class="undeck ${canDraw?'can':''}" ${canDraw?'onclick="unoDraw()" title="Dobierz kartę"':''}>${unoBack(deckCol)}${unoBack(deckCol)}${unoBack(deckCol)}</div>
+   <div class="undisc"><div class="unring" style="--rc:${UNO_COLS[g.color]}"></div>${g.pend>0?`<div class="unpend">+${g.pend}</div>`:''}${unoFace(top,pop?'pop':'')}</div>
+   <div class="uninfo">${lgEsc(g.log||'')}</div></div>
+  <div class="unme"><div class="unmehead"><span class="unav" style="background:${myPl.color};color:${unoInk(myPl.color)}">${lgEsc(myPl.name.slice(0,1).toUpperCase())}</span>${lgEsc(myPl.name)} · ${n} kart${myTurn&&g.drawn?'<button class="lgbtn go" onclick="unoPass()">Pasuję</button>':''}</div>
+   ${myTurn&&sel.length?`<div class="lgrow" style="justify-content:center;margin:0"><button class="lgbtn go" onclick="unoPlaySel()">Zagraj ${sel.length} ${sel.length>1?'karty':'kartę'}</button><button class="lgbtn" onclick="unoClearSel()">Anuluj</button></div><div class="lgnote" style="text-align:center;margin:2px 0">Dotykaj kart o tym samym znaku. Ostatnia zostaje na wierzchu.</div>`:''}<div class="unhand"><div class="unhandin">${handH}</div></div></div></div>
+  <div class="lgrow" style="margin-top:14px"><button class="lgbtn" onclick="unoLeave()">Wyjdź z gry</button>${!UNO.local&&UNO.host===me&&!g.done?'<button class="lgbtn" onclick="unoBackLobby()">Zakończ i wróć do poczekalni</button>':''}</div>`;
+  if(UNO.wild&&myTurn)h+=`<div class="unmod"><div class="unmodbox"><div style="font-weight:700;font-size:1.2em">Wybierz kolor</div><div class="uncols">${'RYGB'.split('').map(c=>`<i style="--c:${UNO_COLS[c]}" onclick="unoChoose('${c}')" role="button" aria-label="${UNO_CN[c]}"></i>`).join('')}</div></div></div>`;
+  if(g.done){const w=unoPl(g.winner),host=UNO.host===me;
+    h+=`<div class="unmod"><div class="unmodbox"><div class="unwin" style="color:${w.color}">🏆 ${lgEsc(w.name)} wygrywa!<small>${g.winner===me?'Gratulacje!':'Następnym razem się uda.'}</small></div>${host?'<button class="lgbtn go" onclick="unoRematch()">Zagraj jeszcze raz</button>':'<div class="lgnote">Czekamy na hosta…</div>'}<div style="margin-top:10px"><button class="lgbtn" onclick="unoLeave()">Wyjdź</button></div></div></div>`}
+  return h;
+}
+
+/* ---------- akcje gracza ---------- */
+function unoAct(fn){
+  if(UNO.busy)return;
+  UNO.msg='';
+  if(UNO.local){const g=JSON.parse(JSON.stringify(UNO.game));if(fn(g)){UNO.game=g;unoRefresh();unoBotNext()}return}
+  if(!UNO.ref)return;
+  UNO.busy=true;
+  UNO.ref.child('game').transaction(cur=>{if(!cur)return;let g;try{g=JSON.parse(cur)}catch(e){return}if(g.done)return;return fn(g)?JSON.stringify(g):undefined})
+    .then(r=>{UNO.busy=false;if(r&&!r.committed){UNO.msg='Ruch nie został zapisany (zmienił się stan gry).';unoRefresh()}})
+    .catch(e=>{UNO.busy=false;UNO.msg='Błąd: '+(e&&e.message||e);unoRefresh()});
+}
+function unoSorted(hand){const ord={R:0,Y:1,G:2,B:3,K:4},vo=v=>/^\d$/.test(v)?+v:10+['S','R','+2','W','+4'].indexOf(v);return hand.slice().sort((a,b)=>ord[a[0]]-ord[b[0]]||vo(a.slice(1))-vo(b.slice(1)))}
+function unoClickCard(i){
+  const g=UNO.game,me=unoMyId();
+  if(!g||g.done||g.order[g.turn]!==me)return;
+  const hand=unoSorted(g.hands[me]||[]),c=hand[i];if(!c)return;
+  let sel=UNO.sel||[];
+  const pos=sel.indexOf(i);
+  if(pos>=0){sel.splice(pos,1);UNO.sel=sel;unoRefresh();return}
+  if(sel.length&&hand[sel[0]].slice(1)===c.slice(1)){sel.push(i);UNO.sel=sel;unoRefresh();return}
+  sel=[];UNO.sel=sel;
+  if(!unoOk(c,g)||(g.drawn&&c!==g.drawn))return;
+  if(!g.drawn&&hand.filter(x=>x.slice(1)===c.slice(1)).length>1){UNO.sel=[i];unoRefresh();return}
+  if(c[0]==='K'){UNO.wild=[c];unoRefresh();return}
+  unoAct(x=>unoPlayFn(x,me,c,null,unoNm));
+}
+function unoClearSel(){UNO.sel=[];unoRefresh()}
+function unoPlaySel(){
+  const g=UNO.game,me=unoMyId();if(!g)return;
+  const hand=unoSorted(g.hands[me]||[]),cards=(UNO.sel||[]).map(i=>hand[i]).filter(Boolean);
+  UNO.sel=[];if(!cards.length){unoRefresh();return}
+  if(cards[cards.length-1][0]==='K'){UNO.wild=cards;unoRefresh();return}
+  unoAct(x=>unoPlayMany(x,me,cards,null,unoNm));
+}
+function unoChoose(col){const cs=UNO.wild,me=unoMyId();UNO.wild=null;if(!cs)return;unoAct(x=>unoPlayMany(x,me,cs,col,unoNm))}
+function unoDraw(){const me=unoMyId();unoAct(x=>unoDrawFn(x,me,unoNm))}
+function unoPass(){const me=unoMyId();unoAct(x=>unoPassFn(x,me,unoNm))}
+
+/* ---------- boty (gra lokalna) ---------- */
+function unoBotCol(h){const cnt={R:0,Y:0,G:0,B:0};h.forEach(x=>{if(x[0]!=='K')cnt[x[0]]++});return Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0]||'R'}
+function unoBotNext(){
+  clearTimeout(UNO.bt);
+  if(!UNO.local||!UNO.game||UNO.game.done||UNO.game.order[UNO.game.turn]==='me')return;
+  UNO.bt=setTimeout(()=>{
+    if(!UNO.local||!UNO.game||UNO.game.done)return;
+    const g=JSON.parse(JSON.stringify(UNO.game)),id=g.order[g.turn];if(id==='me')return;
+    const h=g.hands[id],playable=h.filter(c=>unoOk(c,g));
+    if(!playable.length){
+      unoDrawFn(g,id,unoNm);
+      if(g.drawn&&g.order[g.turn]===id){const c=g.drawn;unoPlayFn(g,id,c,unoBotCol(h),unoNm)}
+    }else{
+      let best=playable[0],bs=-9;
+      playable.forEach(c=>{const s=c[0]==='K'?(h.length>2?-1:1):(/[SR+]/.test(c.slice(1))?2:1)+Math.random();if(s>bs){bs=s;best=c}});
+      const grp=h.filter(c=>c!==best&&c.slice(1)===best.slice(1));let cards=[best];
+      if(grp.length&&Math.random()<.6){const all=[best,...grp],rest=h.slice();all.forEach(c=>rest.splice(rest.indexOf(c),1));const bc=unoBotCol(rest),li=all.findIndex((c,k)=>k>0&&c[0]===bc);if(li>0)all.push(all.splice(li,1)[0]);cards=all}
+      unoPlayMany(g,id,cards,unoBotCol(h),unoNm);
+    }
+    UNO.game=g;unoRefresh();unoBotNext();
+  },1100+Math.random()*700);
+}
+function unoLocal(){
+  const n=Math.max(1,Math.min(3,UNO.nbots||2));
+  clearTimeout(UNO.bt);unoDetach();
+  UNO.local=true;UNO.code='BOT';UNO.host='me';UNO.test=false;UNO.msg='';UNO.ok='';UNO.wild=null;UNO.topKey='';
+  UNO.players=[{id:'me',name:unoNickVal(),color:unoColor()}];
+  for(let i=0;i<n;i++)UNO.players.push({id:'bot'+i,name:'🤖 '+UNO_BOTN[i],color:UNO_BOTCOL[i]});
+  UNO.game=unoNew(UNO.players.map(p=>p.id),unoNm);UNO.screen='play';UNO.status='play';
+  unoRefresh();unoBotNext();
+}
+
+/* ---------- pokoje online (Firebase) ---------- */
+async function unoCreate(){
+  try{
+    const uid=await onlineEnsureAuth(),code=onlineCode(),ref=fbDB.ref('unoRooms/'+code);
+    await ref.set({host:uid,status:'lobby',createdAt:firebase.database.ServerValue.TIMESTAMP,players:{[uid]:{id:uid,name:unoNickVal(),color:unoColor(),order:0}}});
+    UNO.local=false;unoAttach(ref,code);
+  }catch(e){UNO.msg='Nie udało się utworzyć pokoju: '+e.message;unoRefresh()}
+}
+async function unoJoin(){
+  try{
+    const uid=await onlineEnsureAuth(),code=String(UNO.joinCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);
+    if(code.length!==5)throw new Error('Wpisz pięcioznakowy kod pokoju.');
+    const ref=fbDB.ref('unoRooms/'+code),room=(await ref.once('value')).val();
+    if(!room)throw new Error('Nie znaleziono pokoju o takim kodzie.');
+    const players=Object.values(room.players||{});
+    if(!(room.players&&room.players[uid])){
+      if(room.status!=='lobby')throw new Error('Ta rozgrywka już się rozpoczęła.');
+      if(players.length>=6)throw new Error('Pokój jest pełny (maksymalnie 6 graczy).');
+      await ref.child('players/'+uid).set({id:uid,name:unoNickVal(),color:unoColor(),order:Math.max(-1,...players.map(p=>Number(p.order)||0))+1});
+    }
+    UNO.local=false;unoAttach(ref,code);
+  }catch(e){UNO.msg='Nie udało się dołączyć: '+e.message;unoRefresh()}
+}
+async function unoResume(code,silent){
+  try{
+    const uid=await onlineEnsureAuth(),ref=fbDB.ref('unoRooms/'+code),room=(await ref.once('value')).val();
+    if(!room||!(room.players&&room.players[uid])){unoLastSet('');if(!silent)UNO.msg='Ten pokój już nie istnieje.';unoRefresh();return}
+    if(UNO.ref||UNO.local)return;
+    UNO.leftCode='';unoAttach(ref,code);
+  }catch(e){if(!silent){UNO.msg='Nie udało się wrócić do gry: '+e.message;unoRefresh()}}
+}
+function unoDetach(){try{if(UNO.ref&&UNO.listener)UNO.ref.off('value',UNO.listener)}catch(e){}UNO.ref=null;UNO.listener=null}
+function unoAttach(ref,code){
+  unoDetach();UNO.ref=ref;UNO.code=code;UNO.msg='';UNO.ok='';UNO.topKey='';UNO.wild=null;UNO.busy=false;unoLastSet(code);
+  UNO.listener=ref.on('value',snap=>unoOnRoom(snap.val()),err=>{UNO.msg='Błąd połączenia: '+err.message;unoRefresh()});
+}
+function unoOnRoom(room){
+  if(!room){UNO.msg='Pokój został usunięty.';unoLastSet('');unoDetach();UNO.game=null;UNO.players=[];UNO.status=null;UNO.screen='start';unoRefresh();return}
+  UNO.host=room.host;UNO.status=room.status;UNO.test=!!room.test;
+  UNO.players=Object.values(room.players||{}).sort((a,b)=>(a.order||0)-(b.order||0)).map(p=>({id:p.id,name:String(p.name||'Gracz'),color:unoHex(p.color)||'#888888'}));
+  try{UNO.game=room.game?JSON.parse(room.game):null}catch(e){UNO.game=null}
+  if(room.status==='play')UNO.screen='play';else UNO.screen='lobby';
+  if(UNO.game&&UNO.game.done)unoStats();
+  unoRefresh();
+}
+function unoSetColor(v){const me=unoMyId();if(!UNO.ref||!me||!unoHex(v))return;UNO.col=v;UNO.ref.child('players/'+me+'/color').set(v).catch(e=>{UNO.msg='Nie udało się zmienić koloru: '+e.message;unoRefresh()})}
+function unoHostStart(){
+  if(UNO.host!==unoMyId()||!UNO.ref||UNO.players.length<2||UNO.players.length>6)return;
+  const g=unoNew(UNO.players.map(p=>p.id),unoNm);
+  UNO.ref.update({status:'play',game:JSON.stringify(g)}).catch(e=>{UNO.msg='Nie udało się rozpocząć gry: '+e.message;unoRefresh()});
+}
+function unoRematch(){
+  if(UNO.host!==unoMyId()||!UNO.game)return;
+  const ord=UNO.game.order.slice();ord.push(ord.shift());
+  const g=unoNew(ord,unoNm);
+  if(UNO.local){UNO.game=g;UNO.topKey='';unoRefresh();unoBotNext();return}
+  if(!UNO.ref)return;
+  UNO.ref.child('game').set(JSON.stringify(g)).catch(e=>{UNO.msg='Nie udało się zacząć nowej partii: '+e.message;unoRefresh()});
+}
+function unoBackLobby(){
+  if(UNO.local||UNO.host!==unoMyId()||!UNO.ref)return;
+  if(!confirm('Zakończyć tę partię i wrócić do poczekalni?'))return;
+  UNO.ref.update({status:'lobby',game:null}).catch(e=>{UNO.msg='Błąd: '+e.message;unoRefresh()});
+}
+function unoLeave(){
+  clearTimeout(UNO.bt);
+  if(UNO.local){UNO.local=false;UNO.game=null;UNO.players=[];UNO.status=null;UNO.wild=null;UNO.screen='start';unoRefresh();return}
+  const lobby=UNO.status==='lobby',done=!!(UNO.game&&UNO.game.done),me=unoMyId(),ref=UNO.ref,isHost=UNO.host===me;
+  unoDetach();
+  try{if(ref&&me&&lobby){if(isHost)ref.remove();else ref.child('players/'+me).remove()}}catch(e){}
+  if(lobby||done)unoLastSet('');else UNO.leftCode=UNO.code;
+  Object.assign(UNO,{screen:'start',players:[],status:null,msg:'',ok:'',game:null,wild:null,topKey:''});
+  unoRefresh();
+}
+/* ---------- statystyki ---------- */
+function unoStats(){
+  const g=UNO.game;
+  if(UNO.local||!g||!g.done||!g.id||typeof ACC==='undefined'||!ACC.user)return;
+  const me=ACC.user.uid;if(g.order.indexOf(me)<0)return;
+  statsRecord('uno_'+String(UNO.code).toLowerCase().replace(/[^a-z0-9]/g,'')+'_'+g.id,'uno',g.winner===me?'w':'l',UNO.players.filter(p=>g.order.indexOf(p.id)>=0).map(p=>({uid:p.id,name:p.name})),UNO.test);
+}
+/* ---------- wejście / wyjście z gry ---------- */
+
+
+
+/* ===== integracja z platformą: wejście do gry / wyjście z gry ===== */
+window.__show=function(){
+  if(!UNO.ref&&!UNO.local)Object.assign(UNO,{screen:'start',msg:'',ok:''});
+  unoRefresh();
+  var last=unoLastGet();
+  if(!UNO.ref&&!UNO.local&&last&&last!==UNO.leftCode&&unoNet())unoResume(last,true);
+};
+window.__leave=function(){
+  if(UNO.local||(UNO.ref&&UNO.game&&UNO.game.done))unoLeave();
+};
+
+window.__show();
+</script>
+</body>
+</html>
