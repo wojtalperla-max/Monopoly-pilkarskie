@@ -129,7 +129,10 @@ const $=s=>document.querySelector(s);
 const HEX=/^#[0-9a-f]{6}$/i;
 const FALL=['#e53935','#1e88e5','#fdd835','#8e24aa','#43a047','#fb8c00','#00acc1','#6d4c41'];
 const MAXP=4;
-let room=null,me=null,isHost=false,code='',S=null,disp={},lastEv=0,lastRn=0,lastGid='',shownWin='',doneRec='',animGot=[],anim=false,stepT=null,beat=null,unsubs=[],rollLock=0,local=false;
+let room=null,me=null,isHost=false,code='',S=null,disp={},lastEv=0,lastRn=0,lastGid='',shownWin='',doneRec='',animGot=[],anim=false,stepT=null,beat=null,unsubs=[],rollLock=0,local=false,tokenMotion=null,audioCtx=null;
+function tone(freq,duration,volume,type='sine',delay=0){try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;audioCtx=audioCtx||new AC();if(audioCtx.state==='suspended')audioCtx.resume();const t=audioCtx.currentTime+delay,o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type=type;o.frequency.setValueAtTime(freq,t);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(volume,t+.012);g.gain.exponentialRampToValueAtTime(.0001,t+duration);o.connect(g);g.connect(audioCtx.destination);o.start(t);o.stop(t+duration+.02)}catch(e){}}
+function playMoveSound(){tone(520,.085,.035,'sine');tone(760,.07,.018,'sine',.045)}
+function playRollSound(){tone(180,.09,.035,'triangle');tone(260,.11,.03,'triangle',.075);tone(390,.13,.025,'triangle',.16)}
 
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -255,7 +258,8 @@ function drawBoard(){
     S.players.forEach((p,k)=>{const d=posOf(p);(at[d]=at[d]||[]).push([p,k])});
     for(const d in at){at[d].forEach(([p,k],j)=>{const st=STONES[d];const n=at[d].length;
       const x=st.x+(j-(n-1)/2)*17,y=st.y+(n>1?6:9);
-      s+=`<g style="pointer-events:none" transform="translate(${x} ${y})" opacity="${p.gone?.4:1}"><ellipse cy="12" rx="10" ry="4" fill="rgba(0,0,0,.3)"/><circle cy="-2" r="12" fill="${pcol(p)}" stroke="#fff" stroke-width="3"/><circle cx="-4" cy="-7" r="4" fill="rgba(255,255,255,.55)"/></g>`;});}
+      const tm=tokenMotion&&tokenMotion.pid===p.id?tokenMotion:null;
+      s+=`<g class="player-token" style="pointer-events:none" transform="translate(${x} ${y})" opacity="${p.gone?.4:1}"><g>${tm?`<animateTransform attributeName="transform" type="translate" from="${tm.dx} ${tm.dy}" to="0 0" dur=".34s" calcMode="spline" keySplines=".22 .75 .25 1" fill="freeze"/>`:''}<ellipse class="token-shadow" cy="12" rx="10" ry="4" fill="rgba(0,0,0,.3)"/><circle cy="-2" r="12" fill="${pcol(p)}" stroke="#fff" stroke-width="3"/><circle cx="-4" cy="-7" r="4" fill="rgba(255,255,255,.55)"/></g></g>`;});}
     if(playing&&S.L&&cur&&cur.id===me){
       if(plan.length>1){const t=STONES[plan[plan.length-1]];
         s+=`<g class="undo" style="cursor:pointer"><ellipse cx="${t.x}" cy="${t.y}" rx="34" ry="26" fill="rgba(255,255,255,.01)"/></g>`}
@@ -263,7 +267,7 @@ function drawBoard(){
         s+=`<g class="opt" data-i="${i}" style="cursor:pointer"><ellipse cx="${p.x}" cy="${p.y}" rx="38" ry="29" fill="rgba(255,235,59,.4)" stroke="#ffc400" stroke-width="4" class="pulse"/></g>`});
     }
   }
-  $('#board').innerHTML=s;
+  $('#board').innerHTML=s;tokenMotion=null;
 }
 function afterPlan(){
   drawBoard();updUI();
@@ -473,8 +477,8 @@ function onState(){
   if(S.ev&&S.ev.n!==lastEv){
     lastEv=S.ev.n;const ev=S.ev;animGot=(ev.got||[]).slice();disp={};disp[ev.pid]=ev.path[0];clearInterval(stepT);anim=true;let k=0;
     stepT=setInterval(()=>{k++;
-      if(k<ev.path.length){disp[ev.pid]=ev.path[k];animGot=animGot.filter(g=>g.i!==ev.path[k]);drawBoard()}
-      else{clearInterval(stepT);anim=false;disp={};animGot=[];drawBoard();if(S.phase==='end')showWin()}},260);
+      if(k<ev.path.length){const from=STONES[disp[ev.pid]??ev.path[k-1]],to=STONES[ev.path[k]];tokenMotion={pid:ev.pid,dx:from.x-to.x,dy:from.y-to.y};disp[ev.pid]=ev.path[k];animGot=animGot.filter(g=>g.i!==ev.path[k]);playMoveSound();drawBoard()}
+      else{clearInterval(stepT);anim=false;disp={};animGot=[];drawBoard();if(S.phase==='end')showWin()}},390);
   }
   drawBoard();
   if(playing)$('#winbox').classList.add('hide');
@@ -553,7 +557,7 @@ $('#name').addEventListener('input',savePref);$('#pcol').addEventListener('input
 $('#start').onclick=startGame;
 $('#localBtn').onclick=()=>{const p=$('#localPane');p.classList.toggle('hide');if(!p.classList.contains('hide'))setTimeout(()=>p.scrollIntoView({behavior:'smooth',block:'nearest'}),50)};
 document.querySelectorAll('#localN [data-n]').forEach(b=>b.onclick=()=>startLocal(+b.dataset.n));
-$('#roll').onclick=()=>{if(Date.now()<rollLock)return;rollLock=Date.now()+800;send('roll')};
+$('#roll').onclick=()=>{if(Date.now()<rollLock)return;rollLock=Date.now()+800;playRollSound();send('roll')};
 $('#board').addEventListener('click',e=>{const g=e.target.closest('.opt');if(g)return stepTo(+g.dataset.i);if(e.target.closest('.undo'))undoStep()});
 $('#undo').onclick=undoStep;
 $('#go').onclick=()=>{if(!planDone())return;$('#go').disabled=true;send('go:'+plan.join(','))};

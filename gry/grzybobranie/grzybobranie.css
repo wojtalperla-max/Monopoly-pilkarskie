@@ -31,7 +31,7 @@ button:disabled{opacity:.5;cursor:default}
 .pl b{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cnt{display:flex;align-items:center;gap:2px;font-weight:800}
 .cnt svg{width:24px;height:24px}
-.game{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+.game{max-width:1300px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:14px;align-items:start}
 @media(max-width:860px){.game{grid-template-columns:1fr}}
 .boardwrap{padding:8px;overflow:hidden}
 svg.board{width:100%;height:auto;display:block;border-radius:16px}
@@ -126,8 +126,18 @@ body:has(#home:not(.hide)) .back{z-index:70}
 #localPane .gh-btn{font-size:clamp(20px,5vw,26px);padding:12px 6px}
 #home .gh-wrap{padding-top:64px}
 
-.back{display:none!important}
+/* Przycisk menu pozostaje w lobby, znika po rozpoczęciu rozgrywki. */
+body:has(#home:not(.hide)) .back,body:has(#game:not(.hide)) .back{display:none!important}
+body:has(#lobby:not(.hide)) .back{display:inline-flex!important}
 
 /* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
 html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
 html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
+
+
+/* Delikatnie większa plansza; ruch pionka animowany płynnie między polami przez SVG. */
+.boardwrap{padding:9px}
+svg.board{width:104%;max-width:none;margin-left:-2%}
+.player-token{filter:drop-shadow(0 2px 2px rgba(0,0,0,.22))}
+.player-token .token-shadow{opacity:.28}
+@media(prefers-reduced-motion:reduce){.player-token{filter:none!important}}
