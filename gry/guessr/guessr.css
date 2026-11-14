@@ -112,3 +112,27 @@ body:has(#lobby:not(.hid)) .bg{display:none}
 @keyframes gzPane{0%{transform:translateY(-14px) scale(.94);opacity:0}100%{transform:none;opacity:1}}
 .gz #lobinfo{color:#ffffffd9;font-size:15px;min-height:18px}
 @media(prefers-reduced-motion:reduce){.gz *,.gz::before{animation:none!important}}
+
+
+/* ===== PRZYCISK "MENU GŁÓWNE" (jak w Monopoly) ===== */
+.back{position:fixed;top:calc(14px + env(safe-area-inset-top,0px));left:14px;z-index:45;display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:999px;border:2px solid #ffffffb3;background:#0000004d;color:#fff;font-family:"Fredoka","Trebuchet MS",system-ui,sans-serif;font-weight:600;font-size:15px;text-decoration:none;box-shadow:0 4px 0 #0006,0 8px 16px #0005;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:transform .15s cubic-bezier(.2,1.5,.4,1),background .2s}
+.back:hover{transform:translateY(-2px);background:#00000070}
+.back:active{transform:translateY(1px)}
+.back:focus-visible{outline:3px solid #ffd84a;outline-offset:3px}
+body:has(#lobby:not(.hid)) .back{z-index:70}
+.wrap{padding-top:66px}
+
+/* ===== NOWY MOTYW: FIOLET + RÓŻ ===== */
+:root{--bg:#150e26;--card:#2f2542;--card2:#241b35;--gold:#b283f5;--mut:#b4a8cc}
+.bg i:nth-child(1){background:#c2187a}.bg i:nth-child(2){background:#7c3aed}.bg i:nth-child(3){background:#2563eb}
+h1 b{background-image:linear-gradient(90deg,#ff7ac0,#ffd84a,#ff7ac0);background-size:200%;-webkit-background-clip:text;background-clip:text}
+.sub{border-bottom-color:#4a3578}
+.card{border-color:#4a3d66}
+th{background:#3d2a63;border-color:#2f2542}
+.pri{background:#6d3fc0}.tab{border-color:#4a3d66}.tab.on{color:#150e26;box-shadow:0 0 18px #b283f566}
+.code{color:#ffb3dc}.chip{border-color:var(--pc,#5b3d99)}.chip b{color:#ffb3dc}
+.chip.me{box-shadow:0 0 12px var(--pc,#b283f5)}
+.gz{background:radial-gradient(circle at 50% 18%,#b05cff 0,#5b21b6 38%,#1b0a45 100%)}
+.gz-logo{background:linear-gradient(180deg,#ff5fb0,#c2187a);box-shadow:0 0 0 clamp(3px,.7vw,5px) #14060a,0 14px 0 #6d0a45,0 26px 40px #000a}
+.gz-logo b{text-shadow:0 3px 0 #6d0a45,0 6px 0 #4a062f,0 9px 14px #0008}
+.gz-white{color:#5b21b6}

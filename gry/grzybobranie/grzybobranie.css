@@ -9,7 +9,7 @@
 *{box-sizing:inherit}
 html,body{margin:0;min-height:100%}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
-body{font-family:"Baloo 2","Trebuchet MS",system-ui,sans-serif;color:var(--ink);background:radial-gradient(ellipse at 30% 0%,var(--bg1),var(--bg2));background-attachment:fixed;padding:14px}
+body{font-family:"Baloo 2","Trebuchet MS",system-ui,sans-serif;color:var(--ink);background:radial-gradient(ellipse at 30% 0%,var(--bg1),var(--bg2));background-attachment:fixed;padding:14px;padding-top:64px}
 h1{margin:0;font-size:clamp(28px,5vw,44px);font-weight:800;color:#fff;text-shadow:0 3px 0 rgba(0,0,0,.2);text-align:center}
 .sub{text-align:center;color:#fff;opacity:.9;margin:0 0 14px}
 .card{background:var(--card);border-radius:22px;padding:18px;box-shadow:0 8px 0 var(--shadow),0 12px 30px var(--shadow);border:3px solid var(--line)}
@@ -103,3 +103,25 @@ body:has(#home:not(.hide))>h1,body:has(#home:not(.hide))>.sub{display:none}
 #home .err{color:#ffd2c9;min-height:0}#home .err:empty{display:none}
 .gh-note{margin:0;font-size:14px;color:#ffffffcc;animation:ghUp .7s 1.6s both}
 @media(prefers-reduced-motion:reduce){#home *,#home::before{animation:none!important}}
+
+
+/* ===== PRZYCISK "MENU GŁÓWNE" (jak w Monopoly i guessr) ===== */
+.back{position:fixed;top:calc(14px + env(safe-area-inset-top,0px));left:14px;z-index:45;display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border-radius:999px;border:2px solid #ffffffb3;background:#0000004d;color:#fff;font-family:"Baloo 2","Trebuchet MS",system-ui,sans-serif;font-weight:700;font-size:15px;text-decoration:none;box-shadow:0 4px 0 #0006,0 8px 16px #0005;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);transition:transform .15s cubic-bezier(.2,1.5,.4,1),background .2s}
+.back:hover{transform:translateY(-2px);background:#00000070}
+.back:active{transform:translateY(1px)}
+.back:focus-visible{outline:3px solid #ffd84a;outline-offset:3px}
+body:has(#home:not(.hide)) .back{z-index:70}
+
+/* ===== STEROWANIE KROK PO KROKU ===== */
+.movebar{display:flex;align-items:center;gap:10px;padding:10px 6px 4px}
+.movebar span{flex:1.6;font-weight:800;font-size:17px;min-width:0}
+.movebar button{flex:1;font-size:17px;padding:9px 12px}
+.board .opt:hover ellipse{fill:rgba(255,235,59,.65)}
+
+/* ===== GRA LOKALNA ===== */
+.gh-link{background:none;color:#fff;box-shadow:none;font-size:16px;padding:8px 16px;border-radius:999px;border:2px dashed #ffffff99;animation:ghUp .7s 1.5s both}
+.gh-link:hover{background:#ffffff1f}
+.gh-link:active{transform:none;box-shadow:none}
+#localPane .row{gap:8px}
+#localPane .gh-btn{font-size:clamp(20px,5vw,26px);padding:12px 6px}
+#home .gh-wrap{padding-top:64px}

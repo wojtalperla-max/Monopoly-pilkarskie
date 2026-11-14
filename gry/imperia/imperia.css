@@ -349,3 +349,8 @@ body.inbattle #act,body.inbattle #toast{display:none!important}
 #lobby .il-local-link{width:auto;min-height:0;background:transparent;border:0;border-bottom:2px dashed #ffffff77;border-radius:0;color:#ffffffd9;font-weight:600;font-size:17px;padding:6px;margin-top:4px;box-shadow:none;animation:ilUp .7s 1.5s both}
 #lobby .il-local-link:hover:not(:disabled){color:#fff;transform:scale(1.05);box-shadow:none;border-color:#ffffff77}
 @media(prefers-reduced-motion:reduce){#lobby.il *,#lobby.il::before{animation:none!important}}
+
+/* przycisk Menu główne (lobby) */
+#lobby .il-menu{position:fixed;top:10px;left:10px;z-index:40;display:inline-flex;align-items:center;gap:6px;width:auto;margin:0;padding:9px 16px;font:700 15px/1 "Fredoka","Trebuchet MS",system-ui,sans-serif;color:#fff;background:#00000038;border:2px solid #ffffffd9;border-radius:999px;cursor:pointer;box-shadow:0 3px 10px #0006;text-shadow:0 1px 2px #0008;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);transition:transform .15s,background .15s}
+#lobby .il-menu:hover{background:#00000066;transform:translateY(-2px)}
+#lobby .il-menu:active{transform:scale(.96)}

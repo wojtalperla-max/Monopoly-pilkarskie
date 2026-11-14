@@ -4,6 +4,7 @@
 <title>Imperia – gra online</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap"><link rel="stylesheet" href="imperia.css"></head><body>
 <div id="lobby" class="il">
+  <button type="button" id="ilMenu" class="il-menu">← Menu główne</button>
   <div class="il-bg" id="ilBg" aria-hidden="true"></div>
   <div class="il-wrap">
     <div class="logo-lobby il-logo" role="img" aria-label="Imperia"></div>
@@ -258,6 +259,7 @@ function animateMove(u,from,to){
 }
 function unitPos(u){const m=motions.find(x=>x.id===u.id);if(!m)return C(u.q,u.r);let t=Math.min(1,(performance.now()-m.start)/m.duration);t=1-Math.pow(1-t,3);const a=C(m.from.q,m.from.r),b=C(m.to.q,m.to.r);return[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t]}
 
+var _mvB=new Set();
 function moveU(u,q,r){
   const old={q:u.q,r:u.r};const t=tt(q,r);if(t<2){msg='Tam nie da się wejść (woda).';return render()}
   const me_=u.o,en=S.units.filter(x=>x.q==q&&x.r==r&&x.o!=me_),ec=S.cities.find(c=>c.q==q&&c.r==r&&c.o!=me_);
@@ -271,7 +273,8 @@ function moveU(u,q,r){
   }else if(ec){
     if(!MIL(u.k)){msg='Tylko wojsko zdobywa miasta.';return render()}
     ec.o=me_;u.q=q;u.r=r;u.mp=0;animateMove(u,old,{q,r});sfx('win');msg='Miasto zdobyte!';claim(me_,q,r,1,2);
-  }else{u.q=q;u.r=r;animateMove(u,old,{q,r});sfx('move');const rvx=riverX(old.q,old.r,q,r);u.mp=Math.max(0,u.mp-COST[t]-(rvx?2:0));if((S.hs||[]).includes(r*S.w+q))u.mp++;msg=(S.hs||[]).includes(r*S.w+q)?'Przejście przez domek: +1 punkt ruchu!':'';if(rvx)msg='Przeprawa przez rzekę: −2 punkty ruchu.'+(msg?' '+msg:'');if(u.k!='C')claim(u.o,q,r,u.k=='S'?1:0,1)}
+  }else{const _stay=S.units.filter(x=>x!==u&&x.o==u.o&&x.q==q&&x.r==r&&x.k!='C'&&!_mvB.has(x.id));u.q=q;u.r=r;animateMove(u,old,{q,r});sfx('move');const rvx=riverX(old.q,old.r,q,r);u.mp=Math.max(0,u.mp-COST[t]-(rvx?2:0));if((S.hs||[]).includes(r*S.w+q))u.mp++;msg=(S.hs||[]).includes(r*S.w+q)?'Przejście przez domek: +1 punkt ruchu!':'';if(rvx)msg='Przeprawa przez rzekę: −2 punkty ruchu.'+(msg?' '+msg:'');if(u.k!='C')claim(u.o,q,r,u.k=='S'?1:0,1);
+    if(u.k!='C'&&_stay.length){const _m=Math.max(u.mp,..._stay.map(x=>x.mp));u.mp=_m;_stay.forEach(x=>{x.mp=_m})}}
   chk();save();render();
 }
 const CITY_NAMES=['Złotogród','Biały Gród','Kamienna Wola','Srebrna Góra','Wysoka Warta','Czarny Bór','Lwi Gród','Orlia Skała','Dębowa Twierdza','Szafirowe Wrota','Kruszwica','Wolin','Stary Bród','Zielona Dolina','Wilcze Wzgórze','Mglisty Gród','Jantarowa Przystań','Żelazna Brama','Królewska Wola','Granitowy Szczyt','Brzask','Wrzosowisko','Miodowa','Łabędzi Gród','Sokole Gniazdo','Burzogród','Krasnogród','Ostoja','Nowa Nadzieja','Gwiezdny Gród','Rubinowa Warta','Szmaragdowy Bór','Cisowa','Jaskółcza Wola','Bursztynowo','Szronowa Twierdza'];
@@ -405,7 +408,7 @@ function runAI(){const p=S.turn,own=()=>S.own||'';let stop=false;quiet=true;
        const grp=A.filter(x=>x.mp>0&&adj(x,toT[0],toT[1]));
        if(grp.length>=need||grp.length>=n){
         if(!S.pl[fu[0].o].ai){startAIBattle(grp.slice(0,10),fu,toT[0],toT[1]);stop=true;break}
-        grp.forEach(g=>{if(S.units.includes(g)&&g.mp>0)moveU(g,toT[0],toT[1])});
+        _mvB=new Set(grp.map(x=>x.id));try{grp.forEach(g=>{if(S.units.includes(g)&&g.mp>0)moveU(g,toT[0],toT[1])})}finally{_mvB=new Set()}
        }
        break;
       }
@@ -435,7 +438,7 @@ function doEnd(){const m=S.turn,p=S.pl[m];
   let n=m;do{n++;if(n>=S.pl.length){n=0;S.round++}}while(!S.pl[n].alive);
   S.turn=n;S.units.forEach(u=>{if(u.o==n)u.mp=mx(S,n)+(u.k=='C'?2:0)});(S.q||[]).filter(x=>x.o==n&&S.cities.some(c=>c.q==x.q&&c.r==x.r&&c.o==n)).forEach(x=>add(S,n,x.k,x.q,x.r));S.q=(S.q||[]).filter(x=>x.o!=n);sel=null;msg='';{const pn=S.pl[n],inc=income(n);let ng=(pn.g||0)+inc;if(ng<0){ng=0;const ml=S.units.filter(u=>u.o==n&&MIL(u.k));if(ml.length>1){const d=ml[ml.length-1];S.units=S.units.filter(x=>x!==d);pn.dr=S.round}}pn.g=ng;pn.e=(pn.e||0)+Math.max(0,inc);(pn.h=pn.h||[]).push([S.round,pn.g,inc,pn.e])}hold=false;holdFor=null;save();render()}
 function tap(q,r){const mi=meIdx(),own=S.units.filter(u=>u.o==mi&&u.q==q&&u.r==r),su=sel&&sel.k=='u'?S.units.find(u=>u.id==sel.id):null;
-  if(su&&mineTurn()&&su.mp>0&&!(su.q==q&&su.r==r)&&adj(su,q,r)){let gl=grpMode?S.units.filter(x=>x.o==su.o&&x.q==su.q&&x.r==su.r&&x.mp>0):[su];if(grpMode&&grpN>0)gl=[su,...gl.filter(x=>x!==su)].slice(0,grpN);{const en=S.units.filter(x=>x.q==q&&x.r==r&&x.o!=su.o),atk=gl.filter(x=>S.units.includes(x)&&x.mp>0&&MIL(x.k));if(en.length&&tt(q,r)>=2&&atk.length&&S.pl[mi].seen[r*S.w+q]=='1'&&typeof beginBattle==='function'&&!S.bt&&!(typeof FZ!=='undefined'&&FZ)){beginBattle(atk,en,q,r);return}}gl.forEach(x=>{if(S.units.includes(x)&&x.mp>0)moveU(x,q,r)});return}
+  if(su&&mineTurn()&&su.mp>0&&!(su.q==q&&su.r==r)&&adj(su,q,r)){let gl=grpMode?S.units.filter(x=>x.o==su.o&&x.q==su.q&&x.r==su.r&&x.mp>0):[su];if(grpMode&&grpN>0)gl=[su,...gl.filter(x=>x!==su)].slice(0,grpN);{const en=S.units.filter(x=>x.q==q&&x.r==r&&x.o!=su.o),atk=gl.filter(x=>S.units.includes(x)&&x.mp>0&&MIL(x.k));if(en.length&&tt(q,r)>=2&&atk.length&&S.pl[mi].seen[r*S.w+q]=='1'&&typeof beginBattle==='function'&&!S.bt&&!(typeof FZ!=='undefined'&&FZ)){beginBattle(atk,en,q,r);return}}_mvB=new Set(gl.map(x=>x.id));try{gl.forEach(x=>{if(S.units.includes(x)&&x.mp>0)moveU(x,q,r)})}finally{_mvB=new Set()}return}
   const ci=S.cities.findIndex(c=>c.o==mi&&c.q==q&&c.r==r);msg='';
   if(own.length){sfx('select');const i=su?own.findIndex(u=>u.id==su.id):-1;
     if(i>=0&&own.length==1&&ci>=0)sel={k:'c',i:ci};else sel={k:'u',id:own[(i+1)%own.length].id}}
@@ -724,6 +727,26 @@ function renderSpec(){
 /* ---------- okno akcji na planszy (rekrutacja, budowa, ruch grupy) + powiadomienia ---------- */
 const ACT=document.createElement('div');ACT.id='act';$('game').appendChild(ACT);
 const TOAST=document.createElement('div');TOAST.id='toast';$('game').appendChild(TOAST);
+
+/* ===== Menu główne, pełny ekran, ukrycie paska portalu w grze ===== */
+(function(){
+  function pmenu(){const out=[];try{const d=window.parent.document;d.querySelectorAll('button,a,div,span').forEach(e=>{if(e.children.length<=2&&/^\s*(←|<)?\s*menu g[łl]ówne\s*$/i.test(e.textContent||''))out.push(e)})}catch(e){}return out}
+  function hideParentBtn(){pmenu().forEach(e=>{if(e.dataset.impHid==null){e.dataset.impHid=e.style.display||'';e.style.display='none'}})}
+  function restoreParentBtn(){try{window.parent.document.querySelectorAll('[data-imp-hid]').forEach(e=>{e.style.display=e.dataset.impHid;delete e.dataset.impHid})}catch(e){}}
+  const prevClean=window.__impCleanup;window.__impCleanup=()=>{try{prevClean&&prevClean()}catch(e){}restoreParentBtn();};
+  function goMenu(){
+    const p=pmenu();
+    if(p.length){try{window.__impCleanup()}catch(e){}restoreParentBtn();try{p[0].click();return}catch(e){}}
+    try{window.__impCleanup()}catch(e){}
+    const B=impBridge();
+    try{if(B){for(const k of ['menu','mainMenu','home','exit','back','close']){if(typeof B[k]==='function'){B[k]();return}}}}catch(e){}
+    try{window.parent.postMessage({type:'imperia:menu',imperia:'menu'},'*')}catch(e){}
+    setTimeout(()=>{try{(window.top||window.parent).location.href='./'}catch(e){location.href='./'}},150);
+  }
+  $('ilMenu').onclick=goMenu;
+  function sync(){hideParentBtn()}
+  setInterval(sync,700);sync();
+})();
 let _actKey='',_lastMsg='',_toastT=0;
 const UIC={W:'⚔️',A:'🏹',S:'🧺',C:'🐎'};
 function actHide(){ACT.classList.remove('on','pop');ACT.innerHTML='';_actKey=''}
