@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pl"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Tukan – plansza Isla Petit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@500;600;700&display=swap"><link rel="stylesheet" href="tukan.css"><script>/* lobby → strona główna (chowanie przycisku „Menu główne” poza lobby) */
+(function(){
+  var sel='#tkStart';
+  if(window.parent===window)return;
+  function shown(e){
+    if(!e)return false;
+    var r=e.getBoundingClientRect(),cs=getComputedStyle(e);
+    return r.width>40&&r.height>40&&cs.display!=='none'&&cs.visibility!=='hidden';
+  }
+  function send(){
+    var l=false;try{l=shown(document.querySelector(sel))}catch(x){}
+    try{window.parent.postMessage({type:'gmenu-lobby',lobby:l},'*')}catch(x){}
+  }
+  setInterval(send,250);send();
+})();
+</script>
+</head><body>
+<div id="tkStart" role="dialog" aria-label="Tukan – ekran startowy">
+  <div class="tk-bg" aria-hidden="true" id="tkBg"></div>
+  <div class="tk-wrap">
+    <div class="tk-logo" role="img" aria-label="Tukan" id="tkLogo"></div>
+    <div class="tk-bird" aria-hidden="true">🦜</div>
+    <p class="tk-sub">Odkryj wyspę. Zbierz symbole. Wyprzedź znajomych.</p>
+    <div class="tk-main">
+      <button id="tkSolo" class="tk-btn tk-gold"><span class="tk-ic">🌴</span><span>Graj solo</span></button>
+      <button id="tkOnline" class="tk-btn tk-white"><span class="tk-ic">🚪</span><span>Pokój online</span></button>
+    </div>
+    <div class="tk-note" id="tkNote"></div>
+  </div>
+</div>
+
+<h2>Tukan</h2>
+<button id="b">Przemieszaj teren</button> <button id="rs">Losuj symbole</button> <button id="rr">Resetuj symbole</button> <button id="rl">Losuj litery wysp</button>
+<div id="roomline" style="font-size:15px;margin:6px 0;min-height:20px;font-weight:600"></div>
+<div id="codebar" style="display:none">Kod partii: <b id="code">—</b>
+<input id="ci" maxlength="8" size="7" placeholder="wpisz kod" style="font-size:15px;padding:6px;border-radius:6px;border:1px solid #8a7a50;text-transform:uppercase">
+<button id="cj">Dołącz do partii</button> <button id="cnew">Nowa partia</button>
+<div style="font-size:12px;opacity:.8">Ten sam kod = ta sama plansza, symbole, litery wysp, karta symbolu i kolejność kart na każdym urządzeniu.</div></div>
+<div id="cnt"></div>
+<div id="game"><div id="banner" style="font-size:24px;font-weight:800"></div><div id="hand"></div><div id="deckinfo" style="font-size:13px"></div>
+<button id="dr">Losuj 2 karty</button> <button id="nw">Nowa gra</button>
+<label style="font-size:13px"><input type="checkbox" id="fm"> tryb swobodny (bez sprawdzania zasad)</label>
+<div id="msg" style="min-height:22px;font-weight:600"></div></div>
+<div class="wrap"><svg id="s" viewBox="15 55 700 700" width="700" xmlns="http://www.w3.org/2000/svg"></svg><div class="panelwrap"><img class="panel" alt="Panel punktacji" src="media/91f9722f40.jpg"><svg id="ps" viewBox="0 0 273 767" xmlns="http://www.w3.org/2000/svg"></svg><input class="pin" id="p1" readonly tabindex="-1" type="number" inputmode="numeric" min="0" max="999" aria-label="Punkty tura I" style="left:64.1%;top:63.8%;width:20.5%;height:4.7%"><input class="pin" id="p2" readonly tabindex="-1" type="number" inputmode="numeric" min="0" max="999" aria-label="Punkty tura II" style="left:64.1%;top:70.4%;width:20.5%;height:4.3%"><input class="pin" id="p3" readonly tabindex="-1" type="number" aria-label="Punkty za trasy" style="left:64.1%;top:76.1%;width:20.5%;height:4.4%"><input class="pin" id="p4" readonly tabindex="-1" type="number" aria-label="Suma końcowa" style="left:66.5%;top:89.4%;width:19%;height:4.7%"><input class="pin" id="p5" readonly tabindex="-1" aria-label="Punkty z kart tras" style="left:64.1%;top:83.2%;width:20.5%;height:4.3%"><input class="pin" id="s0" readonly tabindex="-1" aria-label="Karta trasy 1" style="left:15.0%;top:60.1%;width:13.2%;height:4.4%"><input class="pin" id="s1" readonly tabindex="-1" aria-label="Karta trasy 2" style="left:33.7%;top:60.1%;width:13.2%;height:4.4%"><input class="pin" id="s2" readonly tabindex="-1" aria-label="Karta trasy 3" style="left:15.0%;top:67.9%;width:13.2%;height:4.4%"><input class="pin" id="s3" readonly tabindex="-1" aria-label="Karta trasy 4" style="left:33.7%;top:67.9%;width:13.2%;height:4.4%"><input class="pin" id="s4" readonly tabindex="-1" aria-label="Karta trasy 5" style="left:15.0%;top:75.7%;width:13.2%;height:4.4%"><input class="pin" id="s5" readonly tabindex="-1" aria-label="Karta trasy 6" style="left:33.7%;top:75.7%;width:13.2%;height:4.4%"></div></div>
+<h3>Karty terenu</h3>
+<div id="cards"></div>
+<h3>Karty tras (bonus za pierwszą trasę)</h3>
+<div id="rcards"></div>
+<p style="font-size:13px">Grafiki wycięte ze zdjęcia planszy. Symbole i pomosty zostają na swoich miejscach, zmienia się teren pod nimi.</p>
+<script>
+const D={"cells":[[0,0,"S",206,139],[0,1,"S",277,139],[0,2,"M",347,139],[0,3,"M",418,139],[0,4,"F",489,139],[1,0,"M",170,200],[1,1,"F",241,200],[1,2,"M",312,200],[1,3,"W",383,200],[1,4,"S",454,200],[1,5,"F",524,200],[2,0,"F",135,262],[2,1,"M",206,262],[2,2,"F",276,262],[2,3,"W",347,262],[2,4,"S",418,262],[2,5,"M",489,262],[2,6,"S",560,262],[3,0,"S",99,323],[3,1,"F",170,323],[3,2,"S",241,323],[3,3,"F",312,323],[3,4,"F",383,323],[3,5,"S",454,323],[3,6,"M",525,323],[3,7,"S",595,323],[4,0,"S",64,385],[4,1,"W",135,385],[4,2,"W",206,385],[4,3,"M",276,385],[4,4,"S",347,384],[4,5,"W",418,384],[4,6,"F",489,385],[4,7,"F",560,385],[4,8,"S",631,385],[5,0,"F",99,446],[5,1,"M",170,446],[5,2,"M",241,446],[5,3,"S",312,446],[5,4,"W",383,446],[5,5,"S",454,446],[5,6,"W",525,446],[5,7,"M",596,446],[5,8,"F",666,446],[6,0,"S",135,507],[6,1,"S",206,507],[6,2,"F",276,507],[6,3,"F",347,507],[6,4,"W",418,507],[6,5,"F",489,507],[6,6,"W",560,507],[6,7,"S",631,507],[7,0,"S",99,569],[7,1,"M",170,569],[7,2,"F",241,569],[7,3,"W",312,569],[7,4,"S",383,569],[7,5,"F",454,569],[7,6,"S",525,569],[7,7,"S",595,569],[8,0,"M",64,630],[8,1,"M",135,630],[8,2,"F",206,630],[8,3,"W",277,630],[8,4,"F",347,630],[8,5,"S",418,630],[8,6,"M",489,630],[8,7,"M",560,630],[9,0,"S",241,692],[9,1,"S",312,692],[9,2,"F",383,692],[9,4,"W",525,692],[9,5,"W",596,692]],"tiles":{"S":"media/212c13a9ab.png","F":"media/fa26370492.png","M":"media/e56f757f54.png","W":"media/2b4c09661b.png"},"syms":{"obelisk":{"src":"media/7a0229b0bc.png","box":[29,26,63,74]},"toucan":{"src":"media/a944e23e2a.png","box":[25,25,62,71]},"cat":{"src":"media/992eec4914.png","box":[24,27,65,71]},"door":{"src":"media/f224cf40dd.png","box":[30,30,63,70]},"book":{"src":"media/3607ad563e.png","box":[30,28,65,70]},"monster":{"src":"media/00fed4602e.png","box":[26,27,63,69]}},"symat":{"2,4":"obelisk","7,4":"obelisk","2,2":"toucan","6,5":"toucan","4,3":"cat","8,0":"cat","4,6":"door","6,2":"book","5,4":"monster","9,5":"monster"},"pier":"media/1448ac0e2c.png","piers":{"1":{"cell":[0,2],"flip":0,"dx":-30,"dy":-76,"err":3210.1},"2":{"cell":[1,5],"flip":0,"dx":-10,"dy":-65,"err":3326.6},"3":{"cell":[3,7],"flip":1,"dx":4,"dy":-62,"err":4364.7},"4":{"cell":[6,7],"flip":0,"dx":-5,"dy":-19,"err":4886.3},"5":{"cell":[8,6],"flip":0,"dx":-28,"dy":-18,"err":3147.5},"6":{"cell":[9,2],"flip":0,"dx":-4,"dy":-19,"err":4175.2},"7":{"cell":[8,2],"flip":1,"dx":-52,"dy":-34,"err":3474.5},"8":{"cell":[6,0],"flip":1,"dx":-61,"dy":-41,"err":3972.5},"9":{"cell":[3,0],"flip":1,"dx":-51,"dy":-53,"err":4500.0},"10":{"cell":[1,0],"flip":1,"dx":-49,"dy":-66,"err":3117.7}}};
+const nm={S:"piasek",F:"las",M:"góry",W:"woda"};
+const cells=D.cells.map(c=>({i:c[0],j:c[1],t:c[2],x:c[3],y:c[4]}));
+const pool=cells.map(c=>c.t);
+const numAt={};Object.entries(D.piers).forEach(([n,p])=>numAt[p.cell.join(",")]=n);
+const origSym={...D.symat};let symat={...origSym};
+function randSym(){
+  const names=Object.values(origSym);
+  const idx=cells.map((c,k)=>k).filter(k=>!numAt[cells[k].i+","+cells[k].j]&&nb[k].every(b=>!numAt[cells[b].i+","+cells[b].j]));
+  for(let tries=0;tries<1000;tries++){
+    const f=idx.slice();
+    for(let k=f.length-1;k>0;k--){const m=Math.floor(rnd()*(k+1));[f[k],f[m]]=[f[m],f[k]]}
+    const pick=[];
+    for(const k of f){if(pick.length>=names.length)break;if(pick.every(p=>!nb[k].includes(p)))pick.push(k)}
+    if(pick.length===names.length){symat={};pick.forEach((k,n)=>symat[cells[k].i+","+cells[k].j]=names[n]);refreshAuto();draw();return}
+  }
+}
+function draw(){
+  const n={S:0,F:0,M:0,W:0};let a="",nums="",sy="",pr="";
+  cells.forEach(c=>{n[c.t]++;
+    a+=`<image href="${D.tiles[c.t]}" x="${c.x-45}" y="${c.y-50}" width="90" height="100"/>`;
+    const k=c.i+","+c.j;
+    if(numAt[k])nums+=`<circle cx="${c.x}" cy="${c.y}" r="14" fill="#fff" fill-opacity=".55"/><text x="${c.x}" y="${c.y+6}" font-size="17" font-weight="bold" text-anchor="middle" fill="#6b6050" fill-opacity=".9">${numAt[k]}</text>`;
+    const s=symat[k];
+    if(s){const b=D.syms[s].box;sy+=`<image href="${D.syms[s].src}" x="${c.x-45+b[0]}" y="${c.y-50+b[1]}" width="${b[2]-b[0]}" height="${b[3]-b[1]}"/>`}
+  });
+  Object.entries(D.piers).forEach(([k,p])=>{
+    const c=cells.find(c=>c.i===p.cell[0]&&c.j===p.cell[1]);const x=c.x+p.dx,y=c.y+p.dy,w=59,h=72;
+    pr+=p.flip?`<image href="${D.pier}" x="${-x-w}" y="${y}" width="${w}" height="${h}" transform="scale(-1,1)"/>`:`<image href="${D.pier}" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
+  });
+  document.getElementById("s").innerHTML=a+nums+sy+linesSvg()+pr+letSvg()+hitSvg();
+  document.getElementById("cnt").textContent=Object.keys(n).map(k=>nm[k]+": "+n[k]).join(" · ");
+}
+const nb=cells.map((c,a)=>cells.map((d,b)=>b!==a&&Math.hypot(c.x-d.x,c.y-d.y)<80?b:-1).filter(b=>b>=0));
+function shuffle(){
+  for(let k=pool.length-1;k>0;k--){const m=Math.floor(rnd()*(k+1));[pool[k],pool[m]]=[pool[m],pool[k]]}
+  const t=pool.slice();
+  const MAX=4;
+  const groups=()=>{const seen=new Array(t.length).fill(-1),gs=[];for(let s=0;s<t.length;s++){if(seen[s]>=0)continue;const g=[s];seen[s]=gs.length;for(let q=0;q<g.length;q++)for(const b of nb[g[q]])if(seen[b]<0&&t[b]===t[s]){seen[b]=gs.length;g.push(b)}gs.push(g)}return gs};
+  const pen=()=>groups().reduce((p,g)=>p+Math.max(0,g.length-MAX),0);
+  let p=pen();
+  for(let it=0;it<20000&&p>0;it++){
+    const big=groups().filter(g=>g.length>MAX);const g=big[rnd()*big.length|0];
+    const a=g[rnd()*g.length|0],b=rnd()*t.length|0;
+    if(t[a]===t[b])continue;
+    [t[a],t[b]]=[t[b],t[a]];const q=pen();
+    if(q>p)[t[a],t[b]]=[t[b],t[a]];else p=q;
+  }
+  cells.forEach((c,k)=>c.t=t[k]);newGame();draw();
+}
+const CARDS=[['S','Pustynia',8,'#c9a64a'],['F','Las',7,'#5f9a35'],['M','Góry',6,'#7d6f63'],['W','Woda',4,'#2f7fa8'],['*','Dowolny żywioł',2,'#8a5fa8']];
+document.getElementById('cards').innerHTML=CARDS.map(c=>`<div class="card" style="--cb:${c[3]}"><b>${c[1]}</b>${c[0]==='*'?'<div class="mix">'+['S','F','M','W'].map(k=>'<img src="'+D.tiles[k]+'" alt="">').join('')+'</div>':'<img src="'+D.tiles[c[0]]+'" alt="'+c[1]+'">'}<small>kart w talii: ${c[2]}</small></div>`).join('');
+let deck=[],discard=[],hand=null,sel=[],lines=[],turn=1,over=false,turnStart=new Set(),auto=new Set(),metas=[],bonus=0,claimOrder=[],forfeit=new Set(),goalRow=0,rnd=Math.random,curCode='',globalClaims={},blockedCards=new Set(),mineKept=new Set(),moveNo=0,claimMove={};
+const msg=t=>{document.getElementById('msg').textContent=t};
+const shuf=a=>{for(let k=a.length-1;k>0;k--){const m=Math.floor(rnd()*(k+1));[a[k],a[m]]=[a[m],a[k]]}};
+const freeMode=()=>document.getElementById('fm').checked;
+function cardHTML(code){const c=CARDS.find(x=>x[0]===code);return `<div class="card" style="--cb:${c[3]}"><b>${c[1]}</b>${code==='*'?'<div class="mix">'+['S','F','M','W'].map(k=>'<img src="'+D.tiles[k]+'" alt="">').join('')+'</div>':'<img src="'+D.tiles[code]+'" alt="'+c[1]+'">'}<small>karta terenu</small></div>`}
+function renderHand(){document.getElementById('hand').innerHTML=hand?hand.cards.map(cardHTML).join(''):'';document.getElementById('deckinfo').textContent='Tura '+turn+' · Kart w talii: '+deck.length+' · odrzucone: '+discard.length+(bonus?' · bonusowe ruchy: '+bonus:'')}
+function newGame(){moveNo=0;claimMove={};globalClaims={};blockedCards.clear();mineKept.clear();deck=[];CARDS.forEach(c=>{for(let i=0;i<c[2];i++)deck.push(c[0])});shuf(deck);discard=[];hand=null;sel=[];lines=[];metas=[];bonus=0;marks.clear();auto=new Set();claimOrder=[];forfeit.clear();goalRow=Math.floor(rnd()*5);renderRouteCards();renderSlots();turnStart=new Set();renderPanel();turn=1;over=false;document.getElementById('banner').textContent='';document.querySelectorAll('.pin').forEach(i=>i.value='');renderHand();msg('Nowa gra. Karta symbolu: połącz dwa elementy „'+['Obelisk','Książka','Tukan','Kot','Smok'][goalRow]+'” (+6). Kliknij „Losuj 2 karty”.')}
+function drawCards(){if(over){msg('Ta tura jest zakończona.');return}document.getElementById('banner').textContent='';if(hand)discard.push(...hand.cards);if(deck.length<2){hand=null;sel=[];renderHand();draw();endTurn();return}hand={cards:[deck.pop(),deck.pop()],used:false};moveNo++;sel=[];renderHand();draw();msg(deck.length<2?'To ostatnia para w tej turze. Zaznacz 2 pola na planszy.':'Zaznacz 2 pola na planszy, a kreska narysuje się sama.')}
+function connect(){
+  if(sel.length!==2){msg('Zaznacz dokładnie 2 pola.');return}
+  const [a,b]=sel;let usedHand=false,usedBonus=false;
+  if(lines.some(l=>(l[0]===a&&l[1]===b)||(l[0]===b&&l[1]===a))){msg('Te pola są już połączone.');return}
+  if(!freeMode()){
+    if(!nb[a].includes(b)){msg('Pola muszą się ze sobą stykać.');return}
+    if(cardsMatch(a,b)){hand.used=true;usedHand=true}
+    else if(bonus>0){bonus--;usedBonus=true}
+    else{msg(!hand?'Najpierw wylosuj karty.':hand.used?'W tej turze kreska już narysowana. Losuj kolejne karty.':'Zaznaczone pola nie pasują do wylosowanych kart.');return}
+  }
+  lines.push([a,b]);metas.push({h:usedHand,b:usedBonus,e:0});sel=[];
+  const before=claimOrder.slice(),gained=refreshAuto(),earned=gained.filter(g=>g%2===1&&g<10).length;bonus+=earned;metas[metas.length-1].e=earned;
+  renderHand();draw();
+  msg('Kreska narysowana.'+(usedBonus?' (bonusowy ruch)':'')+(gained.length?' Zaznaczono punkty automatycznie.':'')+(claimOrder.some(L=>!before.includes(L))?' Zdobywasz kartę: '+claimOrder.filter(L=>!before.includes(L)).map(L=>(L==='X'?'symbolu':L+L)+' (+'+ROUTEPTS[L]+')').join(', ')+'.':'')+(earned?' Drugi symbol tego typu połączony – masz bonusowy ruch: połącz dowolne 2 sąsiednie pola.':'')+(hand&&hand.used&&!bonus?' Losuj kolejne karty.':''));
+  if(hand&&hand.used&&deck.length<2&&bonus===0)endTurn()
+}
+function linesSvg(){return lines.map(([a,b])=>`<line x1="${cells[a].x}" y1="${cells[a].y}" x2="${cells[b].x}" y2="${cells[b].y}" stroke="#000" stroke-width="5" stroke-linecap="round"/>`).join('')}
+const cardsMatch=(a,b)=>{if(!hand||hand.used)return false;const [h1,h2]=hand.cards,ta=cells[a].t,tb=cells[b].t,m=(c,t)=>c==='*'||c===t;return (m(h1,ta)&&m(h2,tb))||(m(h1,tb)&&m(h2,ta))};
+const pairOK=(a,b)=>{if(a===b||!nb[a].includes(b)||lines.some(l=>(l[0]===a&&l[1]===b)||(l[0]===b&&l[1]===a)))return false;return cardsMatch(a,b)||bonus>0};
+const startCards=a=>{if(!hand||hand.used)return false;const [h1,h2]=hand.cards,t=cells[a].t;return h1==='*'||h2==='*'||h1===t||h2===t};
+const startOK=a=>bonus>0||startCards(a);
+const hint=k=>!freeMode()&&sel.length<2&&(bonus>0||(hand&&!hand.used))&&(sel.length===1?pairOK(sel[0],k):startOK(k));
+function hitSvg(){return cells.map((c,k)=>(!sel.includes(k)&&hint(k)?`<circle cx="${c.x}" cy="${c.y}" r="31" fill="none" stroke="#fff" stroke-width="2.5" stroke-dasharray="5 4"/>`:'')+(sel.includes(k)?`<circle cx="${c.x}" cy="${c.y}" r="36" fill="rgba(255,220,0,.25)" stroke="#ffd400" stroke-width="4"/>`:'')+`<circle data-k="${k}" cx="${c.x}" cy="${c.y}" r="34" fill="transparent" style="cursor:pointer"/>`).join('')}
+document.getElementById('s').addEventListener('click',e=>{
+  const k=e.target.dataset&&e.target.dataset.k;if(k===undefined)return;
+  const i=+k,p=sel.indexOf(i);
+  if(over){msg('Ta tura jest zakończona.');return}
+  if(p>=0){sel.splice(p,1);draw();return}
+  if(!freeMode()){
+    if(!((hand&&!hand.used)||bonus>0)){msg(!hand?'Najpierw wylosuj karty.':'W tej turze kreska już narysowana. Losuj kolejne karty.');return}
+    if(sel.length===2)sel=[];
+    if(sel.length===1&&!pairOK(sel[0],i)){if(startOK(i)){sel=[i];draw();return}msg('To pole nie pasuje do wylosowanych kart.');return}
+    if(sel.length===0&&!startOK(i)){msg('To pole nie pasuje do wylosowanych kart.');return}
+  }else if(sel.length>=2)sel.shift();
+  sel.push(i);
+  if(sel.length===2){connect();draw();return}
+  draw();
+  if(!freeMode()&&sel.length===1&&!nb[i].some(b=>pairOK(i,b)))msg('To pole nie ma teraz sąsiada pasującego do drugiej karty.');
+});
+const marks=new Set();
+const PF=[];[73,116,159,202,243].forEach(y=>{PF.push(['c',87,y,14]);PF.push(['r',119,y-16,67,32])});
+[[[145,180],212,328],[[40,72],100,365],[[145,180],212,365],[[40,72],100,400],[[145,180],212,400]].forEach(([xs,n,y])=>{xs.forEach(x=>PF.push(['c',x,y,15]));PF.push(['c',n,y,15])});
+
+function renderPanel(){document.getElementById('ps').innerHTML=PF.map((f,k)=>{const on=marks.has(k)||auto.has(k);const st=`data-p="${k}" fill="${on?'rgba(0,0,0,.08)':'transparent'}" stroke="${on?'#000':'none'}" stroke-width="3.5" style="cursor:pointer"`;return f[0]==='c'?`<circle cx="${f[1]}" cy="${f[2]}" r="${f[3]+1}" ${st}/>`:`<rect x="${f[1]}" y="${f[2]}" width="${f[3]}" height="${f[4]}" rx="7" ${st}/>`}).join('')}
+document.getElementById('ps').addEventListener('click',e=>{const k=e.target.dataset&&e.target.dataset.p;if(k===undefined)return;const i=+k;if(auto.has(i)){msg('To pole zaznaczyło się samo po połączeniu symbolu z wyspą.');return}marks.has(i)?marks.delete(i):marks.add(i);renderPanel()});
+const ROUTEPTS={A:3,B:4,C:5,D:6,E:7,X:6};
+function cardClaimLabel(L,on,f){const g=globalClaims[L],inactive=!!(g&&Number(g.turn)<moveNo&&!on&&!mineKept.has(L)),shared=!!(g&&Number(g.turn)===moveNo&&!on);return {inactive,shared,label:inactive?`nieaktywna · zdobyta w ruchu ${g.turn}`:(f?'oddana · kliknij, by przywrócić':(on?'✓ zdobyta':(shared?'zdobyta w tym ruchu · nadal aktywna':'wolna')))}}
+function renderRouteCards(){document.getElementById('rcards').innerHTML=['A','B','C','D','E'].map(L=>{const on=claimOrder.includes(L),f=forfeit.has(L),st=cardClaimLabel(L,on,f);return `<div class="card rc${on?' got':''}${f?' forf':''}${st.inactive?' inactive':''}" data-l="${L}" style="--cb:#2f7fa8"><b>Trasa</b><div class="pair"><span class="rl">${L}</span><span class="rl">${L}</span></div><div class="pts">${ROUTEPTS[L]} pkt</div><small>${st.label}</small></div>`}).join('')+goalCard()}
+function goalCard(){const gname=['Obelisk','Książka','Tukan','Kot','Smok'][goalRow],img=D.syms[['obelisk','book','toucan','cat','monster'][goalRow]].src,on=claimOrder.includes('X'),f=forfeit.has('X'),st=cardClaimLabel('X',on,f);return `<div class="card rc${on?' got':''}${f?' forf':''}${st.inactive?' inactive':''}" data-l="X" style="--cb:#c9a02f"><b>Karta symbolu</b><img src="${img}" style="height:62px;width:auto" alt="${gname}"><div class="pts">6 pkt</div><small>${st.label==='wolna'?'połącz 2: '+gname:st.label}</small></div>`}
+function renderSlots(){for(let i=0;i<6;i++){const el=document.getElementById('s'+i),L=claimOrder[i];el.value=L?ROUTEPTS[L]:'';el.classList.toggle('on',!!L);el.title=L?(L==='X'?'Karta symbolu':'Trasa '+L+L)+' – kliknij, aby odjąć punkty':''}}
+const VAL={0:1,1:2,2:2,3:2,4:2,5:3,6:3,7:4,8:4,9:5};
+const BLUEVAL={12:12,15:14,18:11,21:13,24:10};
+function routeScore(){let t=0;allMarks().forEach(k=>{if(BLUEVAL[k])t+=BLUEVAL[k]});return t}
+const ROW={obelisk:0,door:1,book:1,toucan:2,cat:3,monster:4};
+const allMarks=()=>new Set([...marks,...auto]);
+function refreshAuto(){
+  const old=auto,adj={};
+  lines.forEach(([a,b])=>{(adj[a]=adj[a]||[]).push(b);(adj[b]=adj[b]||[]).push(a)});
+  const isl=k=>!!numAt[cells[k].i+','+cells[k].j];
+  const cnt=[0,0,0,0,0];
+  cells.forEach((c,k)=>{const s=symat[c.i+','+c.j];if(!s)return;const seen=new Set([k]),q=[k];let ok=false;
+    while(q.length){const x=q.pop();if(isl(x)){ok=true;break}(adj[x]||[]).forEach(y=>{if(!seen.has(y)){seen.add(y);q.push(y)}})}
+    if(ok)cnt[ROW[s]]++});
+  auto=new Set();cnt.forEach((n,r)=>{if(n>=1)auto.add(2*r);if(n>=2)auto.add(2*r+1)});
+  const LG={A:[13,14,15],B:[19,20,21],C:[10,11,12],D:[16,17,18],E:[22,23,24]},pc={},conn=[];
+  Object.entries(D.piers).forEach(([n,p])=>{const L=letters[n];if(L)(pc[L]=pc[L]||[]).push(cells.findIndex(c=>c.i===p.cell[0]&&c.j===p.cell[1]))});
+  for(const L in pc){if(pc[L].length<2)continue;const [s0,t0]=pc[L],seen=new Set([s0]),q=[s0];let ok=false;
+    while(q.length){const x=q.pop();if(x===t0){ok=true;break}(adj[x]||[]).forEach(y=>{if(!seen.has(y)){seen.add(y);q.push(y)}})}
+    if(ok){conn.push(L);LG[L].forEach(k=>auto.add(k))}}
+  const gc=[];cells.forEach((c,k)=>{const sy=symat[c.i+','+c.j];if(sy&&ROW[sy]===goalRow)gc.push(k)});
+  if(gc.length>=2){const seen=new Set([gc[0]]),q=[gc[0]];let ok=false;while(q.length){const x=q.pop();if(x===gc[1]){ok=true;break}(adj[x]||[]).forEach(y=>{if(!seen.has(y)){seen.add(y);q.push(y)}})}if(ok)conn.push('X')}
+  {blockedCards=new Set(Object.keys(globalClaims).filter(L=>Number((globalClaims[L]||{}).turn)<moveNo));[...mineKept].forEach(L=>{if(!conn.includes(L))mineKept.delete(L)});const cc=conn.filter(L=>!forfeit.has(L)&&(!blockedCards.has(L)||mineKept.has(L)));cc.forEach(L=>mineKept.add(L));claimOrder=claimOrder.filter(L=>cc.includes(L)).concat(cc.filter(L=>!claimOrder.includes(L)));Object.keys(claimMove).forEach(L=>{if(!claimOrder.includes(L))delete claimMove[L]});claimOrder.forEach(L=>{if(!claimMove[L])claimMove[L]=moveNo})}renderRouteCards();renderSlots();
+  renderPanel();return [...auto].filter(k=>!old.has(k));
+}
+function turnScore(){let t=0;allMarks().forEach(k=>{if(!turnStart.has(k)&&VAL[k])t+=VAL[k]});return t}
+function endTurn(){
+  const own=turnScore(),sc=turn===1?own:own+(+document.getElementById('p1').value||0);
+  document.getElementById(turn===1?'p1':'p2').value=sc;
+  document.getElementById('banner').textContent='Koniec '+turn+' tury · '+(turn===1?'wynik: ':'suma tur 1 i 2: ')+sc;
+  if(turn===1){nextTurn();msg('Wynik tury 1 ('+sc+') wpisany w polu „I”. Rozpoczęła się tura 2. Losuj karty.')}
+  else{over=true;const rs=routeScore();document.getElementById('p3').value=rs;const cs=claimOrder.reduce((t,L)=>t+ROUTEPTS[L],0);document.getElementById('p5').value=cs;const tot=(+document.getElementById('p1').value||0)+sc+rs+cs;document.getElementById('p4').value=tot;msg('Suma punktów z tur 1 i 2 ('+sc+') wpisana w polu „II”. Punkty za trasy ('+rs+') wpisane w niebieskim polu pod „II”. Punkty z kart tras ('+cs+') wpisane w żółtym polu. Suma końcowa I + II + trasy + karty ('+tot+') w polu „=”. Koniec gry.')}
+}
+function nextTurn(){turn=2;over=false;deck=[];CARDS.forEach(c=>{for(let i=0;i<c[2];i++)deck.push(c[0])});shuf(deck);discard=[];hand=null;sel=[];turnStart=allMarks();refreshAuto();renderHand();draw()}
+let letters={};
+function randLetters(){
+  const base=['A','A','B','B','C','C','D','D','E','E'];
+  for(let t=0;t<20000;t++){
+    shuf(base);const pos={};base.forEach((l,i)=>{(pos[l]=pos[l]||[]).push(i)});
+    let ok=true;for(const l in pos){const d=Math.abs(pos[l][0]-pos[l][1]);if(Math.min(d,10-d)<3){ok=false;break}}
+    if(ok){letters={};base.forEach((l,i)=>letters[i+1]=l);refreshAuto();draw();return}
+  }
+}
+function letSvg(){return Object.entries(D.piers).map(([n,p])=>{const L=letters[n];if(!L)return'';const c=cells.find(c=>c.i===p.cell[0]&&c.j===p.cell[1]);const x=c.x+p.dx+(p.flip?20:39),y=c.y+p.dy+29;return `<circle cx="${x}" cy="${y}" r="11" fill="#3b9fd6" stroke="#000" stroke-width="1.8"/><text x="${x}" y="${y+5.5}" font-size="15" font-weight="900" text-anchor="middle" fill="#000">${L}</text>`}).join('')}
+document.getElementById('rl').onclick=randLetters;
+const poolBase=pool.slice();
+function xmur(str){let h=1779033703^str.length;for(let i=0;i<str.length;i++){h=Math.imul(h^str.charCodeAt(i),3432918353);h=h<<13|h>>>19}return function(){h=Math.imul(h^h>>>16,2246822507);h=Math.imul(h^h>>>13,3266489909);return(h^=h>>>16)>>>0}}
+function mulberry(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function randCode(){return String(1000+Math.floor(Math.random()*9000))}
+function setCode(c){curCode=c;document.getElementById('code').textContent=c||'— własny układ (bez kodu)'}
+function unseed(){rnd=Math.random;setCode('')}
+function startGame(code){
+  code=String(code||'').trim().toUpperCase().slice(0,8)||randCode();
+  rnd=mulberry(xmur('isla-'+code)());
+  pool.splice(0,pool.length,...poolBase);
+  shuffle();randLetters();randSym();
+  setCode(code);document.getElementById('ci').value=code;
+}
+for(let i=0;i<6;i++)document.getElementById('s'+i).addEventListener('click',()=>{const L=claimOrder[i];if(!L)return;forfeit.add(L);refreshAuto();msg('Odjęto punkty za kartę '+(L==='X'?'symbolu':L+L)+'. Kliknij tę kartę, aby je przywrócić.')});
+document.getElementById('rcards').addEventListener('click',e=>{const c=e.target.closest('.card'),L=c&&c.dataset.l;if(L&&forfeit.has(L)){forfeit.delete(L);refreshAuto();msg('Przywrócono punkty za kartę '+(L==='X'?'symbolu':L+L)+'.')}});
+document.getElementById('dr').onclick=drawCards;
+document.getElementById('nw').onclick=()=>startGame(curCode||randCode());
+document.getElementById("b").onclick=shuffle;
+document.getElementById("rs").onclick=randSym;
+document.getElementById("rr").onclick=()=>{symat={...origSym};refreshAuto();draw()};
+const un=f=>()=>{unseed();f()};
+document.getElementById('b').onclick=un(shuffle);
+document.getElementById('rs').onclick=un(randSym);
+document.getElementById('rl').onclick=un(randLetters);
+document.getElementById('rr').onclick=()=>{unseed();symat={...origSym};refreshAuto();draw()};
+document.getElementById('cj').onclick=()=>{const v=document.getElementById('ci').value.trim();if(!v){msg('Wpisz kod partii.');return}startGame(v)};
+document.getElementById('cnew').onclick=()=>startGame(randCode());
+startGame(randCode());
+</script><script>
+/* ===== most do pokoi online (rodzic: strona z pokojami) ===== */
+(function(){
+  const post=o=>{try{parent.postMessage(Object.assign({isla:1},o),'*')}catch(e){}};
+  const LOCKED=['b','rs','rr','rl','nw','cj','cnew'];
+  function live(){
+    try{
+      const g=id=>+document.getElementById(id).value||0;
+      if(over)return g('p4');
+      return (turn===1?0:g('p1'))+turnScore()+routeScore()+claimOrder.reduce((t,L)=>t+ROUTEPTS[L],0);
+    }catch(e){return 0}
+  }
+  function snap(){return {turn:turn,over:!!over,live:live(),lines:lines.length,deck:deck.length,claims:claimOrder.slice(),cm:Object.assign({},claimMove),move:moveNo,ready:!!(over||(hand&&hand.used&&bonus===0)||(turn===2&&!hand))}}
+  let roomLocked=false,isHost=false,canDraw=true;
+  function lock(on,label,host,allowed){
+    roomLocked=!!on;isHost=!!host;canDraw=!!allowed;
+    LOCKED.forEach(id=>{const e=document.getElementById(id);if(e)e.disabled=roomLocked});
+    const dr=document.getElementById('dr');if(dr)dr.disabled=roomLocked&&(!isHost||!canDraw);
+    document.getElementById('roomline').textContent=on?(label||'Tryb pokoju: host losuje wspólne karty.') :'';
+  }
+  let last='';
+  setInterval(()=>{const s=snap(),j=JSON.stringify(s);if(j!==last){last=j;post({type:'state',s:s})}},500);
+  document.getElementById('dr').onclick=()=>{
+    if(roomLocked){if(!isHost||!canDraw)return;drawCards();post({type:'draw'});}
+    else drawCards();
+  };
+  addEventListener('message',e=>{
+    if(e.source!==parent)return;
+    const d=e.data;if(!d||!d.islaCmd)return;
+    if(d.cmd==='start'){startGame(String(d.seed||'').toUpperCase());last='';}
+    else if(d.cmd==='draw'){drawCards();last='';}
+    else if(d.cmd==='lock')lock(true,d.label,d.host,d.canDraw);
+    else if(d.cmd==='claims'){globalClaims=d.claims||{};refreshAuto();renderHand();draw();}
+    else if(d.cmd==='unlock'){lock(false);globalClaims={};blockedCards.clear();mineKept.clear();refreshAuto();draw();}
+  });
+  post({type:'ready'});
+})();
+</script>
+<script>
+/* ===== ekran startowy (styl Monopoly) ===== */
+(function(){
+  var st=document.getElementById('tkStart');if(!st)return;
+  var logo=document.getElementById('tkLogo');
+  'TUKAN'.split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i);b.textContent=c;logo.appendChild(b)});
+  var bg=document.getElementById('tkBg'),em=['🦜','🌴','🥥','🍍','🌺','🏝️','🦜','🍌','🌴','🥭','🌺','🥥'];
+  em.forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)});
+  function hide(){if(st.classList.contains('out'))return;st.classList.add('out');setTimeout(function(){st.style.display='none'},500)}
+  window.tukanStartHide=hide;
+  document.getElementById('tkSolo').onclick=hide;
+  var inFrame=false;try{inFrame=parent!==window}catch(e){inFrame=true}
+  var ob=document.getElementById('tkOnline');
+  if(!inFrame){ob.disabled=true;document.getElementById('tkNote').textContent='Pokoje online działają po wgraniu gry na hosting z Firebase.'}
+  ob.onclick=function(){try{parent.postMessage({isla:1,type:'lobby'},'*')}catch(e){}hide()};
+  /* gdy rodzic włączy tryb pokoju / wystartuje partię – schowaj ekran startowy */
+  addEventListener('message',function(e){if(e.source!==parent)return;var d=e.data;if(d&&d.islaCmd&&(d.cmd==='lock'||d.cmd==='start'))hide()});
+})();
+</script>
+</body></html>

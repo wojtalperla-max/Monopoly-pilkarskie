@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Podbój – gra z kostką</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@500;600;700&display=swap"><link rel="stylesheet" href="pod.css">
+</head>
+<body>
+<h1>🗺️ Podbój</h1>
+
+<div id="setup" class="card">
+  <div class="pd-bg" aria-hidden="true" id="pdBg"></div>
+  <div class="pd-wrap">
+    <div class="pd-logo" role="img" aria-label="Podbój" id="pdLogo"></div>
+    <div class="pd-tiles" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+    <p class="pd-sub">Rzuć kostką. Zajmij mapę. Przejmij strefy.</p>
+    <div class="pd-main">
+      <button type="button" id="pdOnlineBtn" class="pd-btn pd-gold"><span class="pd-ic">🌐</span><span>Multiplayer online</span></button>
+      <button type="button" id="pdBotsBtn" class="pd-btn pd-white"><span class="pd-ic">🤖</span><span>Gra z botami</span></button>
+      <button type="button" id="pdLocalBtn" class="pd-btn pd-white"><span class="pd-ic">👥</span><span>Kilku graczy na jednym ekranie</span></button>
+      <button type="button" id="pdRulesBtn" class="pd-btn pd-ghost"><span class="pd-ic">📜</span><span>Jak grać?</span></button>
+    </div>
+    <div id="pdBots" class="pd-pane"><h3>Ilu przeciwników?</h3>
+      <div class="pd-lvl"><label for="bdiff">Poziom botów:</label><select id="bdiff" class="pd-select"><option value="0">Łatwy</option><option value="1" selected>Normalny</option><option value="2">Trudny</option><option value="3">Ekstremalny</option></select></div>
+      <div class="pd-nums">
+        <button type="button" class="pd-num" onclick="startBots(1)"><span>🤖</span><b>1</b><small>bot</small></button>
+        <button type="button" class="pd-num" onclick="startBots(2)"><span>🤖</span><b>2</b><small>boty</small></button>
+        <button type="button" class="pd-num" onclick="startBots(3)"><span>🤖</span><b>3</b><small>boty</small></button>
+      </div></div>
+    <div id="pdLocal" class="pd-pane"><h3>Ilu graczy?</h3>
+      <div class="pd-nums">
+        <button type="button" class="pd-num" onclick="start(2)"><span>🚩</span><b>2</b><small>graczy</small></button>
+        <button type="button" class="pd-num" onclick="start(3)"><span>🚩</span><b>3</b><small>graczy</small></button>
+        <button type="button" class="pd-num" onclick="start(4)"><span>🚩</span><b>4</b><small>graczy</small></button>
+      </div></div>
+    <div id="pdRules" class="pd-pane"><h3>Zasady</h3><p>Mapa jest podzielona na regiony. Rzucasz kostką i przejmujesz tyle pól, ile wypadnie – każde nowe pole musi sąsiadować z Twoim terytorium. Każda strefa, w której masz choć jeden kafelek, daje Ci punkt (STREFY). Wygrywa ten, kto ma najwięcej stref – przy remisie decyduje liczba pól. Na planszy leżą monety 🪙 (zbierasz je, zajmując pole); w sklepie kupisz działo 🔫 i postawisz je na swoim polu.</p></div>
+    <label class="pd-test"><input type="checkbox" id="tmode"> 🧪 Tryb testowy</label>
+  </div>
+</div>
+
+<div id="game" class="hide" style="width:100%;max-width:820px;display:flex;flex-direction:column;gap:12px">
+  <div class="card" id="hud">
+    <div id="players"></div>
+    <button id='tmodeBtn' onclick='toggleTest()' style='background:var(--muted)'>🧪 Tryb: zwykły</button>
+    <button id="newGameBtn" onclick="location.reload()" style="background:var(--muted)">Nowa gra</button>
+  </div>
+  <div id='tabs'><button id='tabMap' class='on' onclick="setTab('map')">🗺️ Mapa</button><button id='tabShop' onclick="setTab('shop')">🛒 Sklep</button></div>
+  <div class="card" id="ctrl">
+    <button id="roll" onclick="roll()">🎲 Rzuć kostką</button>
+    <div id="die">⚀</div>
+    <div id="msg"></div>
+    <button id="skip" onclick="endTurn()" disabled>Zakończ turę</button>
+    <button id="cancelAim" class="hide" onclick="cancelAim(true)" style="background:var(--muted)">Anuluj celowanie</button>
+  </div>
+  <div class="card" id="shop">
+    <div class='head'><b>🛒 Sklep</b><span id="wal"></span></div>
+    <div class='item'>
+      <div class='ico' id='icoC'></div>
+      <div class='info'><b>Działo</b><div>Strzela w linii: zasięg 3, niszczy 1 blok. Raz na turę.</div></div>
+      <div class='act'><button id="buy" onclick="buy()">Kup działo (5 🪙)</button></div>
+    </div>
+    <div class='item'>
+      <div class='ico'>🛡️</div>
+      <div class='info'><b>Ochrona pól</b><div>Kup pakiet 10 osłon za 15 🪙. Następnie kliknij 10 swoich pól, aby zabezpieczyć je przed działami i katapultami przeciwników.</div></div>
+      <div class='act'><button id="buyS" onclick="buyShield()">Kup ochronę (15 🪙)</button></div>
+    </div>
+    <div class='item'>
+      <div class='ico'>⚡</div>
+      <div class='info'><b>Generator</b><div>Daje 2 🪙 na początku Twojej tury. Niszczy się razem z polem.</div></div>
+      <div class='act'><button id="buyG" onclick="buyGen()">Kup generator (6 🪙)</button></div>
+    </div>
+    <div class='item'>
+      <div class='ico' id='icoK'></div>
+      <div class='info'><b>Katapulta</b><div>Naciągana procą, zasięg do 12 pól. Przejmuje pole i 4 dookoła, niszcząc struktury przeciwnika.</div></div>
+      <div class='act'><button id="buyK" onclick="buyCat()">Kup katapultę (12 🪙)</button></div>
+    </div>
+    <div class='note'><b>Ulepszenia</b> kupujesz w menu jednostki (kliknij ją na mapie):
+      <ul>
+        <li>🔫 zasięg +1: 5 🪙 (maks. 4 poziomy)</li>
+        <li>🔫 niszczone bloki 2: 5 🪙</li>
+        <li>🪨 zasięg 15: 6 🪙</li>
+        <li>⚡ przychód 3 🪙 na turę: 10 🪙</li>
+      </ul>
+    </div>
+  </div>
+  <div class='card hide' id='tpanel'>
+    <b>🧪 Tryb testowy</b>
+    <div class='trow'>
+      <label>Gracz: <select id='tplayer'></select></label>
+      <label>Narzędzie: <select id='ttool'>
+        <option value=''>— brak (gra normalna) —</option>
+        <option value='own'>Zajmij pole</option>
+        <option value='free'>Wyczyść pole</option>
+        <option value='cannon'>Postaw działo</option>
+        <option value='gen'>Postaw generator</option>
+        <option value='cat'>Postaw katapultę</option>
+        <option value='coin'>Przełącz monetę na polu</option>
+        <option value='pot'>Przełącz garnek na polu</option>
+      </select></label>
+    </div>
+    <div class='trow'>
+      <label>Monety: <input id='tcoins' type='number' value='10' style='width:80px'></label>
+      <button onclick='testCoins(true)'>Dodaj</button>
+      <button onclick='testCoins(false)'>Ustaw</button>
+      <button onclick='testTurn()'>Daj turę graczowi</button>
+      <button onclick='testPot()'>Zrzuć garnek</button>
+    </div>
+  </div>
+  <div id='wrap'><div id='bw'><div id='board'></div><svg id='ov'></svg></div></div>
+  <div class="card hide" id="end"></div>
+</div>
+
+<div id='menu' class='hide' onclick="if(event.target===this)closeMenu()"><div class='card' id='mbox'><h3 id='mtitle'>🔫 Działo</h3><div id='mst'></div><div id='mnote' style='color:var(--muted);margin-top:4px'></div><div class='mrow'><button id='mfire' onclick='startAim(menuI)'>🎯 Strzelaj</button><button id='mup' onclick='upgrade()'>⬆️ Ulepsz</button><button id='mrng' onclick='upgradeRange()'>🔭 Zasięg</button><button id='mku' onclick='upgradeKG()'>⬆️ Ulepsz</button><button onclick='closeMenu()' style='background:var(--muted)'>Zamknij</button></div></div></div>
+<script>
+const W=25,H=25;let NAMES=["Czerwony","Niebieski","Zielony","Żółty"];
+const DEFAULT_COLORS=["#e63946","#2a7de1","#2a9d4f","#f0a202"];
+let PLAYER_COLORS=DEFAULT_COLORS.slice();
+const COL=PLAYER_COLORS;
+function setPlayerColors(input){
+  if(!Array.isArray(input))return;
+  PLAYER_COLORS=Array.from({length:Math.max(N||0,input.length)},(_,i)=>{
+    const raw=input[i];const value=typeof raw==='string'?raw:(raw&&typeof raw==='object'?(raw.color||raw.hex||raw.profileColor):null);
+    return typeof value==='string'&&CSS.supports('color',value)?value:DEFAULT_COLORS[i%DEFAULT_COLORS.length];
+  });
+  for(let i=0;i<PLAYER_COLORS.length;i++)document.documentElement.style.setProperty('--player'+i,PLAYER_COLORS[i]);
+}
+const FACES="⚀⚁⚂⚃⚄⚅";
+let N,owner,region,cur,left,rolled,over,cells=[],coin,cannon,cat,kstock,klv,glv,cpow,crange,gen,gstock,gBought,wallet,stock,shield,shieldStock,placeMode=false;
+const PRICE=5,UPG=5,GENP=6,CATP=12,KUP=6,GUP=10,CRMAX=4,PULL=4,RANGE=3;
+const COIN="media/e66d73fa49.png";
+const IMGC="media/ef5cda8396.png";
+const IMGK="media/42aa1fcd81.png";
+const UC="<img class='uimg' src='"+IMGC+"' alt='działo'>",UK="<img class='uimg' src='"+IMGK+"' alt='katapulta'>";
+const IMGP="media/c10dee179b.png";
+const UP="<img class='uimg' src='"+IMGP+"' alt='garnek'>";
+const CI="<img class='cimg' src='"+COIN+"' alt='moneta'>";
+const POTEVERY=5,POTCOINS=5;
+let test=false,pot,rounds=0,note="",aim=null,ignoreClick=false,fired=new Set(),fx=new Set(),menuI=-1;
+const $=id=>document.getElementById(id);
+const idx=(x,y)=>y*W+x;
+function nb8(i){const x=i%W,y=(i/W)|0,r=[];for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const a=x+dx,b=y+dy;if(a>=0&&b>=0&&a<W&&b<H)r.push(idx(a,b))}return r}
+function nb(i){const x=i%W,y=(i/W)|0,r=[];if(x>0)r.push(i-1);if(x<W-1)r.push(i+1);if(y>0)r.push(i-W);if(y<H-1)r.push(i+W);return r}
+
+
+let podOnline=false,podSeat=-1,podRemoteApplying=false,podPublishOnce=false,podStarted=false;
+let podHostBots=false,podBotSeats=[],podBotLevel=1,podActorOverride=null;
+let podAccountName='',podAccountColor='';
+function podCanAct(){return !podOnline||cur===podSeat||(podHostBots&&podBotSeats.includes(cur))}
+function podMarkAction(){if(podOnline&&podCanAct())podPublishOnce=true}
+function podSnapshot(){return {N,names:NAMES.slice(0,N),colors:PLAYER_COLORS.slice(0,N),region,owner,cur,left,rolled,over,coin,cannon,cat,kstock,klv,glv,cpow,crange,gen,gstock,gBought,wallet,stock,shield,shieldStock,placeMode,rounds,note,pot,fired:[...fired],die:$('die').textContent,actor:podActorOverride==null?cur:podActorOverride}}
+function podSendState(){if(!podOnline||podRemoteApplying||!owner)return;try{parent.postMessage({podboj:1,type:'state',s:podSnapshot()},'*')}catch(e){}finally{podActorOverride=null}}
+function podPublish(){if(!podOnline||podRemoteApplying||!podPublishOnce)return;podPublishOnce=false;podSendState()}
+function podApplyState(s){
+  if(!s||!Array.isArray(s.owner)||!Array.isArray(s.region))return;
+  podRemoteApplying=true;
+  try{
+    N=Number(s.N)||2;NAMES=(Array.isArray(s.names)?s.names:NAMES).slice(0,N);setPlayerColors(s.colors);
+    $('setup').classList.add('hide');$('game').classList.remove('hide');
+    $('tplayer').innerHTML=NAMES.map((nm,k)=>`<option value="${k}">${nm}</option>`).join('');
+    $('tmodeBtn').classList.add('hide');$('tpanel').classList.add('hide');$('newGameBtn').classList.add('hide');
+    const board=$('board');board.style.gridTemplateColumns=`repeat(${W},1fr)`;
+    if(!cells.length){board.innerHTML='';for(let i=0;i<W*H;i++){const d=document.createElement('div');d.className='c';d.onclick=()=>claim(i);board.appendChild(d);cells.push(d)}}
+    region=s.region.slice();owner=s.owner.slice();cur=Number(s.cur)||0;left=Number(s.left)||0;rolled=!!s.rolled;over=!!s.over;
+    coin=(s.coin||[]).slice();cannon=(s.cannon||[]).slice();cat=(s.cat||[]).slice();shield=(s.shield||Array(W*H).fill(false)).slice();shieldStock=(s.shieldStock||Array(N).fill(0)).slice();kstock=(s.kstock||[]).slice();klv=(s.klv||[]).slice();glv=(s.glv||[]).slice();cpow=(s.cpow||[]).slice();crange=(s.crange||[]).slice();gen=(s.gen||[]).slice();gstock=(s.gstock||[]).slice();gBought=(s.gBought||Array(N).fill(0)).slice();wallet=(s.wallet||[]).slice();stock=(s.stock||[]).slice();
+    placeMode=s.placeMode||false;rounds=Number(s.rounds)||0;note=String(s.note||'');pot=(s.pot||[]).slice();fired=new Set(s.fired||[]);fx=new Set();aim=null;menuI=-1;closeMenu();cancelAim();
+    $('die').textContent=s.die||'⚀';setTab('map');
+    if(over){render();finish()}else{$('end').classList.add('hide');render()}
+  }catch(e){console.error('Nie udało się odtworzyć Podboju:',e)}
+  finally{podRemoteApplying=false}
+}
+window.addEventListener('message',e=>{
+  const d=e.data;if(!d||d.podboj!==1)return;
+  if(d.cmd==='account'){
+    podAccountName=String(d.name||'').replace(/[<>&]/g,'').trim().slice(0,14);
+    podAccountColor=typeof d.color==='string'&&/^#[0-9a-f]{6}$/i.test(d.color)?d.color:'';
+    // Jeżeli dane konta dotrą już po uruchomieniu botów, zaktualizuj też aktywną planszę.
+    if(typeof BOT!=='undefined'&&BOT.length&&N>0){
+      NAMES[0]=podAccountName||'Ty';
+      const botColors=DEFAULT_COLORS.filter(c=>c.toLowerCase()!==(podAccountColor||DEFAULT_COLORS[0]).toLowerCase());
+      setPlayerColors([podAccountColor||DEFAULT_COLORS[0],...botColors].slice(0,N));
+      render();
+    }
+    return;
+  }
+  if(d.cmd==='start'){
+    podOnline=true;podSeat=Number(d.seat);podHostBots=!!d.hostBots;podBotSeats=Array.isArray(d.botSeats)?d.botSeats.map(Number):[];podBotLevel=Number(d.botLevel)||1;BOT=Array.from({length:Number(d.n)||d.names.length},(_,i)=>podHostBots&&podBotSeats.includes(i));BL=podBotLevel;podStarted=true;NAMES=(d.names||NAMES).slice();setPlayerColors(d.colors||d.playerColors||d.players?.map(p=>p.color||p.profileColor));
+    start(Number(d.n)||d.names.length);
+    $('tmodeBtn').classList.add('hide');$('tpanel').classList.add('hide');$('newGameBtn').classList.add('hide');
+    if(d.emit)podSendState();
+  }else if(d.cmd==='apply'){
+    podOnline=true;if(Number.isInteger(Number(d.seat)))podSeat=Number(d.seat);if('hostBots'in d)podHostBots=!!d.hostBots;if(Array.isArray(d.botSeats))podBotSeats=d.botSeats.map(Number);if(d.botLevel!=null){podBotLevel=Number(d.botLevel)||1;BL=podBotLevel}BOT=Array.from({length:N||4},(_,i)=>podHostBots&&podBotSeats.includes(i));
+    if(!podStarted&&d.state){podStarted=true;NAMES=(d.state.names||NAMES).slice();setPlayerColors(d.state.colors);start(Number(d.state.N)||NAMES.length);$('tmodeBtn').classList.add('hide');$('tpanel').classList.add('hide');$('newGameBtn').classList.add('hide')}
+    podApplyState(d.state);
+  }
+});
+window.addEventListener('load',()=>{try{parent.postMessage({podboj:1,type:'ready'},'*')}catch(e){}});
+
+/* ===== TRYB OFFLINE Z BOTAMI ===== */
+let BOT=[],botTok=0,BL=1,botLog=[];
+function startBots(nb){
+  BL=+$('bdiff').value;BOT=[false];
+  NAMES=[podAccountName||'Ty','Bot Alfa','Bot Beta','Bot Gamma'].slice(0,nb+1);
+  const humanColor=podAccountColor||DEFAULT_COLORS[0];
+  const botColors=DEFAULT_COLORS.filter(c=>c.toLowerCase()!==humanColor.toLowerCase());
+  setPlayerColors([humanColor,...botColors].slice(0,nb+1));
+  for(let k=0;k<nb;k++)BOT.push(true);
+  $('tmode').checked=false;
+  start(nb+1);
+  $('tmodeBtn').classList.add('hide');$('tpanel').classList.add('hide');
+}
+['click','pointerdown'].forEach(ev=>window.addEventListener(ev,e=>{
+  if(podOnline||!BOT[cur]||over)return;
+  const t=e.target;
+  if(t&&t.closest&&t.closest('#board,#roll,#skip,#shop button,#mbox,#menu,#cancelAim')){e.stopPropagation();e.preventDefault()}
+},true));
+const bwait=(ms,t,f)=>setTimeout(()=>{if(t===botTok&&!over)f()},ms);
+function botCounts(){const rc=Array.from({length:N},()=>({}));owner.forEach((o,i)=>{if(o>=0)rc[o][region[i]]=(rc[o][region[i]]||0)+1});return rc}
+function botMyRegions(){const s=new Set();owner.forEach((o,i)=>{if(o===cur)s.add(region[i])});return s}
+function botCount(arr){let n=0;owner.forEach((o,i)=>{if(o===cur&&arr[i])n++});return n}
+function botTurn(t){
+  if(t!==botTok||over||!BOT[cur]||rolled)return;
+  // Bot wykonuje ruch wyłącznie na hoście; jeśli synchronizacja tury jeszcze
+  // trwa, ponów próbę zamiast pozostawiać grę bez aktywnego gracza.
+  if(podOnline&&(!podHostBots||!podBotSeats.includes(cur))){return}
+  if(!podCanAct()){bwait(450,t,()=>botTurn(t));return}
+  setTab('map');botLog=[];
+  try{botShop();botFire()}catch(e){console.error('Bot:',e)}
+  if(botLog.length)$('msg').textContent='🤖 '+NAMES[cur]+': '+botLog.join(' ');
+  render();
+  bwait(1100,t,()=>{if(rolled||over)return;if(!podCanAct()){bwait(450,t,()=>botTurn(t));return}roll();
+    // Zabezpieczenie na wypadek, gdy rzut nie wystartuje z powodu chwilowej
+    // kolizji aktualizacji stanu online.
+    bwait(1200,t,()=>{if(!rolled&&!over&&BOT[cur]&&podCanAct())roll()});
+  });
+}
+function botClaim(t){
+  if(t!==botTok||over||!BOT[cur]||!rolled)return;
+  if(left<=0){endTurn();return}
+  const av=[...avail()];if(!av.length){left=0;endTurn();return}
+  placeMode=false;if(aim)cancelAim();ignoreClick=false;
+  const before=left;claim(botPickCell(av));
+  if(t!==botTok||over)return;
+  if(left===before&&left>0){bwait(500,t,()=>botClaim(t));return}
+  if(left>0)bwait(380,t,()=>botClaim(t));
+}
+function botPickCell(av){
+  const my=botMyRegions(),noise=[6,2,.4,.1][BL];let best=av[0],bs=-1e9;
+  for(const i of av){
+    let s=Math.random()*noise;
+    if(!my.has(region[i]))s+=10;
+    if(coin[i])s+=3;if(pot[i])s+=7;
+    let free=0,newz=0;
+    for(const j of nb8(i))if(owner[j]===-1){free++;if(!my.has(region[j]))newz++}
+    s+=free*.15+newz*(BL>=1?1.2:.3);
+    if(s>bs){bs=s;best=i}
+  }
+  return best;
+}
+function botSpot(kind){
+  const free=[...ownFree()];if(!free.length)return -1;
+  let best=-1,bs=-1e9;
+  for(const i of free){
+    const x=i%W,y=(i/W)|0;let en=0;
+    for(let dy=-3;dy<=3;dy++)for(let dx=-3;dx<=3;dx++){const a=x+dx,b=y+dy;if(a<0||b<0||a>=W||b>=H)continue;const o=owner[idx(a,b)];if(o>=0&&o!==cur)en++}
+    const s=(kind==='cannon'?en:-en*2)+Math.random();
+    if(s>bs){bs=s;best=i}
+  }
+  return best;
+}
+function botBuyPlace(kind){
+  const cfg={cannon:[PRICE,buy,'cannon','działo'],gen:[generatorPrice(cur),buyGen,'gen','generator'],cat:[CATP,buyCat,'cat','katapultę']}[kind];
+  if(wallet[cur]<cfg[0])return false;
+  const i=botSpot(kind);if(i<0)return false;
+  cfg[1]();placeMode=cfg[2];claim(i);placeMode=false;
+  botLog.push('Kupił '+cfg[3]+'.');return true;
+}
+function botUpgradeCat(){
+  for(let i=0;i<W*H;i++){
+    if(owner[i]===cur&&cat[i]&&klv[i]<2&&wallet[cur]>=KUP){menuI=i;upgradeKG();closeMenu();botLog.push('Ulepszył katapultę.');return true}
+  }
+  return false;
+}
+function botUpgradeGen(){
+  for(let i=0;i<W*H;i++){
+    if(owner[i]===cur&&gen[i]&&glv[i]<2&&wallet[cur]>=GUP){menuI=i;upgradeKG();closeMenu();botLog.push('Ulepszył generator – większy dochód.');return true}
+  }
+  return false;
+}
+function botUpgrade(){
+  for(let i=0;i<W*H;i++){
+    if(owner[i]!==cur)continue;
+    let fn=null,label='';
+    if(cat[i]&&klv[i]<2&&wallet[cur]>=KUP){fn=upgradeKG;label='katapultę'}
+    else if(gen[i]&&glv[i]<2&&wallet[cur]>=GUP){fn=upgradeKG;label='generator'}
+    else if(cannon[i]&&crange[i]-RANGE+1<CRMAX&&wallet[cur]>=UPG){fn=upgradeRange;label='zasięg działa'}
+    else if(cannon[i]&&cpow[i]<2&&wallet[cur]>=UPG){fn=upgrade;label='moc działa'}
+    if(fn){menuI=i;fn();closeMenu();botLog.push('Ulepszył '+label+'.');return true}
+  }
+  return false;
+}
+function botShield(){
+  // Kupuj osłony dopiero, gdy nie ma zapasu; każda paczka chroni do 10 pól.
+  if(shieldStock[cur]<1){
+    if(wallet[cur]<15)return false;
+    buyShield();
+  }
+  placeMode='shield';
+  const cnt={};owner.forEach((o,i)=>{if(o===cur)cnt[region[i]]=(cnt[region[i]]||0)+1});
+  const mine=[];owner.forEach((o,i)=>{if(o===cur&&!shield[i]){
+    const exposed=nb8(i).filter(j=>owner[j]>=0&&owner[j]!==cur).length;
+    mine.push([i,(cannon[i]||cat[i]||gen[i]?7:0)+(cnt[region[i]]===1?10:0)+exposed*2+Math.random()]);
+  }});
+  mine.sort((a,b)=>b[1]-a[1]);
+  let protectedNow=0;
+  for(const [i] of mine){if(shieldStock[cur]<1)break;claim(i);protectedNow++}
+  placeMode=false;
+  if(protectedNow)botLog.push('Zabezpieczył '+protectedNow+' pól.');
+  return protectedNow>0;
+}
+function botShop(){
+  if(BL<1)return;
+  if(BL>=3){
+    // Ekstremalny: gospodarka bez sztywnego limitu generatorów, ale z rezerwą na osłony i broń.
+    for(let r=0;r<12;r++){
+      const nG=botCount(gen),nK=botCount(cat),nC=botCount(cannon);
+      const income=owner.reduce((sum,o,i)=>sum+(o===cur&&gen[i]?genInc(i):0),0);
+      const unprotected=owner.some((o,i)=>o===cur&&!shield[i]);
+      // Nie odkładaj ochrony: gdy stać go na paczkę, od razu zabezpiecza pola.
+      if(shieldStock[cur]>0&&unprotected){botShield();continue}
+      if(shieldStock[cur]<1&&wallet[cur]>=15&&unprotected){botShield();continue}
+      // Generatory kupuje bez limitu, ale tylko gdy dochód jest niski lub budżet pozwala na inwestycję.
+      if(wallet[cur]>=generatorPrice(cur) && income<Math.min(12,2+nG*2) && (wallet[cur]>=22||nG===0) && botBuyPlace('gen'))continue;
+      if(botUpgradeGen())continue;
+      // Broń i katapulty pozostają w planie; nie wydaje ostatnich 15 monet, jeśli pola czekają na ochronę.
+      const reserve=unprotected?15:0;
+      if(nK<5&&wallet[cur]>=CATP+reserve&&botBuyPlace('cat'))continue;
+      if(botUpgradeCat()&&wallet[cur]>=reserve)continue;
+      if(nC<2&&wallet[cur]>=PRICE+reserve&&botBuyPlace('cannon'))continue;
+      break;
+    }
+    return;
+  }
+  const cap=BL>=2?3:2;
+  for(let r=0;r<4;r++){
+    const nG=botCount(gen),nK=botCount(cat),nC=botCount(cannon);
+    if(nG<1&&botBuyPlace('gen'))continue;
+    if(nK<1&&botBuyPlace('cat'))continue;
+    if(nC<1&&botBuyPlace('cannon'))continue;
+    if(BL>=2&&shieldStock[cur]<1&&wallet[cur]>=15&&owner.some((o,i)=>o===cur&&!shield[i])){botShield();continue}
+    if(botUpgrade())continue;
+    if(nG<cap&&botBuyPlace('gen'))continue;
+    if(nK<cap&&botBuyPlace('cat'))continue;
+    if(nC<cap&&botBuyPlace('cannon'))continue;
+    break;
+  }
+}
+function botVal(h,rc){
+  return 1+(gen[h]?3:0)+(cannon[h]?3:0)+(cat[h]?4:0)+(rc[owner[h]][region[h]]===1?4:0);
+}
+function cannonHits(i,ux,uy,L,pw){
+  const cx=i%W+.5,cy=((i/W)|0)+.5,hits=[];
+  for(let t=.5;t<=L&&hits.length<pw;t+=.05){
+    const x=Math.floor(cx+ux*t),y=Math.floor(cy+uy*t);
+    if(x<0||y<0||x>=W||y>=H)break;
+    const c=idx(x,y);
+    if(c!==i&&owner[c]!==-1&&owner[c]!==cur&&!hits.includes(c)){if(shield[c])break;hits.push(c)}
+  }
+  return hits;
+}
+function botFireCannon(i){
+  const cx=i%W+.5,cy=((i/W)|0)+.5,R=crange[i],pw=cpow[i],rc=botCounts();
+  let best=null,bs=0;
+  for(let j=0;j<W*H;j++){
+    const o=owner[j];if(o===-1||o===cur)continue;
+    const jx=j%W+.5,jy=((j/W)|0)+.5,d=Math.hypot(jx-cx,jy-cy);if(d>R||d<.5)continue;
+    const ux=(jx-cx)/d,uy=(jy-cy)/d;
+    const sc=cannonHits(i,ux,uy,R,pw).reduce((a,h)=>a+botVal(h,rc),0);
+    if(sc>bs){bs=sc;best={ux,uy}}
+  }
+  if(!best)return;
+  aim={i,drag:true,px:cx+best.ux*R,py:cy+best.uy*R,kind:'cannon'};
+  fire();botLog.push($('msg').textContent);
+}
+function botFireCat(i){
+  const cx=i%W+.5,cy=((i/W)|0)+.5,R=katRange(i),rc=botCounts(),my=botMyRegions();
+  let best=null,bs=3.5;
+  for(let ty=0;ty<H;ty++)for(let tx=0;tx<W;tx++){
+    const D=Math.hypot(tx+.5-cx,ty+.5-cy);if(D<2||D>R)continue;
+    const t=idx(tx,ty),regs=new Set();let sc=0;
+    for(const a of [t,...nb(t)]){
+      if(owner[a]===cur)continue;
+      if(owner[a]!==-1&&shield[a])continue;
+      sc+=1;
+      if(owner[a]!==-1)sc+=.5+botVal(a,rc);
+      if(coin[a])sc+=2;if(pot[a])sc+=5;
+      if(!my.has(region[a])&&!regs.has(region[a])){regs.add(region[a]);sc+=6}
+    }
+    if(sc>bs){bs=sc;best={tx,ty,D}}
+  }
+  if(!best)return;
+  const p=best.D/R*PULL,ux=(best.tx+.5-cx)/best.D,uy=(best.ty+.5-cy)/best.D;
+  aim={i,drag:true,px:cx-ux*p,py:cy-uy*p,kind:'cat'};
+  fireCat();botLog.push($('msg').textContent);
+}
+function botFire(){
+  // Na poziomie ekstremalnym wszystkie katapulty oddają strzał przed rzutem kostką.
+  const order=BL>=3?['cat','cannon']:['all'];
+  for(const kind of order){
+    for(let i=0;i<W*H;i++){
+      if(over||owner[i]!==cur||fired.has(i))continue;
+      if(kind==='cat'&&!cat[i])continue;
+      if(kind==='cannon'&&!cannon[i])continue;
+      if(kind==='all'&&!(cannon[i]||cat[i]))continue;
+      if(BL===0&&Math.random()<.5)continue;
+      if(cat[i])botFireCat(i);else botFireCannon(i);
+    }
+  }
+}
+
+function start(n){
+  N=n;$("setup").classList.add("hide");$("game").classList.remove("hide");
+  $('tplayer').innerHTML=NAMES.slice(0,N).map((nm,k)=>`<option value='${k}'>${nm}</option>`).join('');
+  setTest($('tmode').checked);setTab('map');$('icoC').innerHTML=UC;$('icoK').innerHTML=UK;
+  // regiony (Voronoi)
+  const R=22,seeds=[];
+  for(let k=0;k<R;k++)seeds.push([Math.random()*W,Math.random()*H]);
+  region=[];
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    let b=0,bd=1e9;seeds.forEach((s,k)=>{const d=(s[0]-x)**2+(s[1]-y)**2;if(d<bd){bd=d;b=k}});
+    region.push(b);
+  }
+  owner=Array(W*H).fill(-1);
+  [[0,0],[W-1,H-1],[W-1,0],[0,H-1]].slice(0,N).forEach((p,k)=>owner[idx(p[0],p[1])]=k);
+  pot=Array(W*H).fill(false);rounds=0;note="";coin=Array(W*H).fill(false);shield=Array(W*H).fill(false);shieldStock=Array(N).fill(0);cannon=Array(W*H).fill(false);cpow=Array(W*H).fill(1);crange=Array(W*H).fill(RANGE);gen=Array(W*H).fill(false);gstock=Array(N).fill(0);gBought=Array(N).fill(0);cat=Array(W*H).fill(false);kstock=Array(N).fill(0);klv=Array(W*H).fill(1);glv=Array(W*H).fill(1);wallet=Array(N).fill(0);stock=Array(N).fill(0);placeMode=false;
+  for(let n=0;n<70;){const i=Math.floor(Math.random()*W*H);if(owner[i]===-1&&!coin[i]){coin[i]=true;n++}}
+  const board=$("board");board.style.gridTemplateColumns=`repeat(${W},1fr)`;
+  for(let i=0;i<W*H;i++){
+    const d=document.createElement("div");d.className="c";d.onclick=()=>claim(i);
+    board.appendChild(d);cells.push(d);
+  }
+  cur=0;left=0;rolled=false;over=false;
+  begin();
+}
+function begin(){
+  rolled=false;left=0;placeMode=false;fired=new Set();cancelAim();
+  let inc=0;owner.forEach((o,i)=>{if(o===cur&&gen[i])inc+=genInc(i)});wallet[cur]+=inc;
+  $("roll").disabled=false;$("skip").disabled=true;
+  $("msg").classList.remove("turn-in");void $("msg").offsetWidth;$("msg").classList.add("turn-in");
+  $("msg").textContent=`Tura: ${NAMES[cur]}. Rzuć kostką!`+(inc?` Generatory: +${inc} 🪙`:"")+(note?" "+note:"");note="";
+  render();
+  botTok++;if(BOT[cur]&&!over&&(!podOnline||podHostBots)){const t=botTok;setTimeout(()=>botTurn(t),850)}
+}
+function roll(){
+  if(!podCanAct()||rolled||over)return;podMarkAction();
+  rolled=true;$("roll").disabled=true;
+  let t=0;const iv=setInterval(()=>{
+    $("die").textContent=FACES[Math.floor(Math.random()*6)];
+    if(++t>9){clearInterval(iv);const v=1+Math.floor(Math.random()*6);$("die").textContent=FACES[v-1];left=v;afterRoll(v)}
+  },70);
+}
+function avail(){
+  const s=new Set();
+  const dg=stats().z[cur]>=10;owner.forEach((o,i)=>{if(o===cur)(dg?nb8(i):nb(i)).forEach(j=>{if(owner[j]===-1)s.add(j)})});
+  return s;
+}
+function afterRoll(v){
+  if(avail().size===0){$("msg").textContent=`Wyrzucono ${v}, ale ${NAMES[cur]} nie ma gdzie się rozszerzyć. Tura przepada.`;setTimeout(endTurn,1500);return}
+  $("skip").disabled=false;
+  $("msg").textContent=`Wyrzucono ${v}! Zajmij pola: ${left}`;
+  render();
+  if(BOT[cur]&&(!podOnline||podHostBots)){const t=botTok;bwait(500,t,()=>botClaim(t))}
+}
+function claim(i){
+  if(!podCanAct()||aim||ignoreClick)return;podMarkAction();
+  if(test&&$('ttool').value){testEdit(i);return}
+  if(over)return;
+  if(placeMode==='shield'){
+    if(owner[i]===cur&&!shield[i]&&shieldStock[cur]>0){shield[i]=true;shieldStock[cur]--;if(shieldStock[cur]===0)placeMode=false;$('msg').textContent='🛡️ Pole zabezpieczone! Pozostało osłon: '+shieldStock[cur]+'.';render()}
+    return;
+  }
+  if(placeMode){
+    if(owner[i]===cur&&!cannon[i]&&!gen[i]&&!cat[i]){
+      if(placeMode==="cannon"&&stock[cur]>0){cannon[i]=true;cpow[i]=1;crange[i]=RANGE;stock[cur]--;placeMode=false;$("msg").textContent="Działo postawione!";render()}
+      else if(placeMode==="gen"&&gstock[cur]>0){gen[i]=true;glv[i]=1;gstock[cur]--;placeMode=false;$("msg").textContent="Generator postawiony!";render()}
+      else if(placeMode==="cat"&&kstock[cur]>0){cat[i]=true;klv[i]=1;kstock[cur]--;placeMode=false;$("msg").textContent="Katapulta postawiona!";render()}
+    }
+    return;
+  }
+  if(cannon[i]||cat[i]||gen[i]){openMenu(i);return}
+  if(!rolled||left<=0)return;
+  if(!avail().has(i))return;
+  owner[i]=cur;left--;
+  if(coin[i]){coin[i]=false;wallet[cur]++}
+  if(pot[i]){pot[i]=false;wallet[cur]+=POTCOINS}
+  if(left===0||avail().size===0){render();endTurn();return}
+  $("msg").textContent=`Zostało pól do zajęcia: ${left}`;
+  render();
+}
+function endTurn(){
+  if(!podCanAct()||over)return;podMarkAction();
+  if(owner.every(o=>o!==-1)){return finish()}
+  // następny gracz, który ma ruch (jeśli nikt nie ma - koniec)
+  for(let k=1;k<=N;k++){
+    const p=(cur+k)%N;
+    const old=cur;cur=p;
+    if(avail().size>0){if(p<=old){rounds++;if(rounds%POTEVERY===0)dropPot()}if(podOnline)podActorOverride=old;begin();return}
+    cur=old;
+  }
+  finish();
+}
+function render(){
+  const av=placeMode==='shield'?ownShieldable():(placeMode?ownFree():(rolled&&left>0?avail():new Set()));
+  cells.forEach((d,i)=>{
+    const o=owner[i],r=region[i],x=i%W,y=(i/W)|0;
+    d.style.background=o>=0?(PLAYER_COLORS[o]||DEFAULT_COLORS[o%4]):`hsl(${(r*47+30)%360} 35% ${matchMedia("(prefers-color-scheme:dark)").matches?"28%":"82%"})`;
+    const sh=[];
+    if(x<W-1&&region[i+1]!==r)sh.push("inset -2px 0 0 var(--line)");
+    if(y<H-1&&region[i+W]!==r)sh.push("inset 0 -2px 0 var(--line)");
+    if(!sh.length)sh.push("inset 0 0 0 .5px rgba(128,128,128,.25)");
+    d.style.boxShadow=sh.join(",");
+    d.classList.toggle("av",av.has(i));
+    d.style.setProperty("--cur",PLAYER_COLORS[cur]||DEFAULT_COLORS[cur%4]);
+    d.classList.toggle("coin",!!(coin[i]||pot[i]));
+    {const h=fx.has(i)?"💥":(cannon[i]?UC:(cat[i]?UK:(gen[i]?"⚡":(pot[i]?UP:(coin[i]?CI:"")))));const shown=h+(shield[i]?"<span class=\"shieldMark\">🛡️</span>":"");if(d._h!==shown){d.innerHTML=shown;d._h=shown}}
+  });
+  const {c:cnt,z}=stats();
+  $("players").innerHTML=cnt.map((c,k)=>`<span class="pl ${k===cur&&!over?"on":""}" style="background:${PLAYER_COLORS[k]||DEFAULT_COLORS[k%4]}">${NAMES[k]}${BOT[k]?' 🤖':''} · STREFY: ${z[k]}/${new Set(region).size} · pól: ${c} · ${CI} ${wallet[k]}${z[k]>=10?' · ↗ ukos':''}</span>`).join("");
+  $("buy").disabled=over||wallet[cur]<PRICE;
+  $("buyS").disabled=over||wallet[cur]<15;
+  $('buyG').textContent=`Kup generator (${generatorPrice(cur)} 🪙)`;
+  $("buyG").disabled=over||wallet[cur]<generatorPrice(cur);
+  $("buyK").disabled=over||wallet[cur]<CATP;
+  $("wal").innerHTML=`${NAMES[cur]}: ${CI} ${wallet[cur]}`;
+  if(podOnline){
+    const mine=podCanAct();
+    $('roll').disabled=!mine||rolled||over;
+    $('skip').disabled=!mine||over||!rolled;
+    $('buy').disabled=!mine||over||wallet[cur]<PRICE;
+    $('buyS').disabled=!mine||over||wallet[cur]<15;
+    $('buyG').disabled=!mine||over||wallet[cur]<generatorPrice(cur);
+    $('buyK').disabled=!mine||over||wallet[cur]<CATP;
+    $('msg').textContent=(mine?'Twoja tura. ':'Tura gracza: '+NAMES[cur]+'. Poczekaj. ')+$('msg').textContent.replace(/^Twoja tura\. |^Tura gracza: [^.]+\. Poczekaj\. /,'');
+  }
+  if(!podOnline&&BOT[cur]&&!over)['roll','skip','buy','buyS','buyG','buyK'].forEach(id=>$(id).disabled=true);
+  podPublish();
+}
+function openMenu(i){
+  if(!podCanAct())return;menuI=i;const mine=owner[i]===cur;
+  const K=cat[i],G=gen[i];$('mtitle').innerHTML=K?UK+' Katapulta':G?'⚡ Generator':UC+' Działo';$('mfire').textContent=K?'🎯 Naciągnij i strzel':'🎯 Strzelaj';$('mfire').classList.toggle('hide',G);$('mku').classList.toggle('hide',!(K||G));$('mup').classList.toggle('hide',K||G);$('mrng').classList.toggle('hide',K||G);
+  $('mst').innerHTML=K?'Maks. zasięg: <b>'+katRange(i)+'</b> ('+klv[i]+'/2)<br>Obszar trafienia: <b>pole + 4 dookoła</b>':G?'Przychód: <b>'+genInc(i)+' 🪙</b> na turę ('+glv[i]+'/2)':'Zasięg: <b>'+crange[i]+'</b> ('+(crange[i]-RANGE+1)+'/'+CRMAX+')<br>Niszczone bloki: <b>'+cpow[i]+'</b> ('+cpow[i]+'/2)';
+  $('mnote').textContent=!mine?'Należy do gracza: '+NAMES[owner[i]]:(G?'Produkuje monety na początku Twojej tury.':fired.has(i)?'Już strzelało w tej turze.':'Gotowe do strzału.');
+  $('mfire').disabled=!mine||fired.has(i)||over;
+  const mx=cpow[i]>=2;
+  $('mup').textContent=mx?'Maks. poziom':'⬆️ Ulepsz: 2 bloki ('+UPG+' 🪙)';
+  $('mup').disabled=!mine||mx||over||wallet[cur]<UPG;
+  const rm=crange[i]-RANGE+1>=CRMAX;$('mrng').textContent=rm?'Maks. zasięg':'🔭 Zasięg +1 ('+UPG+' 🪙)';
+  $('mrng').disabled=!mine||rm||over||wallet[cur]<UPG;
+  const km=K?klv[i]>=2:glv[i]>=2,kc=K?KUP:GUP;
+  $('mku').textContent=km?'Maks. poziom':K?'⬆️ Zasięg 15 ('+KUP+' 🪙)':'⬆️ 3 🪙/turę ('+GUP+' 🪙)';
+  $('mku').disabled=!mine||km||over||wallet[cur]<kc;
+  $('menu').classList.remove('hide');
+}
+function upgrade(){
+  if(!podCanAct())return;podMarkAction();const i=menuI;
+  if(over||i<0||owner[i]!==cur||cpow[i]>=2||wallet[cur]<UPG)return;
+  wallet[cur]-=UPG;cpow[i]=2;
+  render();openMenu(i);
+  $('msg').textContent='Działo ulepszone – niszczy teraz 2 bloki leżące na linii strzału.';
+}
+function closeMenu(){$('menu').classList.add('hide')}
+function geom(){const r=cells[0].getBoundingClientRect(),b=$('bw').getBoundingClientRect();return{cs:r.width,l:r.left,t:r.top,ox:r.left-b.left,oy:r.top-b.top}}
+function endPt(){
+  const cx=aim.i%W+.5,cy=((aim.i/W)|0)+.5,dx=aim.px-cx,dy=aim.py-cy,l=Math.hypot(dx,dy)||1e-9,L=Math.min(l,crange[aim.i]);
+  return{x:cx+dx/l*L,y:cy+dy/l*L,L,l,ux:dx/l,uy:dy/l};
+}
+function startAim(i){
+  if(!podCanAct())return;
+  if(over||owner[i]!==cur||fired.has(i))return;
+  closeMenu();placeMode=false;aim={i,drag:false,px:0,py:0,kind:cat[i]?'cat':'cannon'};
+  $('cancelAim').classList.remove('hide');$('bw').classList.add('aiming');
+  $('msg').textContent='Przeciągnij myšką linię od działa (zasięg '+crange[i]+') i puść, aby strzelić.';
+  if(aim.kind==='cat')$('msg').textContent='Naciągnij procę: przeciągnij myśką w PRZECIWNĄ stronę niż cel – im dalej, tym dłuższy strzał. Puść, aby wystrzelić.';
+  render();drawAim();
+}
+function cancelAim(m){
+  aim=null;$('ov').innerHTML='';$('cancelAim').classList.add('hide');$('bw').classList.remove('aiming');
+  if(m)$('msg').textContent='Anulowano celowanie.';
+}
+function drawAim(){
+  if(!aim){$('ov').innerHTML='';return}
+  if(aim.kind==='cat'){drawCat();return}
+  const g=geom(),cx=aim.i%W+.5,cy=((aim.i/W)|0)+.5,P=(x,y)=>[g.ox+x*g.cs,g.oy+y*g.cs],[sx,sy]=P(cx,cy),c=PLAYER_COLORS[cur]||DEFAULT_COLORS[cur%4];
+  let s=`<circle cx='${sx}' cy='${sy}' r='${crange[aim.i]*g.cs}' style='fill:${c};fill-opacity:.13;stroke:${c};stroke-width:2;stroke-dasharray:6 4'/>`;
+  s+=`<circle cx='${sx}' cy='${sy}' r='${g.cs*.7}' style='fill:none;stroke:${c};stroke-width:3'/>`;
+  if(aim.drag){const e=endPt(),[ex,ey]=P(e.x,e.y);s+=`<line x1='${sx}' y1='${sy}' x2='${ex}' y2='${ey}' style='stroke:${c};stroke-width:4;stroke-linecap:round'/><circle cx='${ex}' cy='${ey}' r='5' style='fill:${c}'/>`}
+  $('ov').innerHTML=s;
+}
+function fire(){
+  if(!podCanAct())return;podMarkAction();
+  if(aim.kind==='cat')return fireCat();
+  const e=endPt();
+  if(e.l<0.4){aim.drag=false;drawAim();return}
+  const i=aim.i,cx=i%W+.5,cy=((i/W)|0)+.5,pw=cpow[i],hits=[];
+  for(let t=.5;t<=e.L&&hits.length<pw;t+=.05){
+    const x=Math.floor(cx+e.ux*t),y=Math.floor(cy+e.uy*t);
+    if(x<0||y<0||x>=W||y>=H)break;
+    const c=idx(x,y);
+    if(c!==i&&owner[c]!==-1&&owner[c]!==cur&&!hits.includes(c)){if(shield[c])break;hits.push(c);}
+  }
+  fired.add(i);cancelAim();
+  if(hits.length){
+    const gl=hits.filter(h=>gen[h]).length;hits.forEach(h=>{owner[h]=-1;cannon[h]=false;gen[h]=false;cat[h]=false;fx.add(h)});
+    setTimeout(()=>{hits.forEach(h=>fx.delete(h));render()},800);
+    $('msg').textContent='💥 Trafiono! Zniszczone pola: '+hits.length+(gl?' (w tym generatory: '+gl+')':'')+'.';
+  }else $('msg').textContent='Pudło – linia nie trafiła w pole przeciwnika.';
+  render();
+}
+$('bw').addEventListener('pointerdown',e=>{
+  if(!aim)return;
+  const g=geom(),px=(e.clientX-g.l)/g.cs,py=(e.clientY-g.t)/g.cs,cx=aim.i%W+.5,cy=((aim.i/W)|0)+.5;
+  if(Math.hypot(px-cx,py-cy)<=1){aim.drag=true;aim.px=px;aim.py=py;e.preventDefault();drawAim()}
+});
+window.addEventListener('pointermove',e=>{
+  if(!aim||!aim.drag)return;
+  const g=geom();aim.px=(e.clientX-g.l)/g.cs;aim.py=(e.clientY-g.t)/g.cs;drawAim();
+});
+window.addEventListener('pointerup',()=>{
+  if(!aim||!aim.drag)return;
+  ignoreClick=true;setTimeout(()=>{ignoreClick=false},80);fire();
+});
+window.addEventListener('keydown',e=>{if(e.key==='Escape'){if(aim)cancelAim(true);closeMenu()}});
+function setTest(v){
+  test=v;$('tpanel').classList.toggle('hide',!v);
+  $('tmodeBtn').textContent='🧪 Tryb: '+(v?'testowy':'zwykły');
+  if(!v)$('ttool').value='';
+}
+function toggleTest(){if(podOnline)return;setTest(!test)}
+function testEdit(i){if(podOnline)return;
+  const p=+$('tplayer').value,t=$('ttool').value;
+  const clr=()=>{cannon[i]=false;gen[i]=false;cat[i]=false};
+  if(t==='own'){if(owner[i]!==p){clr();owner[i]=p}}
+  else if(t==='free'){clr();owner[i]=-1}
+  else if(t==='coin'){if(owner[i]===-1)coin[i]=!coin[i]}
+  else if(t==='pot'){if(owner[i]===-1)pot[i]=!pot[i]}
+  else{
+    clr();owner[i]=p;
+    if(t==='cannon'){cannon[i]=true;cpow[i]=1;crange[i]=RANGE}
+    else if(t==='gen'){gen[i]=true;glv[i]=1}
+    else if(t==='cat'){cat[i]=true;klv[i]=1}
+  }
+  if(owner[i]>=0){coin[i]=false;pot[i]=false}
+  render();
+}
+function testCoins(add){if(podOnline)return;
+  const p=+$('tplayer').value,n=parseInt($('tcoins').value)||0;
+  wallet[p]=Math.max(0,add?wallet[p]+n:n);
+  render();
+}
+function testTurn(){if(podOnline)return;
+  if(over)return;
+  cur=+$('tplayer').value;begin();
+}
+function setTab(t){
+  if(t==='shop'&&aim)cancelAim(true);
+  $('game').classList.toggle('tab-shop',t==='shop');
+  $('tabMap').classList.toggle('on',t==='map');
+  $('tabShop').classList.toggle('on',t==='shop');
+}
+function dropPot(){
+  const f=[];for(let i=0;i<W*H;i++)if(owner[i]===-1&&!coin[i]&&!pot[i])f.push(i);
+  if(!f.length)return;
+  pot[f[Math.floor(Math.random()*f.length)]]=true;
+  note='Spadł garnek ze złotem ('+POTCOINS+' monet) – zajmij jego pole!';
+}
+function testPot(){if(podOnline)return;dropPot();$('msg').textContent=note||'Brak wolnego pola na garnek.';note='';render()}
+function katRange(i){return klv[i]>=2?15:12}
+function genInc(i){return glv[i]>=2?3:2}
+function upgradeKG(){
+  if(!podCanAct())return;podMarkAction();const i=menuI;
+  if(over||i<0||owner[i]!==cur)return;
+  if(cat[i]){
+    if(klv[i]>=2||wallet[cur]<KUP)return;
+    wallet[cur]-=KUP;klv[i]=2;$('msg').textContent='Katapulta ulepszona – zasięg 15 pól.';
+  }else if(gen[i]){
+    if(glv[i]>=2||wallet[cur]<GUP)return;
+    wallet[cur]-=GUP;glv[i]=2;$('msg').textContent='Generator ulepszony – daje 3 🪙 na turę.';
+  }else return;
+  render();openMenu(i);
+}
+function upgradeRange(){
+  if(!podCanAct())return;podMarkAction();const i=menuI;
+  if(over||i<0||owner[i]!==cur||wallet[cur]<UPG)return;
+  if(crange[i]-RANGE+1>=CRMAX)return;wallet[cur]-=UPG;crange[i]++;
+  render();openMenu(i);
+  $('msg').textContent='Zasięg działa zwiększony do '+crange[i]+'.';
+}
+function buyShield(){
+  if(!podCanAct())return;podMarkAction();
+  if(over||wallet[cur]<15)return;
+  wallet[cur]-=15;shieldStock[cur]+=10;placeMode='shield';setTab('map');
+  $('msg').textContent='Kupiono ochronę 10 pól! Kliknij swoje pola na mapie, aby je zabezpieczyć.';
+  render();
+}
+function toggleShield(){
+  if(!podCanAct())return;podMarkAction();
+  if(over||(shieldStock[cur]<1&&placeMode!=='shield'))return;
+  placeMode=placeMode==='shield'?false:'shield';
+  $('msg').textContent=placeMode?'Kliknij do 10 swoich pól, aby je zabezpieczyć.':(rolled&&left>0?`Zostało pól do zajęcia: ${left}`:`Tura: ${NAMES[cur]}.`);
+  render();
+}
+function generatorPrice(player){return GENP+Math.floor((gBought?.[player]||0)/2)}
+function buyGen(){
+  if(!podCanAct())return;podMarkAction();
+  const price=generatorPrice(cur);
+  if(over||wallet[cur]<price)return;
+  wallet[cur]-=price;gBought[cur]=(gBought[cur]||0)+1;gstock[cur]++;placeMode='gen';setTab('map');
+  $('msg').textContent='Kupiono generator! Kliknij swoje pole, aby go postawić.';
+  render();
+}
+function togglePlaceG(){
+  if(!podCanAct())return;podMarkAction();
+  if(over||(gstock[cur]<1&&placeMode!=='gen'))return;
+  placeMode=placeMode==='gen'?false:'gen';
+  $('msg').textContent=placeMode?'Kliknij swoje pole, aby postawić generator.':(rolled&&left>0?`Zostało pól do zajęcia: ${left}`:`Tura: ${NAMES[cur]}.`);
+  render();
+}
+function catPt(){
+  const cx=aim.i%W+.5,cy=((aim.i/W)|0)+.5,dx=aim.px-cx,dy=aim.py-cy,l=Math.hypot(dx,dy)||1e-9,p=Math.min(l,PULL),d=p/PULL*katRange(aim.i);
+  return{p,l,d,x:cx-dx/l*d,y:cy-dy/l*d,hx:cx+dx/l*p,hy:cy+dy/l*p};
+}
+function drawCat(){
+  const g=geom(),cx=aim.i%W+.5,cy=((aim.i/W)|0)+.5,P=(x,y)=>[g.ox+x*g.cs,g.oy+y*g.cs],[sx,sy]=P(cx,cy),c=PLAYER_COLORS[cur]||DEFAULT_COLORS[cur%4];
+  let s=`<circle cx='${sx}' cy='${sy}' r='${PULL*g.cs}' style='fill:none;stroke:${c};stroke-width:2;stroke-dasharray:6 4'/>`;
+  s+=`<circle cx='${sx}' cy='${sy}' r='${g.cs*.7}' style='fill:none;stroke:${c};stroke-width:3'/>`;
+  if(aim.drag){
+    const k=catPt(),[hx,hy]=P(k.hx,k.hy),[lx,ly]=P(k.x,k.y);
+    s+=`<line x1='${sx}' y1='${sy}' x2='${hx}' y2='${hy}' style='stroke:${c};stroke-width:5;stroke-linecap:round;opacity:.6'/>`;
+    s+=`<line x1='${sx}' y1='${sy}' x2='${lx}' y2='${ly}' style='stroke:${c};stroke-width:2;stroke-dasharray:3 5'/>`;
+    const tx=Math.floor(k.x),ty=Math.floor(k.y);
+    [[0,0],[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{const x=tx+dx,y=ty+dy;if(x<0||y<0||x>=W||y>=H)return;const [rx,ry]=P(x,y);s+=`<rect x='${rx}' y='${ry}' width='${g.cs}' height='${g.cs}' style='fill:${c};fill-opacity:.35;stroke:${c};stroke-width:2'/>`});
+  }
+  $('ov').innerHTML=s;
+}
+function fireCat(){
+  if(!podCanAct())return;podMarkAction();
+  const k=catPt();
+  if(k.l<0.4){aim.drag=false;drawAim();return}
+  const i=aim.i,tx=Math.floor(k.x),ty=Math.floor(k.y);
+  fired.add(i);cancelAim();
+  if(tx<0||ty<0||tx>=W||ty>=H){$('msg').textContent='Pocisk wylądował poza mapą.';render();return}
+  const t=idx(tx,ty),area=[t,...nb(t)];let taken=0,destroyed=0;
+  area.forEach(a=>{
+    if(owner[a]===cur)return;
+    if(owner[a]!==-1&&shield[a])return;
+    if(owner[a]!==-1){destroyed++;cannon[a]=false;gen[a]=false;cat[a]=false}
+    owner[a]=cur;taken++;
+    if(coin[a]){coin[a]=false;wallet[cur]++}
+    if(pot[a]){pot[a]=false;wallet[cur]+=POTCOINS}
+    fx.add(a);
+  });
+  setTimeout(()=>{area.forEach(a=>fx.delete(a));render()},800);
+  $('msg').textContent='🪨 Katapulta! Przejęte pola: '+taken+(destroyed?' (w tym zniszczone pola przeciwnika: '+destroyed+')':'')+'.';
+  render();
+}
+function buyCat(){
+  if(!podCanAct())return;podMarkAction();
+  if(over||wallet[cur]<CATP)return;
+  wallet[cur]-=CATP;kstock[cur]++;placeMode='cat';setTab('map');
+  $('msg').textContent='Kupiono katapultę! Kliknij swoje pole, aby ją postawić.';
+  render();
+}
+function togglePlaceK(){
+  if(!podCanAct())return;podMarkAction();
+  if(over||(kstock[cur]<1&&placeMode!=='cat'))return;
+  placeMode=placeMode==='cat'?false:'cat';
+  $('msg').textContent=placeMode?'Kliknij swoje pole, aby postawić katapultę.':(rolled&&left>0?`Zostało pól do zajęcia: ${left}`:`Tura: ${NAMES[cur]}.`);
+  render();
+}
+function ownFree(){const s=new Set();owner.forEach((o,i)=>{if(o===cur&&!cannon[i]&&!gen[i]&&!cat[i])s.add(i)});return s}
+function ownShieldable(){const s=new Set();owner.forEach((o,i)=>{if(o===cur&&!shield[i])s.add(i)});return s}
+function buy(){
+  if(!podCanAct())return;podMarkAction();
+  if(over||wallet[cur]<PRICE)return;
+  wallet[cur]-=PRICE;stock[cur]++;placeMode='cannon';setTab('map');
+  $("msg").textContent="Kupiono działo! Kliknij swoje pole, aby je postawić.";
+  render();
+}
+function togglePlace(){
+  if(!podCanAct())return;podMarkAction();
+  if(over||(stock[cur]<1&&placeMode!=="cannon"))return;
+  placeMode=placeMode==="cannon"?false:"cannon";
+  $("msg").textContent=placeMode?"Kliknij swoje pole, aby postawić działo.":(rolled&&left>0?`Zostało pól do zajęcia: ${left}`:`Tura: ${NAMES[cur]}.`);
+  render();
+}
+function stats(){
+  const zs=Array.from({length:N},()=>new Set()),c=Array(N).fill(0);
+  owner.forEach((o,i)=>{if(o>=0){c[o]++;zs[o].add(region[i])}});
+  return {c,z:zs.map(s=>s.size)};
+}
+function finish(){
+  over=true;render();
+  if(podOnline){try{parent.postMessage({podboj:1,type:'finished',winners:win},'*')}catch(e){}}
+  const {c:cnt,z}=stats();
+  const sc=cnt.map((c,k)=>z[k]*1000+c),mx=Math.max(...sc),win=sc.map((s,k)=>s===mx?NAMES[k]:null).filter(Boolean);
+  $("roll").disabled=true;$("skip").disabled=true;
+  $("msg").textContent="Koniec gry!";
+  const e=$("end");e.classList.remove("hide");
+  e.innerHTML=`<h2>🏆 ${win.length>1?"Remis: "+win.join(", "):"Wygrywa: "+win[0]}</h2><p>${cnt.map((c,k)=>NAMES[k]+": STREFY "+z[k]+", pól "+c).join("<br>")}</p>`+(podOnline?"":"<button onclick=\"location.reload()\">Zagraj ponownie</button>");
+}
+</script>
+<script>
+/* ===== ekran startowy (styl Monopoly) ===== */
+(function(){
+  var logo=document.getElementById('pdLogo');if(!logo)return;
+  'PODBÓJ'.split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i);b.textContent=c;logo.appendChild(b)});
+  var bg=document.getElementById('pdBg');
+  ['🗺️','🎲','🪙','🔫','🛡️','🏰','🚩','🎲','⚔️','🪙','🗺️','🏆'].forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)});
+  var ob=document.getElementById('pdOnlineBtn'),inFrame=false;try{inFrame=parent!==window}catch(e){inFrame=true}
+  if(!inFrame){ob.disabled=true;ob.title='Pokoje online działają w platformie z kontem i Firebase'}
+  ob.onclick=function(){try{parent.postMessage({podboj:1,type:'online'},'*')}catch(e){}};
+  var panes=['pdBots','pdLocal','pdRules'],btns={pdBots:'pdBotsBtn',pdLocal:'pdLocalBtn',pdRules:'pdRulesBtn'};
+  panes.forEach(function(id){document.getElementById(btns[id]).onclick=function(){
+    panes.forEach(function(o){var el=document.getElementById(o);el.style.display=(o===id&&el.style.display!=='block')?'block':'none'});
+  }});
+})();
+</script>
+</body>
+</html>
