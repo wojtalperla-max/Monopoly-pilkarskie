@@ -210,3 +210,62 @@ html,body{margin:0;height:100%;overflow:hidden;background:#87ceeb;font-family:sy
 /* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
 html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
 html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
+
+  /* ===== ShortCut – edytor wideo ===== */
+  #pcShortcutWindow{display:none;position:absolute;inset:0 0 42px 0;background:#14171d;color:#e8edf3;z-index:5;flex-direction:column;font-size:13px}
+  #pcShortcutWindow.open{display:flex}
+  #scTop{height:42px;flex-shrink:0;background:#0d0f13;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-weight:650}
+  #pcShortcutWindow button{border:0;border-radius:6px;background:#2c313b;color:#fff;padding:7px 11px;cursor:pointer;font-size:13px}
+  #pcShortcutWindow button:hover:not(:disabled){background:#3a404c}
+  #pcShortcutWindow button:disabled{opacity:.4;cursor:default}
+  #pcShortcutWindow button.scPrimary{background:#1769c2}
+  #pcShortcutWindow button.scPrimary:hover:not(:disabled){background:#1f7ae0}
+  #scMain{flex:1;min-height:0;display:flex}
+  #scBin{width:210px;flex-shrink:0;background:#191d24;border-right:1px solid #262b34;display:flex;flex-direction:column}
+  #scBin h4{margin:0;padding:10px 12px;font-size:13px;color:#aab3c0}
+  #scBinList{flex:1;overflow:auto;padding:0 8px 8px}
+  .scFile{display:flex;align-items:center;gap:8px;background:#222731;border-radius:7px;padding:7px 8px;margin-bottom:6px}
+  .scFile .nm{flex:1;min-width:0}
+  .scFile .nm b{display:block;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .scFile .nm small{color:#8a94a3;font-size:11px}
+  .scNone{color:#7b8795;font-size:12px;padding:10px 4px}
+  #scStage{flex:1;min-width:0;display:flex;flex-direction:column}
+  #scMonitor{flex:1;min-height:0;background:#000;position:relative;display:flex;align-items:center;justify-content:center}
+  #scVideo{max-width:100%;max-height:100%;display:none;background:#000}
+  #scEmpty{position:absolute;color:#7b8795;text-align:center;padding:0 16px}
+  #scTransport{display:flex;align-items:center;gap:6px;padding:8px 10px;background:#12151a;flex-wrap:wrap}
+  #scTime{font-variant-numeric:tabular-nums;min-width:110px;color:#cfd8e3}
+  .scSp{flex:1}
+  .scZoom{display:flex;align-items:center;gap:4px;color:#aab3c0}
+  .scZoom input{width:90px}
+  #scMsg{color:#ffd23f;font-size:12px;min-width:0}
+  #scTimeline{height:150px;flex-shrink:0;background:#0f1216;border-top:1px solid #262b34}
+  #scScroll{height:100%;overflow-x:auto;overflow-y:hidden}
+  #scInner{position:relative;height:100%;min-width:100%}
+  #scRuler{height:24px;background:#171b21;position:relative;cursor:pointer;overflow:hidden}
+  .scTick{position:absolute;top:0;bottom:0;border-left:1px solid #3a4250;font-size:10px;color:#8a94a3;padding-left:3px;line-height:24px;pointer-events:none}
+  #scTrack{position:relative;height:84px;margin-top:10px}
+  .scClip{position:absolute;top:0;height:76px;box-sizing:border-box;background:linear-gradient(#2d6cdf,#2252b0);border:2px solid #7fb0ff55;border-radius:6px;overflow:hidden;cursor:grab;user-select:none;touch-action:none}
+  .scClip.sel{border-color:#ffd23f;box-shadow:0 0 0 1px #ffd23f66}
+  .scClip .nm{position:absolute;left:12px;right:12px;top:8px;font-size:12px;font-weight:650;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+  .scClip .du{position:absolute;left:12px;bottom:6px;font-size:11px;color:#dbe7ff;pointer-events:none}
+  .scH{position:absolute;top:0;bottom:0;width:10px;cursor:ew-resize;background:#ffffff38}
+  .scH:hover{background:#ffffff66}
+  .scH.l{left:0}.scH.r{right:0}
+  #scPlayhead{position:absolute;top:0;bottom:0;left:0;width:2px;margin-left:-1px;background:#ff4d4d;pointer-events:none;z-index:2}
+  #scPlayhead:before{content:"";position:absolute;top:0;left:-5px;border:6px solid transparent;border-top-color:#ff4d4d;border-bottom:0}
+  #scModal{display:none;position:absolute;inset:0;background:#000b;align-items:center;justify-content:center;z-index:4}
+  #scModal.show{display:flex}
+  #scDialog{background:#1c1f26;border-radius:12px;padding:20px;width:min(400px,calc(100% - 32px));box-shadow:0 18px 60px #000a}
+  #scDialog h3{margin:0 0 12px}
+  #scDialog label{display:block;margin-bottom:6px;color:#aab3c0}
+  #scDialog input[type=text]{width:100%;box-sizing:border-box;padding:9px 10px;border-radius:7px;border:1px solid #3a4250;background:#12151a;color:#fff;font-size:14px}
+  .scNote{color:#aab3c0;font-size:12px;line-height:1.5;margin:12px 0}
+  .scBtns{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;margin-top:12px}
+  .scProg{height:10px;background:#2c313b;border-radius:8px;overflow:hidden;margin:14px 0 8px}
+  #scProgBar{height:100%;width:0;background:#4aa3ff}
+  @media (max-width:640px){
+    #scMain{flex-direction:column}
+    #scBin{width:auto;height:96px;border-right:0;border-bottom:1px solid #262b34}
+    #scTimeline{height:140px}
+  }
