@@ -129,7 +129,7 @@ let pulled=null;
 const SND2=new Audio('media/3c7a536396.mp3');const RLDUR=7105;
 function rouletteVisual(j,seq,fin){
 try{SND2.volume=vol;SND2.currentTime=0;SND2.play().catch(()=>{})}catch(e){}
-const ov=document.createElement('div');ov.id='rl';ov.innerHTML='<div class=rt>Paczka — losowanie piłkarza</div><div id=rc></div>';mid.appendChild(ov);
+const ov=document.createElement('div');ov.id='rlp';ov.innerHTML='<div class=rt>Paczka — losowanie piłkarza</div><div id=rc></div>';(document.getElementById('board')||mid).appendChild(ov);
 const rc=ov.querySelector('#rc'),show=x=>{const q=PL[x];if(!q)return;rc.innerHTML=`<div class=cb style="background:${G[q.g]}"></div>${q.img?`<img class=face src="${q.img}" alt="">`:''}<b>${q.n}</b><div>kolor ${GN[q.g]}</div><div>${q.ps}, ocena ${q.r}</div>`};
 const HOLD=Math.min(1100,RLDUR*.3),raw=seq.map((_,k)=>60+Math.pow((k+1)/seq.length,3)*420),K=(RLDUR-HOLD)/raw.slice(0,-1).reduce((a,c)=>a+c,0);
 let i=0;const tick=()=>{show(seq[i]);rc.classList.remove('tk2');void rc.offsetWidth;rc.classList.add('tk2');
@@ -436,7 +436,7 @@ function openMenu(){closeMenu();const d=document.createElement('div');d.id='menu
 function closeMenu(){const d=document.getElementById('menu');if(d)d.remove()}
 function askNew(){document.querySelector('#menu .box').innerHTML='<h2>Zacząć od nowa?</h2><div class=row>Obecna gra zostanie utracona.</div><button onclick="newGame()">Tak, nowa gra</button><button class=skip onclick="closeMenu()">Anuluj</button>'}
 function newGame(){gen++;pot=0;MK=null;moving=false;rolled=false;dbl=0;last=0;cur=0;pulled=null;P=[];B.forEach(s=>{s.o=null;s.sq=[null,null,null,null,null];s.fm='1-1-1-2'});PL.forEach(x=>{x.o=null;x.at=null;x.paid=false});
-['tr','rl','menu'].forEach(id=>{const e=document.getElementById(id);if(e)e.remove()});
+['tr','rl','rlp','menu'].forEach(id=>{const e=document.getElementById(id);if(e)e.remove()});
 document.getElementById('log').innerHTML='';document.getElementById('dice').textContent='—';document.getElementById('turn').textContent='';draw();showSetup()}
 function ui(){const myTurn=onlineIsMyTurn();document.getElementById('turn').textContent='Tura: '+P[cur].n+(P[cur].inJ?' (w więzieniu)':'')+(dbl>0&&!rolled?' — szóstka!':'')+(onlineRoom&&onlineGameStarted&&!myTurn?' — czekaj na swoją turę':'');document.getElementById('roll').textContent=P[cur].inJ&&!rolled?'Rzuć o 6 (próby: '+P[cur].att+')':dbl>0&&!rolled?'Rzuć ponownie (6)':'Rzuć kostką';
 document.getElementById('roll').disabled=!myTurn||rolled||moving||!!MK;document.getElementById('end').disabled=!myTurn||!rolled||moving||!!MK;

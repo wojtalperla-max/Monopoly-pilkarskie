@@ -61,7 +61,9 @@ const SZ=[
 {x:'mv',to:5,text:'Jedź na Warszawa Centralna. Mijając START, pobierz 200 €.'},
 {x:'eachpay',a:50,text:'Wybrano Cię na prezesa. Zapłać każdemu graczowi 50 €.'},
 {x:'cash',a:150,text:'Twoja pożyczka budowlana dojrzała. Pobierz 150 €.'},
-{x:'cash',a:-100,text:'Opłać przegląd techniczny: 100 €.'}];
+{x:'cash',a:-100,text:'Opłać przegląd techniczny: 100 €.'},
+{x:'cash',a:-100,text:'Odwalasz. Zapłać 100 €.'},
+{x:'skip',text:'Nie idę. Omijasz następną kolejkę.'}];
 const CH=[
 {x:'go',text:'Idź na START. Pobierz 200 €.'},
 {x:'cash',a:200,text:'Błąd bankowy na Twoją korzyść. Pobierz 200 €.'},
@@ -99,13 +101,13 @@ function snd(k){try{const m={dice:typeof SND5!=='undefined'?SND5:null,pay:typeof
 
 /* ---------- stan ---------- */
 function create(players,money){
-  return {P:players.map(p=>({uid:p.uid||null,n:p.n,c:p.c,m:money,pos:0,j:0,jt:0,out:0,gf:0})),cur:0,ph:'roll',d:[1,1],dbl:0,
+  return {P:players.map(p=>({uid:p.uid||null,n:p.n,c:p.c,m:money,pos:0,j:0,jt:0,out:0,gf:0,sk:0})),cur:0,ph:'roll',d:[1,1],dbl:0,
     o:Array(40).fill(-1),h:Array(40).fill(0),mg:Array(40).fill(0),k1:shuf(SZ.length),k2:shuf(CH.length),p1:0,p2:0,
     lg:['Gra rozpoczęta! Powodzenia!'],rid:0,pend:null,win:-1,rev:1,ev:null,by:null,mode:'classic'};
 }
 function norm(s){
   const d=arr(s.d);
-  return {P:Object.values(s.P||{}).map(p=>({uid:p.uid||null,n:String(p.n||'Gracz'),c:String(p.c||'#e63946'),m:Number(p.m)||0,pos:Number(p.pos)||0,j:Number(p.j)||0,jt:Number(p.jt)||0,out:Number(p.out)||0,gf:Number(p.gf)||0})),
+  return {P:Object.values(s.P||{}).map(p=>({uid:p.uid||null,n:String(p.n||'Gracz'),c:String(p.c||'#e63946'),m:Number(p.m)||0,pos:Number(p.pos)||0,j:Number(p.j)||0,jt:Number(p.jt)||0,out:Number(p.out)||0,gf:Number(p.gf)||0,sk:Number(p.sk)||0})),
     cur:Number(s.cur)||0,ph:s.ph||'roll',d:d.length===2?d:[1,1],dbl:Number(s.dbl)||0,o:arr(s.o),h:arr(s.h),mg:arr(s.mg),
     k1:arr(s.k1),k2:arr(s.k2),p1:Number(s.p1)||0,p2:Number(s.p2)||0,lg:Object.values(s.lg||{}).map(String),rid:Number(s.rid)||0,
     pend:s.pend?{t:s.pend.t,i:Number(s.pend.i)||0,amt:Number(s.pend.amt)||0,cred:s.pend.cred==null?-1:Number(s.pend.cred),each:Number(s.pend.each)||0}:null,
@@ -118,7 +120,7 @@ function rent(i,opt){
   const f=T[i],o=G.o[i];
   if(f[0]==='st'){const h=G.h[i];if(h>0)return f[4][h];const full=GRP[f[2]].every(j=>G.o[j]===o);return f[4][0]*(full?2:1)}
   if(f[0]==='rr'){const n=RR.filter(j=>G.o[j]===o).length;return 25*Math.pow(2,n-1)*(opt&&opt.rr2?2:1)}
-  const n=UT.filter(j=>G.o[j]===o).length;return (G.d[0]+G.d[1])*(opt&&opt.ut10?10:(n===2?10:4));
+  const n=UT.filter(j=>G.o[j]===o).length;return (G.d[0])*(opt&&opt.ut10?10:(n===2?10:4));
 }
 function credit(cred,amt,each){
   if(cred>=0)G.P[cred].m+=amt;
@@ -146,6 +148,7 @@ function drawCard(p,kind){
     case 'ut':{const u=UT.find(x=>x>p.pos)||12;moveTo(p,u,true);land(p,{ut10:1});break}
     case 'cash':if(c.a>=0)p.m+=c.a;else pay(p,-c.a,-1);break;
     case 'gf':p.gf++;break;
+    case 'skip':p.sk=(p.sk||0)+1;break;
     case 'back':p.pos=(p.pos+37)%40;land(p);break;
     case 'jail':goJail(p);break;
     case 'rep':{let t=0;for(let i=0;i<40;i++)if(G.o[i]===G.cur&&G.h[i]>0)t+=G.h[i]===5?c.H:G.h[i]*c.h;if(t>0)pay(p,t,-1);break}
@@ -176,7 +179,8 @@ function settle(){
   if(p.j||p.out)G.dbl=0;
 }
 function nextPlayer(){
-  let g=0;do{G.cur=(G.cur+1)%G.P.length}while(G.P[G.cur].out&&++g<20);
+  let g=0;
+  do{G.cur=(G.cur+1)%G.P.length;const q=G.P[G.cur];if(q.out)continue;if(q.sk>0){q.sk--;log(q.n+' omija kolejkę.');continue}break}while(++g<40);
   G.dbl=0;G.pend=null;G.ph='roll';
 }
 function checkWin(){
@@ -195,23 +199,24 @@ function commit(){
 function act(f){if(!G||anim||!mine()||G.ph==='over')return;if(f()!==false)commit()}
 function roll(mode){
   act(()=>{
+    if(G.ph==='after'&&G.dbl>0&&!cp().j){G.ph='roll'}
     if(G.ph!=='roll')return false;
     const p=cp();
     if(p.j&&mode==='pay'){if(p.m<50)return false;p.m-=50;p.j=0;p.jt=0;log(p.n+' płaci 50 € i wychodzi z więzienia.')}
     else if(p.j&&mode==='card'){if(p.gf<1)return false;p.gf--;p.j=0;p.jt=0;log(p.n+' używa karty i wychodzi z więzienia.')}
-    const a=r6(),b=r6(),dbl=a===b,s=a+b;G.d=[a,b];G.rid++;
-    log(p.n+' rzuca: '+a+' + '+b+' = '+s+(dbl?' (dublet!)':''));
+    const a=r6(),dbl=a===6,s=a;G.d=[a,0];G.rid++;
+    log(p.n+' rzuca: '+a+(dbl?' (szóstka!)':''));
     if(p.j){
-      if(dbl){p.j=0;p.jt=0;G.dbl=0;log(p.n+' wyrzuca dublet i wychodzi z więzienia.');p.pos=(p.pos+s)%40;land(p)}
+      if(dbl){p.j=0;p.jt=0;G.dbl=0;log(p.n+' wyrzuca szóstkę i wychodzi z więzienia.');p.pos=(p.pos+s)%40;land(p)}
       else{
         p.jt++;
         if(p.jt>=3){
           p.j=0;p.jt=0;G.dbl=0;log(p.n+' po 3 próbach płaci 50 € i wychodzi.');pay(p,50,-1);
           if(!G.pend){const o=p.pos;p.pos=(p.pos+s)%40;if(p.pos<o)p.m+=0;land(p)}
-        }else log(p.n+' nie wyrzuca dubletu (próba '+p.jt+'/3).');
+        }else log(p.n+' nie wyrzuca szóstki (próba '+p.jt+'/3).');
       }
     }else{
-      if(dbl){G.dbl++;if(G.dbl>=3){log(p.n+' wyrzuca trzeci dublet z rzędu!');goJail(p);settle();return}}else G.dbl=0;
+      if(dbl){G.dbl++;if(G.dbl>=3){log(p.n+' wyrzuca trzecią szóstkę z rzędu!');goJail(p);settle();return}}else G.dbl=0;
       const np=p.pos+s;if(np>=40){p.m+=200;log(p.n+' mija START: +200 €')}
       p.pos=np%40;land(p);
     }
@@ -226,7 +231,7 @@ function buy(){
   });
 }
 function skip(){act(()=>{if(G.ph!=='buy')return false;log(cp().n+' rezygnuje z zakupu: '+T[G.pend.i][1]);G.pend=null;G.ph='after'})}
-function endTurn(){act(()=>{if(G.ph!=='after')return false;nextPlayer();log('Tura: '+cp().n)})}
+function endTurn(){act(()=>{if(G.ph==='buy'&&G.pend){log(cp().n+' rezygnuje z zakupu: '+T[G.pend.i][1]);G.pend=null;G.ph='after'}if(G.ph!=='after')return false;if(G.dbl>0&&!cp().j)return false;nextPlayer();log('Tura: '+cp().n)})}
 function payDebt(){
   act(()=>{
     if(G.ph!=='debt'||!G.pend)return false;
@@ -269,21 +274,22 @@ function stats(){
 
 /* ---------- widok ---------- */
 const PIPS={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
-const die=n=>'<div class="cmdie">'+[...Array(9).keys()].map(k=>'<i'+(PIPS[n].includes(k)?' on':'')+'></i>').join('')+'</div>';
+const die=n=>'<div class="cmdie">'+[...Array(9).keys()].map(k=>'<i'+(PIPS[n].includes(k)?' class="on"':'')+'></i>').join('')+'</div>';
 function cellPos(i){let r,c;if(i<=10){r=10;c=10-i}else if(i<20){c=0;r=20-i}else if(i<=30){r=0;c=i-20}else{c=10;r=i-30}return [r,c]}
 function sideOf(i){return i<10?'b':i<20?'l':i<30?'t':'r'}
 function cellHTML(i){
   const f=T[i],[r,c]=cellPos(i),o=G.o[i],corner=i%10===0;
-  let inner='',cls='cmc '+(corner?'corner ':'cs'+sideOf(i)+' ');
+  let inner='',band='',cls='cmc '+(corner?'corner ':'')+'t-'+f[0]+' ';
   if(f[0]==='st'){
     const h=G.h[i];
     const hs=h===5?'<u class="hot"></u>':'<u></u>'.repeat(h);
-    inner=`<div class="bar" style="background:${GC[f[2]]}">${hs}</div><div class="nm">${f[1]}</div><div class="pr">${f[3]} €</div>`;
+    band=`<div class="bar" style="background:${GC[f[2]]}">${hs}</div>`;
+    inner=`<div class="nm">${f[1]}</div><div class="pr">${f[3]} €</div>`;
   }else if(f[0]==='rr')inner=`<div class="ic">🚆</div><div class="nm">${f[1]}</div><div class="pr">200 €</div>`;
   else if(f[0]==='ut')inner=`<div class="ic">${i===12?'💡':'🚰'}</div><div class="nm">${f[1]}</div><div class="pr">150 €</div>`;
   else if(f[0]==='tx')inner=`<div class="ic">💸</div><div class="nm">${f[1]}</div><div class="pr">${f[2]} €</div>`;
-  else if(f[0]==='sz')inner=`<div class="ic big">❓</div><div class="nm">SZANSA</div>`;
-  else if(f[0]==='ch')inner=`<div class="ic big">📦</div><div class="nm">KASA SPOŁECZNA</div>`;
+  else if(f[0]==='sz')inner=`<div class="nm">SZANSA</div><div class="deck"><i></i><i></i><i><b>?</b></i></div>`;
+  else if(f[0]==='ch')inner=`<div class="nm">KASA<br>SPOŁECZNA</div><div class="deck"><i></i><i></i><i><b>€</b></i></div>`;
   else if(f[0]==='go')inner=`<div class="ic big">🏁</div><div class="nm">START</div><div class="pr">+200 €</div>`;
   else if(f[0]==='jl')inner=`<div class="ic big">⛓️</div><div class="nm">WIĘZIENIE</div><div class="pr">odwiedziny</div>`;
   else if(f[0]==='fp')inner=`<div class="ic big">🅿️</div><div class="nm">PARKING</div>`;
@@ -291,44 +297,72 @@ function cellHTML(i){
   if(o>=0){cls+='own ';if(G.mg[i])cls+='mg '}
   const tks=G.P.map((p,k)=>(!p.out&&vis[k]===i)?`<span class="cmtk${k===G.cur?' me':''}" style="background:${esc(p.c)}" title="${esc(p.n)}"></span>`:'').join('');
   const own=o>=0?`style="grid-area:${r+1}/${c+1};--oc:${esc(G.P[o].c)}"`:`style="grid-area:${r+1}/${c+1}"`;
-  return `<div class="${cls}" ${own} onclick="CM.info(${i})"><div class="in">${inner}</div>${G.mg[i]&&o>=0?'<div class="mgl">ZASTAW</div>':''}<div class="tks">${tks}</div></div>`;
+  return `<div class="${cls}" ${own} onclick="CM.info(${i})"><span class="no">${i}</span>${band}<div class="in">${inner}</div>${G.mg[i]&&o>=0?'<div class="mgl">ZASTAW</div>':''}<div class="tks">${tks}</div></div>`;
 }
 function centerHTML(){
-  const p=cp(),d=G.d;
-  let ctl='';
-  if(G.ph==='over'){
-    ctl=`<div class="cmwin">🏆 ${esc(G.P[G.win].n)} wygrywa!</div><button class="cmb go" onclick="CM.exit(true)">Menu główne</button>`;
-  }else if(anim){ctl='<div class="cmwait">…</div>'}
-  else if(!mine()){ctl=`<div class="cmwait">Teraz gra <b style="color:${esc(p.c)}">${esc(p.n)}</b><span class="dots"><i>.</i><i>.</i><i>.</i></span></div>`}
-  else if(G.ph==='roll'){
-    if(p.j){
-      ctl=`<div class="cmq">⛓️ Jesteś w więzieniu (próba ${p.jt+1}/3)</div><button class="cmb go" onclick="CM.roll()">🎲 Rzuć (dublet wypuszcza)</button><button class="cmb" ${p.m<50?'disabled':''} onclick="CM.roll('pay')">Zapłać 50 € i rzuć</button>${p.gf?'<button class="cmb" onclick="CM.roll(\'card\')">Użyj karty</button>':''}`;
-    }else ctl='<button class="cmb go pulse" onclick="CM.roll()">🎲 Rzuć kośćmi</button>';
-  }else if(G.ph==='buy'&&G.pend){
-    const i=G.pend.i,f=T[i];
-    ctl=`<div class="cmq">Kupić <b>${f[1]}</b> za <b>${price(i)} €</b>?</div><button class="cmb go" onclick="CM.buy()">Kup</button><button class="cmb" onclick="CM.skip()">Pomiń</button>`;
-  }else if(G.ph==='debt'&&G.pend){
-    ctl=`<div class="cmq bad">Dług: <b>${G.pend.amt} €</b><br><small>Sprzedaj domy lub zastaw posesje (przycisk Posesje)</small></div><button class="cmb go" ${p.m<G.pend.amt?'disabled':''} onclick="CM.payDebt()">Zapłać ${G.pend.amt} €</button><button class="cmb red" onclick="if(confirm('Na pewno ogłosić bankructwo?'))CM.bankrupt()">Bankructwo</button>`;
-  }else if(G.ph==='after'){
-    ctl=(G.dbl>0&&!p.j)?'<button class="cmb go pulse" onclick="CM.setRoll()">🎲 Dublet! Rzuć ponownie</button>':'<button class="cmb go pulse" onclick="CM.endTurn()">Zakończ turę ➜</button>';
+  const p=cp(),d=G.d,ph=G.ph;
+  const my=!anim&&mine()&&ph!=='over';
+  const again=ph==='after'&&G.dbl>0&&!p.j;
+  const canRoll=my&&(ph==='roll'||again);
+  const canBuy=my&&ph==='buy'&&!!G.pend&&p.m>=price(G.pend.i);
+  const canEnd=my&&(ph==='buy'||(ph==='after'&&!again));
+  let info='',row='',extra='';
+  if(ph==='over'){
+    info=`<div class="cmwin">🏆 ${esc(G.P[G.win].n)} wygrywa!</div><button class="cmb go" onclick="CM.exit(true)">Menu główne</button>`;
+  }else if(ph==='debt'&&G.pend&&my){
+    info=`<div class="cmq bad">Dług: <b>${G.pend.amt} €</b><br><small>Sprzedaj domy lub zastaw posesje (przycisk Posesje)</small></div><button class="cmb go" ${p.m<G.pend.amt?'disabled':''} onclick="CM.payDebt()">Zapłać ${G.pend.amt} €</button><button class="cmb red" onclick="if(confirm('Na pewno ogłosić bankructwo?'))CM.bankrupt()">Bankructwo</button>`;
+  }else{
+    if(anim)info='<div class="cmwait">…</div>';
+    else if(!mine())info=`<div class="cmwait">Teraz gra <b style="color:${esc(p.c)}">${esc(p.n)}</b><span class="dots"><i>.</i><i>.</i><i>.</i></span></div>`;
+    else if(ph==='roll'&&p.j)info=`<div class="cmq">⛓️ Jesteś w więzieniu (próba ${p.jt+1}/3) — szóstka wypuszcza</div>`;
+    else if(ph==='buy'&&G.pend)info=`<div class="cmq">Kupić <b>${T[G.pend.i][1]}</b> za <b>${price(G.pend.i)} €</b>?</div>`;
+    else if(again)info='<div class="cmq">Szóstka! Rzuć ponownie</div>';
+    if(my&&ph==='roll'&&p.j)extra=`<button class="cmb" ${p.m<50?'disabled':''} onclick="CM.roll('pay')">Zapłać 50 € i rzuć</button>${p.gf?'<button class="cmb" onclick="CM.roll(\'card\')">Użyj karty wyjścia</button>':''}`;
+    row=`<div class="cmrow"><button class="cmb${canRoll?' pulse':''}" ${canRoll?'':'disabled'} onclick="CM.roll()">🎲 Rzuć kostką</button><button class="cmb${canBuy?' pulse':''}" ${canBuy?'':'disabled'} onclick="CM.buy()">💸 Kup</button><button class="cmb${canEnd&&ph==='after'?' pulse':''}" ${canEnd?'':'disabled'} onclick="CM.endTurn()">👋 Zakończ turę</button></div>`;
   }
-  const man=(G.ph!=='over'&&!anim&&mine())?'<button class="cmb ghost" onclick="CM.manage()">🏠 Posesje</button>':'';
-  return `<div class="cmlogo">MONOPOLY</div><div class="cmturn" style="--tc:${esc(p.c)}">Tura: <b>${esc(p.n)}</b></div><div id="cmd">${die(d[0])}${die(d[1])}</div><div class="cmctl">${ctl}${man}</div><div class="cmlast">${esc(G.lg[G.lg.length-1]||'')}</div>`;
+  const man=my?'<button class="cmb ghost" onclick="CM.manage()">🏠 Posesje</button>':'';
+  return `<div class="cmlogo">MONOPOLY</div><div class="cmturn" style="--tc:${esc(p.c)}">Tura: <b>${esc(p.n)}</b></div><div id="cmd">${die(d[0])}</div><div class="cmctl">${info}${row}${extra}${man}</div><div class="cmlast">${esc(G.lg[G.lg.length-1]||'')}</div>`;
 }
 function sideHTML(){
   let h='';
   G.P.forEach((p,k)=>{
     const props=[];for(let i=0;i<40;i++)if(G.o[i]===k)props.push(i);
     const chips=props.map(i=>{const f=T[i];const col=f[0]==='st'?GC[f[2]]:f[0]==='rr'?'#555':'#aaa';return `<span class="cmchip${G.mg[i]?' mg':''}" style="background:${col}" onclick="CM.info(${i})" title="${esc(f[1])}">${G.h[i]>0?(G.h[i]===5?'H':G.h[i]):''}</span>`}).join('');
-    h+=`<div class="cmpl${k===G.cur&&G.ph!=='over'?' act':''}${p.out?' out':''}" data-pl="${k}"><div class="plh"><span class="dot" style="background:${esc(p.c)}"></span><b>${esc(p.n)}</b>${p.j?'<span title="W więzieniu">⛓️</span>':''}${p.gf?'<span title="Karta wyjścia z więzienia">🎫'+p.gf+'</span>':''}<span class="mn">${p.out?'BANKRUT':p.m+' €'}</span></div><div class="chips">${chips||'<small>brak posesji</small>'}</div></div>`;
+    h+=`<div class="cmpl${k===G.cur&&G.ph!=='over'?' act':''}${p.out?' out':''}" data-pl="${k}" style="border-left-color:${esc(p.c)}"><div class="plh"><span class="dot" style="background:${esc(p.c)}"></span><b>${esc(p.n)}</b>${p.j?'<span title="W więzieniu">⛓️</span>':''}${p.gf?'<span title="Karta wyjścia z więzienia">🎫'+p.gf+'</span>':''}${p.sk?'<span title="Ominie następną kolejkę">⏭️</span>':''}<span class="mn">${p.out?'BANKRUT':p.m+' €'}</span></div><div class="chips">${chips||'<small>brak posesji</small>'}</div></div>`;
   });
   h+='<div class="cmlgh">Dziennik gry</div><div class="cmlgl">'+G.lg.slice(-14).reverse().map(x=>'<div>'+esc(x)+'</div>').join('')+'</div>';
+  return h;
+}
+
+function deedHTML(i){
+  const f=T[i],h=G.h[i],mg=G.mg[i];
+  let band,img='',rows='';
+  if(f[0]==='st'){
+    band=GC[f[2]];
+    rows=`<tr><td>Czynsz</td><td>${f[4][0]} €</td></tr><tr><td>Cały kolor</td><td>${f[4][0]*2} €</td></tr>`+[1,2,3,4].map(k=>`<tr><td>${k} ${k===1?'dom':k<5?'domy':'domów'}</td><td>${f[4][k]} €</td></tr>`).join('')+`<tr><td>Hotel</td><td>${f[4][5]} €</td></tr><tr><td>Dom / hotel</td><td>${f[5]} €</td></tr>`;
+  }else if(f[0]==='rr'){
+    band='#555';img='<div class="dcic">🚆</div>';
+    rows='<tr><td>1 dworzec</td><td>25 €</td></tr><tr><td>2 dworce</td><td>50 €</td></tr><tr><td>3 dworce</td><td>100 €</td></tr><tr><td>4 dworce</td><td>200 €</td></tr>';
+  }else{
+    band='#999';img=`<div class="dcic">${i===12?'💡':'🚰'}</div>`;
+    rows='<tr><td>1 spółka</td><td>4× oczka</td></tr><tr><td>2 spółki</td><td>10× oczka</td></tr>';
+  }
+  const st=mg?'ZASTAWIONE':f[0]==='st'&&h?(h===5?'Hotel':h+(h===1?' dom':h<5?' domy':' domów')):'';
+  return `<div class="dc${mg?' mg':''}" onclick="CM.info(${i})"><div class="cb" style="background:${band}"></div>${img}<b>${f[1]}</b><div>Cena: ${price(i)} €</div><table>${rows}</table>${st?`<div class="dcst">${st}</div>`:''}</div>`;
+}
+function cardsHTML(){
+  let h='';
+  if(G.ph==='buy'&&G.pend&&mine())h+=`<div class="ph" style="border-color:#fff"><h3>Dostępne do kupienia</h3><div class="cl">${deedHTML(G.pend.i)}</div></div>`;
+  G.P.forEach((p,k)=>{
+    const o=[];for(let i=0;i<40;i++)if(G.o[i]===k)o.push(i);
+    if(o.length)h+=`<div class="ph" style="border-color:${esc(p.c)}"><h3 style="color:${esc(p.c)}">Karty gracza: ${esc(p.n)}</h3><div class="cl">${o.map(deedHTML).join('')}</div></div>`;
+  });
   return h;
 }
 function ensureRoot(){
   if(root&&document.body.contains(root))return;
   root=document.createElement('div');root.id='cm';
-  root.innerHTML='<div id="cmbar"><button class="cmb ghost" onclick="CM.exit()">← Menu główne</button><b>MONOPOLY</b><span id="cmbadge"></span></div><div id="cmwrap"><div id="cmb"></div><div id="cmside"></div></div><div id="cmmodal" hidden></div><div id="cmtoast"></div>';
+  root.innerHTML='<div id="cmbar"><button class="cmb ghost" onclick="CM.exit()">← Menu główne</button><b>MONOPOLY</b><span id="cmbadge"></span></div><div id="cmwrap"><div id="cmb"></div><div id="cmside"></div><div id="cmcards"></div></div><div id="cmmodal" hidden></div><div id="cmtoast"></div>';
   document.body.appendChild(root);
   root.querySelector('#cmmodal').addEventListener('click',e=>{if(e.target.id==='cmmodal')closeModal()});
 }
@@ -338,7 +372,7 @@ function render(){
   let h='';for(let i=0;i<40;i++)h+=cellHTML(i);
   h+=`<div id="cmmid">${centerHTML()}</div>`;
   b.innerHTML=h;
-  root.querySelector('#cmside').innerHTML=sideHTML();
+  root.querySelector('#cmside').innerHTML=sideHTML();root.querySelector('#cmcards').innerHTML=cardsHTML();
   root.querySelector('#cmbadge').textContent=ONL?'online · '+CODE:'lokalnie';
   if(modal)drawModal();
 }
@@ -361,8 +395,8 @@ function diceAnim(id,cb){
   const iv=setInterval(()=>{
     if(id!==aid){clearInterval(iv);return}
     n++;const e=root&&root.querySelector('#cmd');
-    if(e&&n<8){e.classList.add('shake');e.innerHTML=die(r6())+die(r6())}
-    if(n>=8){clearInterval(iv);if(e){e.classList.remove('shake');e.innerHTML=die(G.d[0])+die(G.d[1])}cb()}
+    if(e&&n<8){e.classList.add('shake');e.innerHTML=die(r6())}
+    if(n>=8){clearInterval(iv);if(e){e.classList.remove('shake');e.innerHTML=die(G.d[0])}cb()}
   },75);
 }
 function walk(id,cb){
@@ -372,7 +406,7 @@ function walk(id,cb){
       if(vis[i]!==p.pos){any=true;const dist=(p.pos-vis[i]+40)%40;if(dist>12||dist===0)vis[i]=p.pos;else{vis[i]=(vis[i]+1)%40;snd('step')}}
     });
     render();
-    if(any)setTimeout(step,95);else cb();
+    if(any)setTimeout(step,260);else cb();
   };
   step();
 }
@@ -401,7 +435,7 @@ function propBtns(i){
 }
 function infoHTML(i){
   const f=T[i],o=G.o[i];
-  if(!PROP.includes(f[0]))return `<h3>${f[1]}</h3><p>${f[0]==='tx'?'Zapłać '+f[2]+' € bankowi.':f[0]==='go'?'Mijając START lub stając na nim, pobierasz 200 €.':f[0]==='jl'?'Zwykłe odwiedziny. Z więzienia wychodzisz dubletem, za 50 € lub kartą.':f[0]==='gj'?'Idziesz prosto do więzienia.':f[0]==='fp'?'Odpoczywasz. Nic się nie dzieje.':'Dobierz kartę.'}</p>`;
+  if(!PROP.includes(f[0]))return `<h3>${f[1]}</h3><p>${f[0]==='tx'?'Zapłać '+f[2]+' € bankowi.':f[0]==='go'?'Mijając START lub stając na nim, pobierasz 200 €.':f[0]==='jl'?'Zwykłe odwiedziny. Z więzienia wychodzisz szóstką, za 50 € lub kartą.':f[0]==='gj'?'Idziesz prosto do więzienia.':f[0]==='fp'?'Odpoczywasz. Nic się nie dzieje.':'Dobierz kartę.'}</p>`;
   let t=`<h3>${f[0]==='st'?`<span class="sw" style="background:${GC[f[2]]}"></span>`:''}${f[1]}</h3><p>Cena: <b>${price(i)} €</b> · Zastaw: ${price(i)/2} €${f[0]==='st'?' · '+GN[f[2]]:''}</p>`;
   if(f[0]==='st')t+=`<table class="cmrt"><tr><td>Czynsz</td><td>${f[4][0]} €</td></tr><tr><td>Cały kolor (bez domów)</td><td>${f[4][0]*2} €</td></tr>${[1,2,3,4].map(k=>`<tr><td>${k} ${k===1?'dom':k<5?'domy':'domów'}</td><td>${f[4][k]} €</td></tr>`).join('')}<tr><td>Hotel</td><td>${f[4][5]} €</td></tr><tr><td>Koszt domu / hotelu</td><td>${f[5]} €</td></tr></table>`;
   else if(f[0]==='rr')t+='<p>Czynsz: 25 € · 2 dworce 50 € · 3 dworce 100 € · 4 dworce 200 €</p>';
@@ -452,7 +486,7 @@ function remote(s){
 function exit(force){
   if(force||confirm('Wyjść do menu głównego? Obecna gra zostanie przerwana.'))monoLeaveToHub();
 }
-function setRoll(){act(()=>{if(G.ph!=='after')return false;G.ph='roll';log(cp().n+' rzuca ponownie (dublet)')})}
+function setRoll(){act(()=>{if(G.ph!=='after')return false;G.ph='roll';log(cp().n+' rzuca ponownie (szóstka)')})}
 
 return {roll,buy,skip,endTurn,payDebt,bankrupt,build,sell,mort,unm,info,manage,closeModal,startLocal,hostStart,remote,exit,setRoll};
 })();
