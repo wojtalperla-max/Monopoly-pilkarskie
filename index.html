@@ -48,4 +48,52 @@
 <script src="js/game-kropki-kwadraty.js"></script>
 <script src="js/game-hub.js"></script>
 <script src="js/playtime.js"></script>
+<script>
+/* Przycisk „Menu główne” jest widoczny tylko na ekranie lobby danej gry.
+   Po stworzeniu/dołączeniu do pokoju albo starcie gry jest chowany (display:none) –
+   zostaje w DOM, bo gry wywołują go programowo przy wyjściu. */
+(function(){
+  /* id kontenera gry -> selektor elementu, który jest widoczny tylko na ekranie lobby */
+  var SEL={
+    lg:'.ob:not(.ob-compact)',kod:'.ob:not(.ob-compact)',cz:'.ob:not(.ob-compact)',kj:'.ob:not(.ob-compact)',
+    pm:'.ob:not(.ob-compact)',uno:'.ob:not(.ob-compact)',stk:'.ob:not(.ob-compact)',
+    isla:'#tkStart',imp:'#lobby',ttt:'#menu',kul:'#menu.on',snl:'#home.on',pcw:'#start',dbl:'#home.on',
+    grz:'#home',wis:'#home',gof:'#v-home',kro:'#menu.on',bie:'#menu.on',chin:'#home',hole:'#menu',
+    guessr:'#lobby',darksweep:'#menu',krzyzowka:'#lobby',tabu:'.tb-home',mono:'#onlineGate',
+    pnm:'.ph-pane',szept:'#menu.screen:not(.hidden),#loading.screen:not(.hidden)',rl:'#pauseScreen'
+  };
+  var PARENT={pod:'#podGate:not(.inlobby)'};   /* lobby Podboju jest w stronie głównej, nie w ramce */
+  function shown(e){
+    if(!e)return false;
+    var r=e.getBoundingClientRect(),cs=e.ownerDocument.defaultView.getComputedStyle(e);
+    return r.width>40&&r.height>40&&cs.display!=='none'&&cs.visibility!=='hidden';
+  }
+  var STATE={};
+  window.addEventListener('message',function(e){
+    var d=e.data;if(!d||d.type!=='gmenu-lobby')return;
+    document.querySelectorAll('.gmenu').forEach(function(b){
+      var w=b.parentElement,f=w&&w.querySelector('iframe');
+      if(f&&f.contentWindow===e.source)STATE[w.id]={lobby:!!d.lobby,t:Date.now()};
+    });
+  });
+  function tick(){
+    document.querySelectorAll('.gmenu').forEach(function(b){
+      var w=b.parentElement;if(!w||w.hidden||w.offsetParent===null&&getComputedStyle(w).position!=='fixed')return;
+      var id=w.id,lobby=true;
+      try{
+        if(PARENT[id])lobby=shown(w.querySelector(PARENT[id]));
+        else if(STATE[id]&&Date.now()-STATE[id].t<2500)lobby=STATE[id].lobby;   /* komunikat z gry (działa też z file://) */
+        else if(SEL[id]){
+          var f=w.querySelector('iframe'),d=f&&f.contentDocument;
+          lobby=d&&d.body?shown(d.querySelector(SEL[id])):true;   /* ramka jeszcze się ładuje – pokaż */
+        }
+      }catch(e){lobby=true}
+      b.classList.toggle('gmenu-off',!lobby);
+      if(lobby)b.style.removeProperty('display');else b.style.setProperty('display','none','important');
+    });
+  }
+  setInterval(tick,200);
+})();
+
+</script>
 </body></html>
