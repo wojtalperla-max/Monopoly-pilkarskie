@@ -112,28 +112,35 @@
 const LG_ALPHA='aąbcćdeęfghijklłmnńoópqrsśtuvwxyzźż';
 const LG_ORD=['pierwsza','druga','trzecia','czwarta','piąta','szósta','siódma','ósma','dziewiąta','dziesiąta','jedenasta','dwunasta','trzynasta','czternasta','piętnasta','szesnasta','siedemnasta','osiemnasta','dziewiętnasta','dwudziesta'];
 const LG_COLS=['#e63946','#2a9df4','#f2c230','#3a9b62','#b04fe0','#ff8c42'];
-let LG={screen:'start',mode:null,draft:'',names:[],cols:[],n:3,wi:0,players:[],words:{},game:null,msg:'',ref:null,status:null,code:'',host:null,listener:null,promoting:false,showHistory:false,cmode:'all',category:''};
+let LG={screen:'start',mode:null,draft:'',names:[],cols:[],n:3,wi:0,players:[],words:{},game:null,msg:'',ref:null,status:null,code:'',host:null,listener:null,promoting:false,showHistory:false,cmode:'all',dir:'fwd',pane:'',category:''};
 const lgEsc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const lgRank=c=>LG_ALPHA.indexOf(c);
 const lgNorm=w=>String(w||'').trim().toLocaleLowerCase('pl');
 const lgValid=w=>new RegExp('^['+LG_ALPHA+']{2,}$').test(w);
 const lgCap=s=>s.charAt(0).toUpperCase()+s.slice(1);
-const lgNewGame=()=>({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),turn:0,round:1,guesses:[],solved:[],done:false,winners:[]});
-function lgCompare(secret,guess){
+const lgNewGame=()=>({rev:LG.dir==='rev',id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),turn:0,round:1,guesses:[],solved:[],done:false,winners:[]});
+const lgRevStr=s=>String(s).split('').reverse().join('');
+/* rev=true → tryb „Od tyłu”: porównujemy litery od końca (pos = numer litery licząc od końca, od 0) */
+function lgCompare(secret,guess,rev){
   if(secret===guess)return {solved:true,match:secret.length};
+  if(rev){secret=lgRevStr(secret);guess=lgRevStr(guess)}
   const n=Math.min(secret.length,guess.length);let i=0;
   while(i<n&&secret[i]===guess[i])i++;
   if(i<n)return {solved:false,match:i,pos:i,dir:lgRank(secret[i])<lgRank(guess[i])?'przed':'po',ref:guess[i].toUpperCase()};
   return guess.length<secret.length?{solved:false,match:i,more:true}:{solved:false,match:i,less:true};
 }
-function lgMsg(fb){
+function lgMsg(fb,rev){
   if(fb.solved)return 'Zgadnięto całe hasło!';
-  if(fb.pos!=null)return lgCap(LG_ORD[fb.pos]||((fb.pos+1)+'.'))+' litera jest '+fb.dir+' '+fb.ref;
-  if(fb.more)return 'Wszystkie litery się zgadzają, ale hasło jest dłuższe';
-  return 'Hasło jest krótsze — pasuje tylko '+fb.match+' pierwszych liter';
+  if(fb.pos!=null){
+    if(!rev)return lgCap(LG_ORD[fb.pos]||((fb.pos+1)+'.'))+' litera jest '+fb.dir+' '+fb.ref;
+    const nm=fb.pos===0?'Ostatnia litera':fb.pos===1?'Przedostatnia litera':lgCap(LG_ORD[fb.pos]||((fb.pos+1)+'.'))+' litera od końca';
+    return nm+' jest '+fb.dir+' '+fb.ref;
+  }
+  if(fb.more)return rev?'Wszystkie litery od końca się zgadzają, ale hasło jest dłuższe':'Wszystkie litery się zgadzają, ale hasło jest dłuższe';
+  return rev?'Hasło jest krótsze — pasuje tylko '+fb.match+' ostatnich liter':'Hasło jest krótsze — pasuje tylko '+fb.match+' pierwszych liter';
 }
 function lgStep(game,n,secret,guess){
-  const g=JSON.parse(JSON.stringify(game)),p=g.turn,fb=lgCompare(secret,guess);
+  const g=JSON.parse(JSON.stringify(game)),p=g.turn,fb=lgCompare(secret,guess,!!game.rev);
   g.guesses.push({p,g:guess,fb});
   if(fb.solved)g.solved.push(p);
   g.turn=(p+1)%n;
@@ -141,10 +148,12 @@ function lgStep(game,n,secret,guess){
   return g;
 }
 function lgKnow(game,p){
+  /* pre = znane litery w kolejności odgadywania (w trybie „Od tyłu” zaczynają się od ostatniej litery hasła) */
+  const R=s=>game.rev?lgRevStr(s):s;
   const gs=(game.guesses||[]).filter(x=>x.p===p);let k=0,pre='',lo=null,hi=null,more=false;
-  gs.forEach(x=>{if(x.fb.match>k){k=x.fb.match;pre=x.g.slice(0,k)}});
+  gs.forEach(x=>{if(x.fb.match>k){k=x.fb.match;pre=R(x.g).slice(0,k)}});
   gs.forEach(x=>{if(x.fb.match===k){
-    if(x.fb.pos===k){const r=x.g[k];if(x.fb.dir==='po'){if(lo==null||lgRank(r)>lgRank(lo))lo=r}else if(hi==null||lgRank(r)<lgRank(hi))hi=r}
+    if(x.fb.pos===k){const r=R(x.g)[k];if(x.fb.dir==='po'){if(lo==null||lgRank(r)>lgRank(lo))lo=r}else if(hi==null||lgRank(r)<lgRank(hi))hi=r}
     else if(x.fb.more)more=true}});
   return {k,pre,lo,hi,more,solved:(game.solved||[]).includes(p)};
 }
@@ -156,7 +165,7 @@ const lgRefresh=(keepFocus)=>{
   if(fid){const e=document.getElementById(fid);if(e){e.focus();try{e.setSelectionRange(pos,pos)}catch(x){}}}
 };
 function lgLeaveRoom(){try{if(LG.ref&&onlinePlayerId)LG.ref.child('players/'+onlinePlayerId).remove();if(LG.ref&&LG.listener)LG.ref.off('value',LG.listener)}catch(e){}LG.ref=null;LG.listener=null}
-function lgGo(s,extra){LG.screen=s;LG.msg='';LG.draft='';if(extra)Object.assign(LG,extra);lgRefresh()}
+function lgGo(s,extra){LG.screen=s;LG.msg='';LG.draft='';LG.pane='';if(extra)Object.assign(LG,extra);lgRefresh()}
 function lgView(){
   const me=LG.mode==='online'?LG.players.findIndex(p=>p.id===(typeof onlinePlayerId!=='undefined'?onlinePlayerId:null)):null;
   return {players:LG.players,words:LG.words,game:LG.game,me};
@@ -167,8 +176,8 @@ function lgScreen(){
   switch(LG.screen){
     case 'start':return lgStartHTML(m);
     case 'lsetup':return lgSetupHTML(m);
-    case 'category':return lgCatHTML()+m;
-    case 'words':return lgWordsHTML()+m;
+    case 'category':return lgCatHTML(m);
+    case 'words':return lgWordsHTML(m);
     case 'olobby':return lgLobbyHTML(m);
     case 'play':case 'end':return lgPlayHTML()+m;
   }
@@ -194,12 +203,17 @@ function lgLocalStart(){
   LG.words={};LG.wi=0;LG.game=null;lgGo('words');
 }
 const lgCatBanner=()=>(LG.mode==='online'&&LG.cmode==='cat'&&LG.category)?`<div class="lgnote lgcat">Kategoria: <b>${lgEsc(LG.category)}</b></div>`:'';
-function lgCatHTML(){
-  const isHost=LG.host===onlinePlayerId;
-  if(!isHost)return `<h2>Wybór kategorii</h2><p>Host wybiera kategorię, w której trzeba wymyślić hasła…</p>`;
-  return `<h2>Wybierz kategorię</h2>
-  <p class="lgnote">Wpisz kategorię, w której wszyscy gracze wymyślą swoje hasła (np. zwierzęta, miasta, jedzenie).</p>
-  <div class="lgrow"><input id="lgcatin" type="text" maxlength="40" autocomplete="off" value="${lgEsc(LG.catDraft||'')}" oninput="LG.catDraft=this.value" onkeydown="if(event.key==='Enter')lgSubmitCat()" aria-label="Kategoria"><button class="lgbtn go" onclick="lgSubmitCat()">Zatwierdź</button></div>`;
+const lgShellOpt={host:'#lg',theme:'lg'};
+const lgModeCard=(fn,ic,t,sm)=>`<button class="ob-mode" onclick="${fn}"><span class="ob-mode-ic">${ic}</span><b>${t}</b></button>`;
+const lgModeCards=fn=>lgModeCard(fn.replace('%','\'fwd\''),'🔤','Klasyczny','Litery odgadujesz od początku hasła')+lgModeCard(fn.replace('%','\'rev\''),'⏪','Od tyłu','Litery odgadujesz od końca hasła');
+function lgCatHTML(m){
+  const isHost=LG.host===onlinePlayerId,tiles=['K','A','T'];
+  if(!isHost)return obShell(Object.assign({key:'lg-cat-wait',compact:true,words:['KATEGORIA'],tiles,sub:'Host wybiera kategorię…',msg:m,
+    body:`<div class="ob-pane ob-center"><label>Chwileczkę…</label><p class="ob-note">Host wybiera kategorię, w której trzeba wymyślić hasła.</p></div>`},lgShellOpt));
+  return obShell(Object.assign({key:'lg-cat',compact:true,words:['KATEGORIA'],tiles,sub:'Wybierz kategorię dla wszystkich graczy',msg:m,
+    body:`<div class="ob-pane"><label for="lgcatin">Kategoria haseł</label>
+      <input id="lgcatin" type="text" maxlength="40" autocomplete="off" placeholder="np. zwierzęta, miasta, jedzenie" value="${lgEsc(LG.catDraft||'')}" oninput="LG.catDraft=this.value" onkeydown="if(event.key==='Enter')lgSubmitCat()">
+      ${obBtn('Zatwierdź','✅','lgSubmitCat()','gold')}</div>`},lgShellOpt));
 }
 function lgSubmitCat(){
   if(LG.host!==onlinePlayerId||!LG.ref)return;
@@ -208,21 +222,28 @@ function lgSubmitCat(){
   LG.catDraft='';LG.msg='';
   LG.ref.update({category:c,status:'words'}).catch(e=>{LG.msg='Nie udało się zapisać kategorii: '+e.message;lgRefresh()});
 }
-function lgWordsHTML(){
+function lgWordsHTML(m){
+  const rev=LG.dir==='rev',words=rev?['OD TYŁU']:['HASŁO'],tiles=rev?['C','B','A']:['A','B','C'];
+  const rule='Jedno słowo: co najmniej 2 litery, same litery alfabetu, bez spacji i cyfr.';
+  const dirNote=rev?'<p class="ob-note">Tryb „Od tyłu”: rywale będą odgadywać Twoje hasło od <b>ostatniej</b> litery.</p>':'';
+  const input=`<input id="lgin" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Twoje hasło" value="${lgEsc(LG.draft)}" oninput="LG.draft=this.value" onkeydown="if(event.key==='Enter')lgSubmitWord()" aria-label="Tajne hasło">`;
   if(LG.mode==='local'){
     const p=LG.players[LG.wi];
-    return `<h2>${lgDot(p.color)}${lgEsc(p.name)}, wpisz swoje hasło</h2>
-    <p class="lgnote">Pozostali gracze nie powinni patrzeć na ekran. Hasło to jedno słowo (${lgWordErr.replace('Hasło musi mieć ','')}</p>
-    <div class="lgrow"><input id="lgin" type="text"  autocomplete="off" value="${lgEsc(LG.draft)}" oninput="LG.draft=this.value" onkeydown="if(event.key==='Enter')lgSubmitWord()" aria-label="Tajne hasło"><button class="lgbtn go" onclick="lgSubmitWord()">Zatwierdź</button></div>
-    <p class="lgnote">Gracz ${LG.wi+1} z ${LG.players.length}</p>`;
+    return obShell(Object.assign({key:'lg-words-'+LG.wi,compact:true,words,tiles,sub:`Gracz ${LG.wi+1} z ${LG.players.length}`,msg:m,
+      body:`<div class="ob-pane"><label for="lgin">${lgDot(p.color)}${lgEsc(p.name)}, wpisz swoje hasło</label>${input}
+        <p class="ob-note">Pozostali gracze nie powinni patrzeć na ekran. ${rule}</p>${dirNote}
+        ${obBtn('Zatwierdź','✅','lgSubmitWord()','gold')}</div>`},lgShellOpt));
   }
   const v=lgView(),mine=v.me>=0&&LG.words[LG.players[v.me].id];
   const waiting=LG.players.filter(p=>!LG.words[p.id]).map(p=>lgEsc(p.name)).join(', ');
-  const cb=lgCatBanner();
-  if(mine)return `<h2>Hasło zapisane</h2>${cb}<p>Czekamy na pozostałych graczy${waiting?': <b>'+waiting+'</b>':''}…</p>`;
-  return `<h2>Wpisz swoje hasło</h2>${cb}<p class="lgnote">Jedno słowo, ${lgWordErr.replace('Hasło musi mieć ','')}</p>
-    <div class="lgrow"><input id="lgin" type="text"  autocomplete="off" value="${lgEsc(LG.draft)}" oninput="LG.draft=this.value" onkeydown="if(event.key==='Enter')lgSubmitWord()" aria-label="Tajne hasło"><button class="lgbtn go" onclick="lgSubmitWord()">Zatwierdź</button></div>
-    <p class="lgnote">Czekamy jeszcze na: ${waiting||'—'}</p>`;
+  const sub=(LG.cmode==='cat'&&LG.category)?'Kategoria: <b>'+lgEsc(LG.category)+'</b>':'';
+  if(mine)return obShell(Object.assign({key:'lg-words-done',compact:true,words,tiles,sub,msg:m,
+    body:`<div class="ob-pane ob-center"><label>Hasło zapisane ✅</label><p class="ob-note">Czekamy na pozostałych graczy${waiting?': <b>'+waiting+'</b>':''}…</p></div>`},lgShellOpt));
+  return obShell(Object.assign({key:'lg-words-in',compact:true,words,tiles,sub,msg:m,
+    body:`<div class="ob-pane"><label for="lgin">Wpisz swoje hasło</label>${input}
+      <p class="ob-note">${rule}</p>${dirNote}
+      ${obBtn('Zatwierdź','✅','lgSubmitWord()','gold')}
+      <p class="ob-note" style="margin-bottom:0">Czekamy jeszcze na: ${waiting||'—'}</p></div>`},lgShellOpt));
 }
 function lgSubmitWord(){
   const w=lgNorm(LG.draft);
@@ -241,7 +262,7 @@ function lgPlayHTML(){
   if(!g)return '<h2>Przygotowanie gry…</h2>';
   const act=g.done?-1:g.turn,tgt=act>=0?(act+1)%n:-1;
   const my=LG.mode==='local'?act:v.me;
-  let h=lgCatBanner()+`<div class="lgh"><span>Runda ${g.round}</span>${g.done?'<b>Koniec gry</b>':''}</div>`;
+  let h=lgCatBanner()+`<div class="lgh"><span>Runda ${g.round}</span>${g.rev?'<span>⏪ Tryb: od tyłu</span>':''}${g.done?'<b>Koniec gry</b>':''}</div>`;
   if(g.done){
     const w=g.winners.map(i=>lgEsc(pl[i].name));
     h+=`<div class="lgwin">${w.length>1?'Remis! Zgadli w tej samej rundzie: <b>'+w.join(', ')+'</b>':'Wygrywa <b>'+w[0]+'</b>!'}<small>Liczba prób: ${g.round}</small></div>`;
@@ -250,17 +271,17 @@ function lgPlayHTML(){
     if(my===act)h+=`<div class="lgrow"><input id="lgin"  autocomplete="off" value="${lgEsc(LG.draft)}" placeholder="Twoja propozycja" oninput="LG.draft=this.value" onkeydown="if(event.key==='Enter')lgSubmitGuess()" aria-label="Propozycja hasła"><button class="lgbtn go" onclick="lgSubmitGuess()">Zgaduj</button></div>`;
     else h+=`<div class="lgnote">Czekaj na ruch gracza ${lgEsc(pl[act].name)}…</div>`;
     const kn=lgKnow(g,act),mine=my===act;
-    h+=`<div class="lgal"><div class="lgalh">Litera nr ${kn.k+1} w haśle gracza ${lgEsc(pl[tgt].name)} — możliwe są jasne litery${kn.k?' (poprzednie trafione: <b>'+lgEsc(kn.pre.toUpperCase())+'</b>)':''}:</div><div class="lgalb">`+
+    h+=`<div class="lgal"><div class="lgalh">Litera nr ${kn.k+1}${g.rev?' od końca':''} w haśle gracza ${lgEsc(pl[tgt].name)} — możliwe są jasne litery${kn.k?' (poprzednie trafione: <b>'+lgEsc((g.rev?lgRevStr(kn.pre):kn.pre).toUpperCase())+'</b>)':''}:</div><div class="lgalb">`+
       [...LG_ALPHA].map(c=>{const ok=(kn.lo==null||lgRank(c)>lgRank(kn.lo))&&(kn.hi==null||lgRank(c)<lgRank(kn.hi));
         return ok&&mine?`<button class="lgl" onclick="lgAddLetter('${c}')">${c.toUpperCase()}</button>`:`<span class="lgl ${ok?'':'no'}">${c.toUpperCase()}</span>`}).join('')+'</div></div>';
   }
   h+='<div class="lgcards">'+pl.map((p,i)=>{
     const t=pl[(i+1)%n],k=lgKnow(g,i);
-    let boxes=[...k.pre].map(c=>`<span class="lgb">${lgEsc(c.toUpperCase())}</span>`).join('');
-    if(!k.solved)boxes+='<span class="lgb q">?</span>';
+    let boxes=(g.rev?[...k.pre].reverse():[...k.pre]).map(c=>`<span class="lgb">${lgEsc(c.toUpperCase())}</span>`).join('');
+    if(!k.solved)boxes=g.rev?'<span class="lgb q">?</span>'+boxes:boxes+'<span class="lgb q">?</span>';
     let hint='';
     if(k.solved)hint='<b>Zgadnięte!</b>';
-    else if(k.lo||k.hi)hint=`Litera ${k.k+1}: ${k.lo?'po '+k.lo.toUpperCase():''}${k.lo&&k.hi?' i ':''}${k.hi?'przed '+k.hi.toUpperCase():''}`;
+    else if(k.lo||k.hi)hint=`Litera ${k.k+1}${g.rev?' od końca':''}: ${k.lo?'po '+k.lo.toUpperCase():''}${k.lo&&k.hi?' i ':''}${k.hi?'przed '+k.hi.toUpperCase():''}`;
     else if(k.more)hint='Hasło jest dłuższe';
     const reveal=g.done?`<div class="lgrev">Hasło: <b>${lgEsc((v.words[t.id]||'').toUpperCase())}</b></div>`:'';
     return `<div class="lgcard ${act===i?'act':''}">${lgDot(p.color)}<b>${lgEsc(p.name)}</b> → hasło: ${lgEsc(t.name)}<div class="lgbx">${boxes}</div><div class="lghint">${hint}</div>${reveal}</div>`;
@@ -270,13 +291,29 @@ function lgPlayHTML(){
   const historyOwner=LG.mode==='online'?v.me:(g.done?null:act);
   const historyItems=g.guesses.slice().reverse().filter(x=>!myHistory||historyOwner==null||x.p===historyOwner);
   const hist=historyItems.map(x=>{const p=pl[x.p],t=pl[(x.p+1)%n];
-    return `<div class="lghist">${lgDot(p.color)}<b>${lgEsc(p.name)}</b> → ${lgEsc(t.name)}: <span class="lgw">${lgEsc(x.g.toUpperCase())}</span> — ${lgEsc(lgMsg(x.fb))}</div>`}).join('');
+    return `<div class="lghist">${lgDot(p.color)}<b>${lgEsc(p.name)}</b> → ${lgEsc(t.name)}: <span class="lgw">${lgEsc(x.g.toUpperCase())}</span> — ${lgEsc(lgMsg(x.fb,g.rev))}</div>`}).join('');
   h+=`<div class="lgrow" style="margin-top:16px"><h3 style="margin:0">${myHistory?'Moja historia':'Historia'}</h3><button class="lgbtn" onclick="lgToggleHistory()">${myHistory?'Pokaż całą historię':'Moja historia'}</button></div>${hist||(myHistory?'<div class="lgnote">Nie masz jeszcze żadnych prób.</div>':'<div class="lgnote">Jeszcze nie było prób.</div>')}`;
   if(g.done){
     const canAgain=LG.mode==='local'||LG.host===(typeof onlinePlayerId!=='undefined'?onlinePlayerId:null);
     h+=`<div class="lgrow">${canAgain?'<button class="lgbtn go" onclick="lgRematch()">Zagraj ponownie</button>':'<span class="lgnote">Host może rozpocząć kolejną grę.</span>'}<button class="lgbtn" onclick="lgExit()">Menu główne</button></div>`;
   }
   return h;
+}
+/* przełączanie paneli bez przerysowania ekranu (jak w Monopoly) */
+const LG_PANES={create:'lgpCreate',join:'lgpJoin',local:'lgpLocal'};
+function lgPane(k){
+  LG.pane=LG.pane===k?'':k;LG.msg='';
+  document.querySelectorAll('#lgc .lgmsg').forEach(e=>e.remove());
+  Object.keys(LG_PANES).forEach(n=>{const e=document.getElementById(LG_PANES[n]);if(e)e.style.display=LG.pane===n?'block':'none'});
+  const t=LG.pane?document.getElementById(LG_PANES[LG.pane]):null;
+  if(t)setTimeout(()=>{try{t.scrollIntoView({behavior:'smooth',block:'nearest'})}catch(e){}if(LG.pane==='join'){const e=document.getElementById('lgjoin');if(e)e.focus({preventScroll:true})}},40);
+}
+function lgLocalMode(d){lgGo('lsetup',{mode:'local',names:[],n:3,dir:d==='rev'?'rev':'fwd'})}
+function lgSetCmode(v){
+  LG.cmode=v==='cat'?'cat':'all';const cat=LG.cmode==='cat';
+  const a=document.getElementById('lgcAll'),b=document.getElementById('lgcCat'),n=document.getElementById('lgcNote');
+  if(a)a.classList.toggle('on',!cat);if(b)b.classList.toggle('on',cat);
+  if(n)n.textContent=cat?'Host wybierze kategorię dla wszystkich graczy.':'Każdy może wpisać dowolne hasło.';
 }
 function lgToggleHistory(){LG.showHistory=!LG.showHistory;lgRefresh(true)}
 function lgAddLetter(c){LG.draft=(LG.draft||'')+c;lgRefresh();const e=document.getElementById('lgin');if(e){e.focus();const l=e.value.length;try{e.setSelectionRange(l,l)}catch(x){}}}
@@ -331,11 +368,12 @@ function lgLobbyHTML(){
   <p class="lgnote">${isHost?(LG.players.length>=2?'Możesz rozpocząć grę.':'Poczekaj, aż dołączy co najmniej jeden gracz.'):'Czekaj, aż host rozpocznie grę.'} (Gracze: ${LG.players.length}/6)</p>
   <div class="lgrow">${isHost?`<button class="lgbtn go" ${LG.players.length>=2?'':'disabled'} onclick="lgHostStart()">Rozpocznij grę</button>`:''}<button class="lgbtn" onclick="navigator.clipboard&&navigator.clipboard.writeText(LG.code)">Kopiuj kod</button></div>`;
 }
-async function lgCreate(){
+async function lgCreate(dir){
+  if(dir)LG.dir=dir==='rev'?'rev':'fwd';
   try{
     const uid=await onlineEnsureAuth(),code=onlineCode(),nick=(LG.nick||'Gracz').replace(/[<>&]/g,'').trim().slice(0,14)||'Gracz';
     const ref=fbDB.ref('lgRooms/'+code);
-    await ref.set({status:'lobby',cmode:LG.cmode==='cat'?'cat':'all',host:uid,createdAt:firebase.database.ServerValue.TIMESTAMP,players:{[uid]:{id:uid,name:nick,color:LG.col||'#2a9df4',order:0}}});
+    await ref.set({status:'lobby',cmode:LG.cmode==='cat'?'cat':'all',dir:LG.dir==='rev'?'rev':'fwd',host:uid,createdAt:firebase.database.ServerValue.TIMESTAMP,players:{[uid]:{id:uid,name:nick,color:LG.col||'#2a9df4',order:0}}});
     lgAttach(ref,code);
   }catch(e){LG.msg='Nie udało się utworzyć pokoju: '+e.message;lgRefresh()}
 }
@@ -356,13 +394,13 @@ async function lgJoin(){
   }catch(e){LG.msg='Nie udało się dołączyć: '+e.message;lgRefresh()}
 }
 function lgAttach(ref,code){
-  lgLeaveRoom();LG.ref=ref;LG.code=code;LG.msg='';
+  lgLeaveRoom();LG.ref=ref;LG.code=code;LG.msg='';LG.pane='';LG.mode='online';LG.screen='olobby';
   LG.listener=ref.on('value',snap=>lgOnRoom(snap.val()),err=>{LG.msg='Błąd połączenia: '+err.message;lgRefresh()});
   lgRefresh();
 }
 function lgOnRoom(room){
   if(!room){LG.msg='Pokój został usunięty.';lgRefresh();return}
-  LG.host=room.host;LG.status=room.status;LG.test=!!room.test;LG.cmode=room.cmode==='cat'?'cat':'all';LG.category=String(room.category||'');
+  LG.host=room.host;LG.status=room.status;LG.test=!!room.test;LG.cmode=room.cmode==='cat'?'cat':'all';LG.dir=room.dir==='rev'?'rev':'fwd';LG.category=String(room.category||'');
   LG.players=Object.values(room.players||{}).sort((a,b)=>(a.order||0)-(b.order||0)).map(p=>({id:p.id,name:String(p.name||'Gracz'),color:p.color}));
   LG.words=room.words||{};
   try{LG.game=room.game?JSON.parse(room.game):null}catch(e){LG.game=null}
@@ -389,40 +427,41 @@ function lgHostStart(){
   window.lgBackToStart=()=>lgGo('start');
   const L={host:'#lg',theme:'lg',words:['LITERKI']};
   window.lgStartHTML=function(m){
-    const online=typeof fbDB!=='undefined'&&fbDB&&typeof onlineEnsureAuth==='function';
+    lgAccSync();
+    const online=typeof fbDB!=='undefined'&&fbDB&&typeof onlineEnsureAuth==='function',cat=LG.cmode==='cat',pn=LG.pane;
+    const d=k=>`style="display:${pn===k?'block':'none'}"`;
+    const create=`<div class="ob-subdrop" id="lgpCreate" ${d('create')}><label>Jaką grę tworzysz?</label>
+        <div class="ob-opt" style="margin-top:12px"><span>Hasła</span><div class="ob-chips">${obChip('Dowolne',!cat,"lgSetCmode('all')").replace('class="ob-chip','id="lgcAll" class="ob-chip')}${obChip('Kategoria',cat,"lgSetCmode('cat')").replace('class="ob-chip','id="lgcCat" class="ob-chip')}</div></div>
+        <p class="ob-note" id="lgcNote" style="margin-top:0">${cat?'Host wybierze kategorię dla wszystkich graczy.':'Każdy może wpisać dowolne hasło.'}</p>
+        <div class="ob-modes">${lgModeCards('lgCreate(%)')}</div></div>`;
+    const join=`<div class="ob-subdrop" id="lgpJoin" ${d('join')}><label for="lgjoin">Kod pokoju od znajomego</label><input id="lgjoin" class="cd" maxlength="5" placeholder="KOD" autocomplete="off" value="${lgEsc(LG.joinCode||'')}" oninput="LG.joinCode=this.value" onkeydown="if(event.key==='Enter')lgJoin()">
+        ${obBtn('Dołącz','🚪','lgJoin()','gold')}</div>`;
+    const local=`<div class="ob-subdrop" id="lgpLocal" ${d('local')}><label>Jaką grę tworzysz?</label><div class="ob-modes">${lgModeCards('lgLocalMode(%)')}</div></div>`;
+    const gap='<div style="height:12px"></div>';
     return obShell(Object.assign({key:'lg-start',tiles:['Ł','A','B','C'],sub:'Zgadnij hasło. Przechytrz znajomych.',msg:m,
     body:`<div class="ob-pane"><label>Zgadywanie literek</label><p class="ob-note">Każdy gracz wpisuje tajne hasło, a pozostali próbują je odgadnąć. Wskazówki podpowiadają, czy szukana litera jest wcześniej, czy później w polskim alfabecie.</p>
-      ${obBtn('Gra lokalna','🎲',"lgGo('lsetup',{mode:'local',names:[],n:3})",'gold')}<div style="height:12px"></div>${obBtn('Gra online','🌐',"lgGo('olobby',{mode:'online'})",'white',!online)}</div>
+      ${obBtn('Utwórz pokój','🏠',"lgPane('create')",'gold',!online)}${create}${gap}
+      ${obBtn('Dołącz do znajomego','🚪',"lgPane('join')",'white',!online)}${join}${gap}
+      ${obBtn('Gra lokalnie na jednym urządzeniu','🎲',"lgPane('local')",'ghost',false,'ob-sm')}${local}</div>
     ${online?'':'<p class="ob-net">Gra online wymaga uruchomienia na hostingu z Firebase.</p>'}
-    ${obRules('<p>Gracze kolejno zgadują hasła pozostałych. Po każdej próbie otrzymują informację o pierwszej niepasującej literze. Wygrywa osoba, która jako pierwsza odgadnie całe hasło.</p>')}`},L));
+    ${obRules('<p>Gracze kolejno zgadują hasła pozostałych. Po każdej próbie otrzymują informację o pierwszej niepasującej literze. Wygrywa osoba, która jako pierwsza odgadnie całe hasło.</p><p>W trybie „Od tyłu” wszystko działa tak samo, ale litery odgadujesz od końca: najpierw ostatnia, potem przedostatnia i tak dalej.</p>')}`},L));
   };
   window.lgSetupHTML=function(m){
     const n=LG.n;
     const rows=[...Array(n)].map((_,i)=>`<div class="ob-prow"><i style="background:${LG_COLS[i]}"></i><input id="lgname${i}" maxlength="14" value="${lgEsc(LG.names[i]||'Gracz '+(i+1))}" oninput="LG.names[${i}]=this.value" aria-label="Nick gracza ${i+1}"></div>`).join('');
-    return obShell(Object.assign({key:'lg-setup',compact:true,sub:'Gra lokalna na jednym urządzeniu',back:{onclick:'lgBackToStart()'},msg:m,
+    return obShell(Object.assign({key:'lg-setup',compact:true,sub:'Gra lokalna · tryb: '+(LG.dir==='rev'?'od tyłu':'klasyczny'),back:{onclick:'lgBackToStart()'},msg:m,
     body:`<div class="ob-pane"><label>Liczba graczy</label><div class="ob-chips">${[2,3,4,5,6].map(k=>obChip(k,k===n,'LG.n='+k+';lgRefresh()')).join('')}</div><div style="height:10px"></div>${rows}<div style="height:6px"></div>${obBtn('Dalej — wpisywanie haseł','➡️','lgLocalStart()','gold')}</div>`},L));
   };
   function lgAccSync(){try{const a=String((typeof ACC!=='undefined'&&ACC.nick)||'').trim().slice(0,14),c=(typeof ACC!=='undefined'&&/^#[0-9a-f]{6}$/i.test(ACC.col||''))?ACC.col:'';if(a&&!LG.nickT)LG.nick=a;if(c&&!LG.colT)LG.col=c}catch(e){}}
 window.lgLobbyHTML=function(m){lgAccSync();
-    if(!LG.ref){
-      const cat=LG.cmode==='cat';
-      return obShell(Object.assign({key:'lg-entry',tiles:['Ł','A','B','C'],sub:'Gra online',back:{onclick:'lgBackToStart()'},msg:m,
-      body:`<div class="ob-pane"><label for="lgnick">Twój nick</label><input id="lgnick" maxlength="14" autocomplete="off" value="${lgEsc(LG.nick||'Gracz')}" oninput="LG.nick=this.value;LG.nickT=1">
-        <div class="ob-opt"><span>Kolor pionka</span><input id="lgcol" type="color" value="${lgEsc(LG.col||'#2a9df4')}" oninput="LG.col=this.value;LG.colT=1"></div>
-        <div class="ob-opt"><span>Zasady</span><div class="ob-chips">${obChip('Dowolne hasła',!cat,"LG.cmode='all';lgRefresh()")}${obChip('Kategoria',cat,"LG.cmode='cat';lgRefresh()")}</div></div>
-        <p class="ob-note">${cat?'Host wybierze kategorię dla wszystkich graczy.':'Każdy może wpisać dowolne hasło.'}</p>
-        ${obBtn('Stwórz pokój','🎲','lgCreate()','gold')}</div>
-      <div class="ob-or">albo</div>
-      <div class="ob-pane"><label for="lgjoin">Kod pokoju</label><input id="lgjoin" class="cd" maxlength="5" placeholder="KOD" autocomplete="off" value="${lgEsc(LG.joinCode||'')}" oninput="LG.joinCode=this.value">
-        ${obBtn('Dołącz do pokoju','🚪','lgJoin()','white')}</div>`},L));
-    }
+    if(!LG.ref)return lgStartHTML(m);
     const isHost=LG.host===onlinePlayerId,n=LG.players.length;
     return obShell(Object.assign({key:'lg-lobby',compact:true,msg:m,
     body:obRoom({code:LG.code,copy:'LG.code',max:6,players:LG.players.map(p=>({name:p.name,color:p.color,host:p.id===LG.host,me:p.id===onlinePlayerId})),
-      extra:`<div class="ob-pane ob-center"><label>Tryb gry</label><p class="ob-note" style="margin:6px 0 0"><b>${LG.cmode==='cat'?'wybierz kategorię':'wszystkie słowa'}</b></p></div>`,
+      extra:`<div class="ob-pane ob-center"><label>Tryb gry</label><p class="ob-note" style="margin:6px 0 0"><b>${LG.dir==='rev'?'od tyłu':'klasyczny'}</b> · <b>${LG.cmode==='cat'?'wybierz kategorię':'wszystkie słowa'}</b></p></div>`,
       test:tgBox('LG.ref',LG.test),
       note:isHost?(n>=2?'Wszyscy gotowi? Możesz rozpocząć grę.':'Udostępnij kod znajomym i poczekaj na gracza.'):'Czekaj, aż host rozpocznie grę.',
-      start:isHost?{onclick:'lgHostStart()',disabled:n<2}:null,leave:{label:'Opuść pokój',onclick:"lgLeaveRoom();lgGo('olobby',{mode:'online'})"}})},L));
+      start:isHost?{onclick:'lgHostStart()',disabled:n<2}:null,leave:{label:'Opuść pokój',onclick:"lgLeaveRoom();lgGo('start',{mode:null})"}})},L));
   };
 })();
 
@@ -436,7 +475,7 @@ function statsLg(){
 
 /* ===== integracja z platformą: wejście do gry / wyjście z gry ===== */
 window.__show=function(){
-  LG=Object.assign(LG,{screen:'start',mode:null,draft:'',msg:'',players:[],words:{},game:null,status:null});lgRefresh();
+  LG=Object.assign(LG,{screen:'start',pane:'',mode:null,draft:'',msg:'',players:[],words:{},game:null,status:null});lgRefresh();
 };
 window.__leave=function(){
   lgLeaveRoom();

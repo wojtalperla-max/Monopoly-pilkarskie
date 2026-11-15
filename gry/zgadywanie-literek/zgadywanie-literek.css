@@ -246,3 +246,27 @@ body:has(.ob[data-t="lg"]) #obBg{background:radial-gradient(circle at 50% 18%,#b
 .ob .ob-pane .ob-prow input:not([type=color]){margin:6px 0!important;flex:1!important;width:auto!important}
 .ob-prow i{width:20px;height:20px;border-radius:50%;border:2px solid #fff;flex:none}
 .ob-pane .ob-chips{margin:10px 0 6px}
+
+/* wybór trybu pod przyciskiem „Stwórz pokój” (rozwija się pod spodem, bez zmiany ekranu) */
+.ob-main{width:100%}
+.ob-modes{display:flex;flex-direction:column;gap:10px;margin-top:4px}
+.ob .ob-mode{display:grid!important;grid-template-columns:auto 1fr;column-gap:14px;align-items:center;width:100%!important;margin:0!important;padding:14px 16px!important;text-align:left;font:inherit!important;color:#fff!important;background:#ffffff1f!important;border:3px solid #ffffff66!important;border-radius:16px!important;box-shadow:0 4px 0 #0006!important;cursor:pointer;transition:transform .15s,background .15s,border-color .15s}
+.ob .ob-mode:hover{transform:translateY(-3px);background:#ffffff33!important;border-color:#ffd23f!important}
+.ob .ob-mode:active{transform:translateY(2px)}
+.ob-mode .ob-mode-ic{grid-row:1/3;font-size:34px;line-height:1}
+.ob-mode b{font-size:20px;font-weight:700;color:#ffd23f}
+.ob-mode small{font-size:14px;font-weight:500;color:#ffffffd9}
+
+/* rozwijane panele: pojawiają się od razu (bez opóźnienia animacji wejścia ekranu) */
+.ob .ob-pane.ob-drop{animation:obDrop .28s ease-out both;animation-delay:0s}
+@keyframes obDrop{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
+
+/* rozwijane tryby wewnątrz panelu (ekran startowy) */
+.ob .ob-subdrop{margin-top:12px;padding-top:6px;border-top:2px solid #ffffff2e;animation:obDrop .28s ease-out both;animation-delay:0s}
+.ob-subdrop>label{margin-bottom:10px!important}
+
+/* karty trybów obok siebie (lewa / prawa), bez opisów */
+.ob-modes{flex-direction:row!important;gap:12px!important}
+.ob .ob-mode{flex:1 1 0;min-width:0;grid-template-columns:1fr!important;justify-items:center;row-gap:8px;text-align:center!important;padding:18px 10px!important}
+.ob-mode .ob-mode-ic{grid-row:auto!important;font-size:40px}
+.ob-mode b{font-size:clamp(17px,4.4vw,22px)}
