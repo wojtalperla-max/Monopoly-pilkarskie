@@ -3407,6 +3407,8 @@
         break;
       }
       if(mp.room) await mpLeave(true);
+      if(mp.had && mp.lastCode !== code) svFresh();             // inny serwer = osobny postęp (domy, monety, ekwipunek…)
+      mp.had = true; mp.lastCode = code;
       mp.uid = uid; mp.room = code; mp.nick = String(a.nick || 'Gracz').slice(0,16);
       mp.pl = db.ref(MP_ROOT+'/'+code+'/players'); mp.me = mp.pl.child(uid);
       mp.last = {x:player.position.x, y:player.position.y, z:player.position.z, r:player.rotation.y, c:mpTorsoCol()};
@@ -3508,6 +3510,37 @@
       pos: JSON.stringify(svPos())
     };
   }
+  // Dom jest częścią postępu na KONKRETNYM serwerze – przy zmianie serwera czyścimy domy, meble i ładowarkę,
+  // żeby nie „przeszły” na nowy serwer (i nie zapisały się tam przy najbliższym zapisie).
+  function svResetHomes(){
+    for(const H of HOMES){
+      if(!(H.rented || H.owned)) continue;
+      H.owned = false; H.rented = false; H.paidUntil = 0; H.door.open = false; drawHomeSign(H);
+      if(homeIn === H){                                        // gracz stoi w domu, który znika – wyprowadzamy go przed drzwi
+        if(isSleeping){ isSleeping = false; body.rotation.x = 0; body.position.set(0,0,0); }
+        if(sitting) standUp();
+        if(placing) cancelPlacement('Zmiana serwera – anulowano ustawianie mebla');
+        setActiveHome(H); const p = homeW(0, HOME.d/2 + 1.8);
+        player.position.set(p.x, 0, p.z); vy = 0;
+      }
+    }
+    svApplyFurn([]);                                           // meble stoją tylko w domach
+    chargerPlugged = false; chargerHome = null; phoneDocked = false; batFull = true;
+    HOMES.forEach(H => { if(H.charger) H.charger.visible = false; if(H.phone) H.phone.visible = false; });
+    refreshPhoneDom();
+  }
+  // Stan „nowego save’a” – zrobiony zaraz po załadowaniu gry (zanim cokolwiek zdążysz zrobić).
+  let SV_DEFAULT = null;
+  setTimeout(() => { try{ SV_DEFAULT = svSnapshot(); }catch(e){ console.error('Nie udało się zapamiętać stanu początkowego', e); } }, 0);
+  // Serwer bez postępu = gra od zera: monety, ekwipunek, głód/energia, konto, lodówka, domy, meble, czas i pozycja startowa.
+  function svFresh(){
+    if(bikeMounted){ bikeMounted = false; player.visible = true; riderBlend = 0; }   // zsiadamy bez przenoszenia postaci przy rowerze
+    bikePurchased = false; bike.visible = false;
+    job.accepted = false; job.order = null; job.carrying = false; job.delivered = 0;
+    try{ closeDialog(); }catch(e){}
+    svResetHomes();
+    if(SV_DEFAULT) svApply(SV_DEFAULT);
+  }
   function svApplyHomes(arr){
     for(const h of arr){
       const H = HOMES.find(q => q.id === h.id); if(!H) continue;
@@ -3596,7 +3629,8 @@
       sv.ref = db.ref(SAVE_ROOT+'/'+uid+'/'+String(serverCode).toUpperCase());
       sv.ready = false; sv.dead = false; sv.last = '';
       const d = (await sv.ref.once('value')).val();
-      if(d && d.v && svApply(d)){ sv.last = ''; toast('💾 Wczytano zapis: '+serverCode); }
+      if(d && d.v){ if(svApply(d)){ sv.last = ''; toast('💾 Wczytano zapis: '+serverCode); } }
+      else{ svFresh(); sv.last = ''; toast('🆕 Nowa gra na serwerze '+serverCode); }
       sv.ready = true;
       if(!sv.timer) sv.timer = setInterval(svSave, SAVE_EVERY_MS);
     }catch(e){
