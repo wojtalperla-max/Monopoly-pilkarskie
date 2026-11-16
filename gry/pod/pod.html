@@ -227,7 +227,35 @@ function botTurn(t){
   if(podOnline&&(!podHostBots||!podBotSeats.includes(cur))){return}
   if(!podCanAct()){bwait(450,t,()=>botTurn(t));return}
   setTab('map');botLog=[];
+  if(BL>=3){try{botShop()}catch(e){console.error('Bot:',e)}botFireSeq(t,()=>botRollPhase(t));return}
   try{botShop();botFire()}catch(e){console.error('Bot:',e)}
+  botRollPhase(t);
+}
+// Ekstremalny: każda katapulta (potem działa) strzela w tej turze, jeden strzał po drugim.
+function botFireSeq(t,done){
+  const tried=new Set();
+  const step=()=>{
+    if(t!==botTok||over)return;
+    let shot=false;
+    try{
+      for(const kind of ['cat','cannon']){
+        for(let i=0;i<W*H&&!shot;i++){
+          if(owner[i]!==cur||fired.has(i)||tried.has(i))continue;
+          if(kind==='cat'?!cat[i]:!cannon[i])continue;
+          tried.add(i);const before=fired.size;
+          if(kind==='cat')botFireCat(i);else botFireCannon(i);
+          if(fired.size>before)shot=true;
+        }
+        if(shot)break;
+      }
+    }catch(e){console.error('Bot:',e)}
+    if(shot){if(botLog.length)$('msg').textContent='🤖 '+NAMES[cur]+': '+botLog.join(' ');bwait(650,t,step)}
+    else done();
+  };
+  step();
+}
+function botRollPhase(t){
+  if(t!==botTok||over||rolled)return;
   if(botLog.length)$('msg').textContent='🤖 '+NAMES[cur]+': '+botLog.join(' ');
   render();
   bwait(1100,t,()=>{if(rolled||over)return;if(!podCanAct()){bwait(450,t,()=>botTurn(t));return}roll();
@@ -250,16 +278,17 @@ function botPickCell(av){
   const my=botMyRegions(),noise=[6,2,.4,.1][BL];let best=av[0],bs=-1e9;
   for(const i of av){
     let s=Math.random()*noise;
-    if(!my.has(region[i]))s+=10;
-    if(coin[i])s+=3;if(pot[i])s+=7;
+    if(!my.has(region[i]))s+=BL>=3?30:10;
+    if(coin[i])s+=BL>=3?6:3;if(pot[i])s+=BL>=3?10:7;
     let free=0,newz=0;
     for(const j of nb8(i))if(owner[j]===-1){free++;if(!my.has(region[j]))newz++}
-    s+=free*.15+newz*(BL>=1?1.2:.3);
+    s+=free*.15+newz*(BL>=3?3:BL>=1?1.2:.3);
     if(s>bs){bs=s;best=i}
   }
   return best;
 }
 function botSpot(kind){
+  if(kind==='cat'&&BL>=3)return botSpotCat();
   const free=[...ownFree()];if(!free.length)return -1;
   let best=-1,bs=-1e9;
   for(const i of free){
@@ -311,7 +340,7 @@ function botShield(){
   const cnt={};owner.forEach((o,i)=>{if(o===cur)cnt[region[i]]=(cnt[region[i]]||0)+1});
   const mine=[];owner.forEach((o,i)=>{if(o===cur&&!shield[i]){
     const exposed=nb8(i).filter(j=>owner[j]>=0&&owner[j]!==cur).length;
-    mine.push([i,(cannon[i]||cat[i]||gen[i]?7:0)+(cnt[region[i]]===1?10:0)+exposed*2+Math.random()]);
+    mine.push([i,(BL>=3?(cat[i]?25:gen[i]?12:cannon[i]?6:0)+(cnt[region[i]]===1?20:0):(cannon[i]||cat[i]||gen[i]?7:0)+(cnt[region[i]]===1?10:0))+exposed*2+Math.random()]);
   }});
   mine.sort((a,b)=>b[1]-a[1]);
   let protectedNow=0;
@@ -323,22 +352,24 @@ function botShield(){
 function botShop(){
   if(BL<1)return;
   if(BL>=3){
-    // Ekstremalny: gospodarka bez sztywnego limitu generatorów, ale z rezerwą na osłony i broń.
-    for(let r=0;r<12;r++){
-      const nG=botCount(gen),nK=botCount(cat),nC=botCount(cannon);
-      const income=owner.reduce((sum,o,i)=>sum+(o===cur&&gen[i]?genInc(i):0),0);
+    // Ekstremalny: minimum ekonomii (1 generator), potem ciągła rozbudowa floty katapult.
+    // Każda nowa katapulta strzela jeszcze w tej samej turze.
+    for(let r=0;r<16;r++){
+      const nG=botCount(gen),nK=botCount(cat),nC=botCount(cannon),gp=generatorPrice(cur);
       const unprotected=owner.some((o,i)=>o===cur&&!shield[i]);
-      // Nie odkładaj ochrony: gdy stać go na paczkę, od razu zabezpiecza pola.
-      if(shieldStock[cur]>0&&unprotected){botShield();continue}
-      if(shieldStock[cur]<1&&wallet[cur]>=15&&unprotected){botShield();continue}
-      // Generatory kupuje bez limitu, ale tylko gdy dochód jest niski lub budżet pozwala na inwestycję.
-      if(wallet[cur]>=generatorPrice(cur) && income<Math.min(12,2+nG*2) && (wallet[cur]>=22||nG===0) && botBuyPlace('gen'))continue;
-      if(botUpgradeGen())continue;
-      // Broń i katapulty pozostają w planie; nie wydaje ostatnich 15 monet, jeśli pola czekają na ochronę.
-      const reserve=unprotected?15:0;
-      if(nK<5&&wallet[cur]>=CATP+reserve&&botBuyPlace('cat'))continue;
-      if(botUpgradeCat()&&wallet[cur]>=reserve)continue;
-      if(nC<2&&wallet[cur]>=PRICE+reserve&&botBuyPlace('cannon'))continue;
+      const unshK=owner.some((o,i)=>o===cur&&cat[i]&&!shield[i]);
+      const threat=owner.some((o,i)=>o>=0&&o!==cur&&(cat[i]||cannon[i]));
+      const targetG=nK<1?3:Math.min(10,5+nK);
+      if(shieldStock[cur]>0&&unprotected&&botShield())continue;
+      if(nG<targetG&&wallet[cur]>=gp&&botBuyPlace('gen'))continue;
+      if(nG<targetG&&nK<1)break;
+      if(nK<1){if(wallet[cur]>=CATP&&botBuyPlace('cat'))continue;break}
+      if(threat&&nK>=2&&unshK&&wallet[cur]>=15&&botShield())continue;
+      if(nK<10&&wallet[cur]>=CATP&&botBuyPlace('cat'))continue;
+      if(nK>=2&&wallet[cur]>=KUP&&botUpgradeCat())continue;
+      if(nK>=10&&unprotected&&wallet[cur]>=15&&botShield())continue;
+      if(nK>=2&&wallet[cur]>=GUP+CATP&&botUpgradeGen())continue;
+      if(nK>=5&&nC<1&&wallet[cur]>=PRICE+CATP&&botBuyPlace('cannon'))continue;
       break;
     }
     return;
@@ -358,6 +389,7 @@ function botShop(){
   }
 }
 function botVal(h,rc){
+  if(BL>=3)return 1+(gen[h]?5:0)+(cannon[h]?4:0)+(cat[h]?12:0)+(rc[owner[h]][region[h]]===1?15:0);
   return 1+(gen[h]?3:0)+(cannon[h]?3:0)+(cat[h]?4:0)+(rc[owner[h]][region[h]]===1?4:0);
 }
 function cannonHits(i,ux,uy,L,pw){
@@ -384,7 +416,63 @@ function botFireCannon(i){
   aim={i,drag:true,px:cx+best.ux*R,py:cy+best.uy*R,kind:'cannon'};
   fire();botLog.push($('msg').textContent);
 }
+// Dokładna ocena każdego pola-celu (pole + 4 sąsiednie): zysk stref (1000 pkt = ~45 w skali bota),
+// utrata stref przez rywali, zniszczone struktury, monety i garnki. Osłonięte pola są pomijane.
+function botScoreGrid(){
+  const rc=botCounts(),mine=rc[cur],S=new Float64Array(W*H);
+  const st=stats(),sc=st.c.map((c,k)=>st.z[k]*1000+c);
+  let top=-1e9;sc.forEach((v,k)=>{if(k!==cur&&v>top)top=v});
+  for(let t=0;t<W*H;t++){
+    let s=0;const gain=new Set(),loss=new Map();
+    for(const a of [t,...nb(t)]){
+      const o=owner[a];
+      if(o===cur||(o!==-1&&shield[a]))continue;
+      s+=1;
+      if(o!==-1){
+        const w=sc[o]>=top?1.25:.8;
+        s+=w;
+        if(cat[a])s+=14*w;else if(gen[a])s+=7*w;else if(cannon[a])s+=4*w;
+        const k=o*100+region[a];loss.set(k,(loss.get(k)||0)+1);
+      }
+      if(coin[a])s+=2;if(pot[a])s+=6;
+      if(!mine[region[a]])gain.add(region[a]);
+    }
+    s+=gain.size*45;
+    loss.forEach((n,k)=>{const o=Math.floor(k/100),r=k%100;if(rc[o][r]-n<=0)s+=40*(sc[o]>=top?1.25:.8)});
+    S[t]=s;
+  }
+  return S;
+}
+function botBestShot(cx,cy,R,S){
+  let best=null,bs=0;
+  for(let ty=0;ty<H;ty++)for(let tx=0;tx<W;tx++){
+    const t=idx(tx,ty);if(S[t]<=bs)continue;
+    const D=Math.hypot(tx+.5-cx,ty+.5-cy);if(D<KMIN+.02||D>R)continue;
+    bs=S[t];best={tx,ty,D,s:S[t]};
+  }
+  return best;
+}
+function botSpotCat(){
+  const free=[...ownFree()];if(!free.length)return -1;
+  const S=botScoreGrid(),R=12;let best=-1,bs=-1e9;
+  for(const i of free){
+    const cx=i%W+.5,cy=((i/W)|0)+.5,b=botBestShot(cx,cy,R,S);
+    let en=0;
+    for(const j of nb8(i))if(owner[j]>=0&&owner[j]!==cur)en++;
+    const sc=(b?b.s:0)+(shield[i]?5:0)-en*1.5+Math.random()*.5;
+    if(sc>bs){bs=sc;best=i}
+  }
+  return best;
+}
+function botFireCatX(i){
+  const cx=i%W+.5,cy=((i/W)|0)+.5,R=katRange(i),b=botBestShot(cx,cy,R,botScoreGrid());
+  if(!b)return;
+  const p=b.D/R*PULL,ux=(b.tx+.5-cx)/b.D,uy=(b.ty+.5-cy)/b.D;
+  aim={i,drag:true,px:cx-ux*p,py:cy-uy*p,kind:'cat'};
+  fireCat();botLog.push($('msg').textContent);
+}
 function botFireCat(i){
+  if(BL>=3)return botFireCatX(i);
   const cx=i%W+.5,cy=((i/W)|0)+.5,R=katRange(i),rc=botCounts(),my=botMyRegions();
   let best=null,bs=3.5;
   for(let ty=0;ty<H;ty++)for(let tx=0;tx<W;tx++){
