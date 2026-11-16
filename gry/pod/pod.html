@@ -57,7 +57,7 @@
     <div class='head'><b>🛒 Sklep</b><span id="wal"></span></div>
     <div class='item'>
       <div class='ico' id='icoC'></div>
-      <div class='info'><b>Działo</b><div>Strzela w linii: zasięg 3, niszczy 1 blok. Raz na turę.</div></div>
+      <div class='info'><b>Działo</b><div>Strzela w linii: zasięg 3, niszczy 5 bloków. Raz na turę.</div></div>
       <div class='act'><button id="buy" onclick="buy()">Kup działo (5 🪙)</button></div>
     </div>
     <div class='item'>
@@ -66,19 +66,19 @@
       <div class='act'><button id="buyS" onclick="buyShield()">Kup ochronę (15 🪙)</button></div>
     </div>
     <div class='item'>
-      <div class='ico'>⚡</div>
+      <div class='ico' id='icoG'></div>
       <div class='info'><b>Generator</b><div>Daje 2 🪙 na początku Twojej tury. Niszczy się razem z polem.</div></div>
       <div class='act'><button id="buyG" onclick="buyGen()">Kup generator (6 🪙)</button></div>
     </div>
     <div class='item'>
       <div class='ico' id='icoK'></div>
-      <div class='info'><b>Katapulta</b><div>Naciągana procą, zasięg do 12 pól. Przejmuje pole i 4 dookoła, niszcząc struktury przeciwnika.</div></div>
+      <div class='info'><b>Katapulta</b><div>Naciągana procą, zasięg od 5 do 12 pól (nie strzela za blisko). Przejmuje pole i 4 dookoła, niszcząc struktury przeciwnika.</div></div>
       <div class='act'><button id="buyK" onclick="buyCat()">Kup katapultę (12 🪙)</button></div>
     </div>
     <div class='note'><b>Ulepszenia</b> kupujesz w menu jednostki (kliknij ją na mapie):
       <ul>
         <li>🔫 zasięg +1: 5 🪙 (maks. 4 poziomy)</li>
-        <li>🔫 niszczone bloki 2: 5 🪙</li>
+        <li>🔫 niszczone bloki 6: 5 🪙</li>
         <li>🪨 zasięg 15: 6 🪙</li>
         <li>⚡ przychód 3 🪙 na turę: 10 🪙</li>
       </ul>
@@ -127,11 +127,13 @@ function setPlayerColors(input){
 }
 const FACES="⚀⚁⚂⚃⚄⚅";
 let N,owner,region,cur,left,rolled,over,cells=[],coin,cannon,cat,kstock,klv,glv,cpow,crange,gen,gstock,gBought,wallet,stock,shield,shieldStock,placeMode=false;
-const PRICE=5,UPG=5,GENP=6,CATP=12,KUP=6,GUP=10,CRMAX=4,PULL=4,RANGE=3;
+const PRICE=5,UPG=5,GENP=6,CATP=12,KUP=6,GUP=10,CRMAX=4,PULL=4,RANGE=3,CP0=5,CP1=6,KMIN=5;
 const COIN="media/e66d73fa49.png";
 const IMGC="media/ef5cda8396.png";
 const IMGK="media/42aa1fcd81.png";
 const UC="<img class='uimg' src='"+IMGC+"' alt='działo'>",UK="<img class='uimg' src='"+IMGK+"' alt='katapulta'>";
+const IMGG="media/generator.png";
+const UG="<img class='uimg' src='"+IMGG+"' alt='generator'>";
 const IMGP="media/c10dee179b.png";
 const UP="<img class='uimg' src='"+IMGP+"' alt='garnek'>";
 const CI="<img class='cimg' src='"+COIN+"' alt='moneta'>";
@@ -294,7 +296,7 @@ function botUpgrade(){
     if(cat[i]&&klv[i]<2&&wallet[cur]>=KUP){fn=upgradeKG;label='katapultę'}
     else if(gen[i]&&glv[i]<2&&wallet[cur]>=GUP){fn=upgradeKG;label='generator'}
     else if(cannon[i]&&crange[i]-RANGE+1<CRMAX&&wallet[cur]>=UPG){fn=upgradeRange;label='zasięg działa'}
-    else if(cannon[i]&&cpow[i]<2&&wallet[cur]>=UPG){fn=upgrade;label='moc działa'}
+    else if(cannon[i]&&cpow[i]<CP1&&wallet[cur]>=UPG){fn=upgrade;label='moc działa'}
     if(fn){menuI=i;fn();closeMenu();botLog.push('Ulepszył '+label+'.');return true}
   }
   return false;
@@ -386,7 +388,7 @@ function botFireCat(i){
   const cx=i%W+.5,cy=((i/W)|0)+.5,R=katRange(i),rc=botCounts(),my=botMyRegions();
   let best=null,bs=3.5;
   for(let ty=0;ty<H;ty++)for(let tx=0;tx<W;tx++){
-    const D=Math.hypot(tx+.5-cx,ty+.5-cy);if(D<2||D>R)continue;
+    const D=Math.hypot(tx+.5-cx,ty+.5-cy);if(D<KMIN||D>R)continue;
     const t=idx(tx,ty),regs=new Set();let sc=0;
     for(const a of [t,...nb(t)]){
       if(owner[a]===cur)continue;
@@ -421,7 +423,7 @@ function botFire(){
 function start(n){
   N=n;$("setup").classList.add("hide");$("game").classList.remove("hide");
   $('tplayer').innerHTML=NAMES.slice(0,N).map((nm,k)=>`<option value='${k}'>${nm}</option>`).join('');
-  setTest($('tmode').checked);setTab('map');$('icoC').innerHTML=UC;$('icoK').innerHTML=UK;
+  setTest($('tmode').checked);setTab('map');$('icoC').innerHTML=UC;$('icoK').innerHTML=UK;$('icoG').innerHTML=UG;
   // regiony (Voronoi)
   const R=22,seeds=[];
   for(let k=0;k<R;k++)seeds.push([Math.random()*W,Math.random()*H]);
@@ -432,7 +434,7 @@ function start(n){
   }
   owner=Array(W*H).fill(-1);
   [[0,0],[W-1,H-1],[W-1,0],[0,H-1]].slice(0,N).forEach((p,k)=>owner[idx(p[0],p[1])]=k);
-  pot=Array(W*H).fill(false);rounds=0;note="";coin=Array(W*H).fill(false);shield=Array(W*H).fill(false);shieldStock=Array(N).fill(0);cannon=Array(W*H).fill(false);cpow=Array(W*H).fill(1);crange=Array(W*H).fill(RANGE);gen=Array(W*H).fill(false);gstock=Array(N).fill(0);gBought=Array(N).fill(0);cat=Array(W*H).fill(false);kstock=Array(N).fill(0);klv=Array(W*H).fill(1);glv=Array(W*H).fill(1);wallet=Array(N).fill(0);stock=Array(N).fill(0);placeMode=false;
+  pot=Array(W*H).fill(false);rounds=0;note="";coin=Array(W*H).fill(false);shield=Array(W*H).fill(false);shieldStock=Array(N).fill(0);cannon=Array(W*H).fill(false);cpow=Array(W*H).fill(CP0);crange=Array(W*H).fill(RANGE);gen=Array(W*H).fill(false);gstock=Array(N).fill(0);gBought=Array(N).fill(0);cat=Array(W*H).fill(false);kstock=Array(N).fill(0);klv=Array(W*H).fill(1);glv=Array(W*H).fill(1);wallet=Array(N).fill(0);stock=Array(N).fill(0);placeMode=false;
   for(let n=0;n<70;){const i=Math.floor(Math.random()*W*H);if(owner[i]===-1&&!coin[i]){coin[i]=true;n++}}
   const board=$("board");board.style.gridTemplateColumns=`repeat(${W},1fr)`;
   for(let i=0;i<W*H;i++){
@@ -481,7 +483,7 @@ function claim(i){
   }
   if(placeMode){
     if(owner[i]===cur&&!cannon[i]&&!gen[i]&&!cat[i]){
-      if(placeMode==="cannon"&&stock[cur]>0){cannon[i]=true;cpow[i]=1;crange[i]=RANGE;stock[cur]--;placeMode=false;$("msg").textContent="Działo postawione!";render()}
+      if(placeMode==="cannon"&&stock[cur]>0){cannon[i]=true;cpow[i]=CP0;crange[i]=RANGE;stock[cur]--;placeMode=false;$("msg").textContent="Działo postawione!";render()}
       else if(placeMode==="gen"&&gstock[cur]>0){gen[i]=true;glv[i]=1;gstock[cur]--;placeMode=false;$("msg").textContent="Generator postawiony!";render()}
       else if(placeMode==="cat"&&kstock[cur]>0){cat[i]=true;klv[i]=1;kstock[cur]--;placeMode=false;$("msg").textContent="Katapulta postawiona!";render()}
     }
@@ -522,7 +524,7 @@ function render(){
     d.classList.toggle("av",av.has(i));
     d.style.setProperty("--cur",PLAYER_COLORS[cur]||DEFAULT_COLORS[cur%4]);
     d.classList.toggle("coin",!!(coin[i]||pot[i]));
-    {const h=fx.has(i)?"💥":(cannon[i]?UC:(cat[i]?UK:(gen[i]?"⚡":(pot[i]?UP:(coin[i]?CI:"")))));const shown=h+(shield[i]?"<span class=\"shieldMark\">🛡️</span>":"");if(d._h!==shown){d.innerHTML=shown;d._h=shown}}
+    {const h=fx.has(i)?"💥":(cannon[i]?UC:(cat[i]?UK:(gen[i]?UG:(pot[i]?UP:(coin[i]?CI:"")))));const shown=h+(shield[i]?"<span class=\"shieldMark\">🛡️</span>":"");if(d._h!==shown){d.innerHTML=shown;d._h=shown}}
   });
   const {c:cnt,z}=stats();
   $("players").innerHTML=cnt.map((c,k)=>`<span class="pl ${k===cur&&!over?"on":""}" style="background:${PLAYER_COLORS[k]||DEFAULT_COLORS[k%4]}">${NAMES[k]}${BOT[k]?' 🤖':''} · STREFY: ${z[k]}/${new Set(region).size} · pól: ${c} · ${CI} ${wallet[k]}${z[k]>=10?' · ↗ ukos':''}</span>`).join("");
@@ -547,12 +549,12 @@ function render(){
 }
 function openMenu(i){
   if(!podCanAct())return;menuI=i;const mine=owner[i]===cur;
-  const K=cat[i],G=gen[i];$('mtitle').innerHTML=K?UK+' Katapulta':G?'⚡ Generator':UC+' Działo';$('mfire').textContent=K?'🎯 Naciągnij i strzel':'🎯 Strzelaj';$('mfire').classList.toggle('hide',G);$('mku').classList.toggle('hide',!(K||G));$('mup').classList.toggle('hide',K||G);$('mrng').classList.toggle('hide',K||G);
-  $('mst').innerHTML=K?'Maks. zasięg: <b>'+katRange(i)+'</b> ('+klv[i]+'/2)<br>Obszar trafienia: <b>pole + 4 dookoła</b>':G?'Przychód: <b>'+genInc(i)+' 🪙</b> na turę ('+glv[i]+'/2)':'Zasięg: <b>'+crange[i]+'</b> ('+(crange[i]-RANGE+1)+'/'+CRMAX+')<br>Niszczone bloki: <b>'+cpow[i]+'</b> ('+cpow[i]+'/2)';
+  const K=cat[i],G=gen[i];$('mtitle').innerHTML=K?UK+' Katapulta':G?UG+' Generator':UC+' Działo';$('mfire').textContent=K?'🎯 Naciągnij i strzel':'🎯 Strzelaj';$('mfire').classList.toggle('hide',G);$('mku').classList.toggle('hide',!(K||G));$('mup').classList.toggle('hide',K||G);$('mrng').classList.toggle('hide',K||G);
+  $('mst').innerHTML=K?'Maks. zasięg: <b>'+katRange(i)+'</b> ('+klv[i]+'/2)<br>Obszar trafienia: <b>pole + 4 dookoła</b>':G?'Przychód: <b>'+genInc(i)+' 🪙</b> na turę ('+glv[i]+'/2)':'Zasięg: <b>'+crange[i]+'</b> ('+(crange[i]-RANGE+1)+'/'+CRMAX+')<br>Niszczone bloki: <b>'+cpow[i]+'</b> ('+(cpow[i]-CP0+1)+'/2)';
   $('mnote').textContent=!mine?'Należy do gracza: '+NAMES[owner[i]]:(G?'Produkuje monety na początku Twojej tury.':fired.has(i)?'Już strzelało w tej turze.':'Gotowe do strzału.');
   $('mfire').disabled=!mine||fired.has(i)||over;
-  const mx=cpow[i]>=2;
-  $('mup').textContent=mx?'Maks. poziom':'⬆️ Ulepsz: 2 bloki ('+UPG+' 🪙)';
+  const mx=cpow[i]>=CP1;
+  $('mup').textContent=mx?'Maks. poziom':'⬆️ Ulepsz: 6 bloków ('+UPG+' 🪙)';
   $('mup').disabled=!mine||mx||over||wallet[cur]<UPG;
   const rm=crange[i]-RANGE+1>=CRMAX;$('mrng').textContent=rm?'Maks. zasięg':'🔭 Zasięg +1 ('+UPG+' 🪙)';
   $('mrng').disabled=!mine||rm||over||wallet[cur]<UPG;
@@ -563,10 +565,10 @@ function openMenu(i){
 }
 function upgrade(){
   if(!podCanAct())return;podMarkAction();const i=menuI;
-  if(over||i<0||owner[i]!==cur||cpow[i]>=2||wallet[cur]<UPG)return;
-  wallet[cur]-=UPG;cpow[i]=2;
+  if(over||i<0||owner[i]!==cur||cpow[i]>=CP1||wallet[cur]<UPG)return;
+  wallet[cur]-=UPG;cpow[i]=CP1;
   render();openMenu(i);
-  $('msg').textContent='Działo ulepszone – niszczy teraz 2 bloki leżące na linii strzału.';
+  $('msg').textContent='Działo ulepszone – niszczy teraz 6 bloków leżące na linii strzału.';
 }
 function closeMenu(){$('menu').classList.add('hide')}
 function geom(){const r=cells[0].getBoundingClientRect(),b=$('bw').getBoundingClientRect();return{cs:r.width,l:r.left,t:r.top,ox:r.left-b.left,oy:r.top-b.top}}
@@ -580,7 +582,7 @@ function startAim(i){
   closeMenu();placeMode=false;aim={i,drag:false,px:0,py:0,kind:cat[i]?'cat':'cannon'};
   $('cancelAim').classList.remove('hide');$('bw').classList.add('aiming');
   $('msg').textContent='Przeciągnij myšką linię od działa (zasięg '+crange[i]+') i puść, aby strzelić.';
-  if(aim.kind==='cat')$('msg').textContent='Naciągnij procę: przeciągnij myśką w PRZECIWNĄ stronę niż cel – im dalej, tym dłuższy strzał. Puść, aby wystrzelić.';
+  if(aim.kind==='cat')$('msg').textContent='Naciągnij procę: przeciągnij myśką w PRZECIWNĄ stronę niż cel – im dalej, tym dłuższy strzał (min. 5 pól). Puść, aby wystrzelić.';
   render();drawAim();
 }
 function cancelAim(m){
@@ -645,7 +647,7 @@ function testEdit(i){if(podOnline)return;
   else if(t==='pot'){if(owner[i]===-1)pot[i]=!pot[i]}
   else{
     clr();owner[i]=p;
-    if(t==='cannon'){cannon[i]=true;cpow[i]=1;crange[i]=RANGE}
+    if(t==='cannon'){cannon[i]=true;cpow[i]=CP0;crange[i]=RANGE}
     else if(t==='gen'){gen[i]=true;glv[i]=1}
     else if(t==='cat'){cat[i]=true;klv[i]=1}
   }
@@ -732,13 +734,15 @@ function catPt(){
 function drawCat(){
   const g=geom(),cx=aim.i%W+.5,cy=((aim.i/W)|0)+.5,P=(x,y)=>[g.ox+x*g.cs,g.oy+y*g.cs],[sx,sy]=P(cx,cy),c=PLAYER_COLORS[cur]||DEFAULT_COLORS[cur%4];
   let s=`<circle cx='${sx}' cy='${sy}' r='${PULL*g.cs}' style='fill:none;stroke:${c};stroke-width:2;stroke-dasharray:6 4'/>`;
+  s+=`<circle cx='${sx}' cy='${sy}' r='${KMIN*g.cs}' style='fill:${c};fill-opacity:.12;stroke:${c};stroke-width:2'/>`;
   s+=`<circle cx='${sx}' cy='${sy}' r='${g.cs*.7}' style='fill:none;stroke:${c};stroke-width:3'/>`;
   if(aim.drag){
     const k=catPt(),[hx,hy]=P(k.hx,k.hy),[lx,ly]=P(k.x,k.y);
     s+=`<line x1='${sx}' y1='${sy}' x2='${hx}' y2='${hy}' style='stroke:${c};stroke-width:5;stroke-linecap:round;opacity:.6'/>`;
     s+=`<line x1='${sx}' y1='${sy}' x2='${lx}' y2='${ly}' style='stroke:${c};stroke-width:2;stroke-dasharray:3 5'/>`;
-    const tx=Math.floor(k.x),ty=Math.floor(k.y);
-    [[0,0],[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{const x=tx+dx,y=ty+dy;if(x<0||y<0||x>=W||y>=H)return;const [rx,ry]=P(x,y);s+=`<rect x='${rx}' y='${ry}' width='${g.cs}' height='${g.cs}' style='fill:${c};fill-opacity:.35;stroke:${c};stroke-width:2'/>`});
+    const tx=Math.floor(k.x),ty=Math.floor(k.y),bad=k.d<KMIN;
+    if(bad)s+=`<text x='${sx}' y='${sy-KMIN*g.cs-6}' text-anchor='middle' style='fill:${c};font:700 14px system-ui'>za blisko (min. ${KMIN})</text>`;
+    [[0,0],[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{const x=tx+dx,y=ty+dy;if(x<0||y<0||x>=W||y>=H)return;const [rx,ry]=P(x,y);s+=`<rect x='${rx}' y='${ry}' width='${g.cs}' height='${g.cs}' style='fill:${c};fill-opacity:${bad?.1:.35};stroke:${c};stroke-width:2'/>`});
   }
   $('ov').innerHTML=s;
 }
@@ -746,6 +750,7 @@ function fireCat(){
   if(!podCanAct())return;podMarkAction();
   const k=catPt();
   if(k.l<0.4){aim.drag=false;drawAim();return}
+  if(k.d<KMIN){aim.drag=false;drawAim();$('msg').textContent='Za blisko! Katapulta strzela dopiero od '+KMIN+' pól – naciągnij procę mocniej.';return}
   const i=aim.i,tx=Math.floor(k.x),ty=Math.floor(k.y);
   fired.add(i);cancelAim();
   if(tx<0||ty<0||tx>=W||ty>=H){$('msg').textContent='Pocisk wylądował poza mapą.';render();return}
