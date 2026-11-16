@@ -85,6 +85,8 @@
 
   // Ulica główna (biegnie wzdłuż osi X, przed postacią)
   const ROAD_Z = -14, ROAD_W = 10, SIDEWALK_W = 3, TILE = 8, ROAD_LEN = 160;
+  const SIGN_COLL = [];                                   // kolizje słupków znaków drogowych i tabliczek z nazwami ulic (okręgi jak pnie drzew)
+  const solidPole = (x, z) => SIGN_COLL.push({x, z, r:0.32});
   const rc = document.createElement('canvas'); rc.width = 256; rc.height = 320;
   const r = rc.getContext('2d');
   r.fillStyle = '#3b3b40'; r.fillRect(0,0,256,320);
@@ -118,6 +120,8 @@
   const SIDE_ROAD_LEN = SIDE_ROAD_END - SIDE_ROAD_START;
   const SIDE_ROAD_CENTER = (SIDE_ROAD_START + SIDE_ROAD_END) / 2;
   const SIDEWALK_OFFSET = ROAD_W/2 + SIDEWALK_GAP + SIDEWALK_W/2;
+  // Ulica Poprzeczna: w prawo (+z) z Długiej, za domem nr 10 – salon samochodowy po wschodniej stronie
+  const POP_X = 78, POP_END = 62, POP_EDGE = ROAD_W/2 + SIDEWALK_GAP + SIDEWALK_W;   // POP_EDGE = 8.15
 
   // Dwa chodniki przy głównej ulicy. Przy wlocie bocznej ulicy
   // górny chodnik jest przerwany, żeby nie przecinał skrzyżowania.
@@ -127,12 +131,17 @@
     if (side === 1) {
       const segmentLen = (ROAD_LEN - junctionHalfWidth*2) / 2;
       [-1, 1].forEach(direction => {
-        const sidewalk = new THREE.Mesh(
-          new THREE.BoxGeometry(segmentLen, 0.2, SIDEWALK_W), walkMat
-        );
-        sidewalk.position.set(direction*(junctionHalfWidth + segmentLen/2), 0.1, z);
-        sidewalk.receiveShadow = true;
-        street.add(sidewalk);
+        // wschodni odcinek (od x=8,15 do 80) jest przerwany na wlocie ulicy Poprzecznej
+        const pieces = direction === -1 ? [[-(junctionHalfWidth + segmentLen), -junctionHalfWidth]]
+          : [[junctionHalfWidth, POP_X - POP_EDGE], [POP_X + POP_EDGE, junctionHalfWidth + segmentLen]];
+        pieces.forEach(([x0, x1]) => {
+          const sidewalk = new THREE.Mesh(
+            new THREE.BoxGeometry(x1 - x0, 0.2, SIDEWALK_W), walkMat
+          );
+          sidewalk.position.set((x0 + x1)/2, 0.1, z);
+          sidewalk.receiveShadow = true;
+          street.add(sidewalk);
+        });
       });
     } else {
       const sidewalk = new THREE.Mesh(
@@ -175,12 +184,38 @@
   });
   street.add(sideRoad);
 
+  // Ulica Poprzeczna (x = POP_X, od krawędzi Długiej w stronę +z)
+  (function buildPoprzeczna(){
+    const len = POP_END - SIDE_ROAD_START;
+    const tex = roadTex.clone(); tex.needsUpdate = true; tex.repeat.set(len/TILE, 1);
+    const g = new THREE.Group(); g.position.set(POP_X, 0, (SIDE_ROAD_START + POP_END)/2); g.rotation.y = Math.PI/2;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(len, ROAD_W), new THREE.MeshLambertMaterial({map:tex}));
+    mesh.rotation.x = -Math.PI/2; mesh.position.y = 0.025; mesh.receiveShadow = true; g.add(mesh); street.add(g);
+    [-1,1].forEach(sd => {
+      const sw = new THREE.Mesh(new THREE.BoxGeometry(SIDEWALK_W, 0.2, len), walkMat);
+      sw.position.set(POP_X + sd*SIDEWALK_OFFSET, 0.1, (SIDE_ROAD_START + POP_END)/2); sw.receiveShadow = true; street.add(sw);
+    });
+    // tabliczka „POPRZECZNA” (czytelna z Długiej i z ulicy)
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128;
+    const c2 = cv.getContext('2d'); c2.fillStyle = '#174b78'; c2.fillRect(0,0,512,128);
+    c2.strokeStyle = '#fff'; c2.lineWidth = 9; c2.strokeRect(6,6,500,116);
+    c2.fillStyle = '#fff'; c2.font = 'bold 60px sans-serif'; c2.textAlign = 'center'; c2.textBaseline = 'middle'; c2.fillText('POPRZECZNA', 256, 66);
+    const tx = new THREE.CanvasTexture(cv); tx.anisotropy = 8;
+    const px = POP_X - 7.2, pz = SIDE_ROAD_START + 4.5;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 3.2, 10), new THREE.MeshLambertMaterial({color:0x55585c}));
+    pole.position.set(px, 1.6, pz); pole.castShadow = true; street.add(pole); solidPole(px, pz);
+    [1,-1].forEach(sd => {
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.55, 0.64), new THREE.MeshBasicMaterial({map:tx, side:THREE.FrontSide}));
+      face.position.set(px + sd*0.11, 2.65, pz); face.rotation.y = sd > 0 ? Math.PI/2 : -Math.PI/2; street.add(face);
+    });
+  })();
+
   // Nazwy ulic na tabliczkach przy skrzyżowaniu.
   const streetSignPole = new THREE.Mesh(
     new THREE.CylinderGeometry(0.07, 0.09, 3.2, 10),
     new THREE.MeshLambertMaterial({color:0x55585c})
   );
-  streetSignPole.position.set(7.2, 1.6, ROAD_Z + ROAD_W/2 + 1.1);
+  streetSignPole.position.set(7.2, 1.6, ROAD_Z + ROAD_W/2 + 1.1); solidPole(7.2, ROAD_Z + ROAD_W/2 + 1.1);
   street.add(streetSignPole);
   function addStreetNameSign(name, y, rotationY=0) {
     const canvas = document.createElement('canvas');
@@ -243,7 +278,7 @@
     const placeSign = (tex, x, z, rotY, size, isTriangle) => {
       const signY = 2.4, OFFN = 0.08;   // środek znaku; znak przesunięty przed słupek, żeby go nie przebijał
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,signY,8), poleMat);
-      pole.position.set(x, signY/2, z); pole.castShadow = true; street.add(pole);   // słupek kończy się za środkiem znaku
+      pole.position.set(x, signY/2, z); pole.castShadow = true; street.add(pole); solidPole(x, z);   // słupek kończy się za środkiem znaku
       const g = new THREE.Group(); g.position.set(x + Math.sin(rotY)*OFFN, signY, z + Math.cos(rotY)*OFFN); g.rotation.y = rotY;
       const back = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({color:0x9aa0a6, side:THREE.BackSide}));
       back.position.z = -0.02; g.add(back);
@@ -260,9 +295,15 @@
     placeSign(d3Tex,  12, MAIN_S,  Math.PI/2, 0.95, false);   // jadący na zachód (-x), normalna znaku = +x
     // A-7 na Krótkiej, przy wjeździe na skrzyżowanie, po prawej stronie jadących w stronę Długiej (-z)
     placeSign(a7Tex, SIDE_ROAD_X + ROAD_W/2 + 0.8, SIDE_ROAD_START + 2.2, 0, 0.95, true);   // normalna znaku = +z (do nadjeżdżających)
+    // A-7 także na Poprzecznej – tak samo jak na Krótkiej, po prawej stronie jadących w stronę Długiej
+    placeSign(a7Tex, POP_X + ROAD_W/2 + 0.8, SIDE_ROAD_START + 2.2, 0, 0.95, true);
     // P-13 linia warunkowego zatrzymania (przerywana) w poprzek pasa jadącego w stronę Długiej
     const lineMat = new THREE.MeshLambertMaterial({color:0xf4f4f4});
     for(let x = SIDE_ROAD_X + 0.4; x < SIDE_ROAD_X + ROAD_W/2 - 0.3; x += 1.2){
+      const dash = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.012, 0.35), lineMat);
+      dash.position.set(x + 0.4, 0.036, SIDE_ROAD_START + 1.0); dash.receiveShadow = true; street.add(dash);
+    }
+    for(let x = POP_X + 0.4; x < POP_X + ROAD_W/2 - 0.3; x += 1.2){                 // P-13 także na Poprzecznej
       const dash = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.012, 0.35), lineMat);
       dash.position.set(x + 0.4, 0.036, SIDE_ROAD_START + 1.0); dash.receiveShadow = true; street.add(dash);
     }
@@ -282,7 +323,7 @@
     [-1,1].forEach(side => {
       const z = ROAD_Z + side*(ROAD_W/2 + 0.15 + 2.6);
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,2.6,8), poleMat);
-      pole.position.set(CW_X + 3.2, 1.4, z); pole.castShadow = true; street.add(pole);
+      pole.position.set(CW_X + 3.2, 1.4, z); pole.castShadow = true; street.add(pole); solidPole(CW_X + 3.2, z);
       const plate = new THREE.Mesh(new THREE.BoxGeometry(0.7,0.7,0.06), signMat);
       plate.position.set(CW_X + 3.2, 2.75, z); plate.rotation.y = side > 0 ? 0 : Math.PI; street.add(plate);
       const tri = new THREE.Mesh(new THREE.BoxGeometry(0.36,0.36,0.02), whiteMat);
@@ -297,7 +338,13 @@
   const HOME = {x:14, z:10, w:9, d:8, h:3.5, rot:-Math.PI/2};   // AKTYWNY dom (ten, w którym jesteś); jego położenie podmienia setActiveHome()
   const HOMES = [                                               // oba domy gracza – do wynajęcia (30 monet / dobę)
     {id:'A', label:'Dom A', x:14,  z:10, rot:-Math.PI/2, rented:false, paidUntil:0, exterior:[]},
-    {id:'B', label:'Dom B', x:-14, z:19, rot: Math.PI/2, rented:false, paidUntil:0, exterior:[]}
+    {id:'B', label:'Dom B', x:-14, z:19, rot: Math.PI/2, rented:false, paidUntil:0, exterior:[]},
+    // ulica Społeczna (prawy zjazd z ronda): zachodnia strona – drzwi na wschód, wschodnia – drzwi na zachód
+    {id:'C', label:'Dom C', x:116, z:14, rot: Math.PI/2, rented:false, paidUntil:0, exterior:[]},
+    {id:'D', label:'Dom D', x:116, z:33, rot: Math.PI/2, rented:false, paidUntil:0, exterior:[]},
+    {id:'E', label:'Dom E', x:116, z:52, rot: Math.PI/2, rented:false, paidUntil:0, exterior:[]},
+    {id:'F', label:'Dom F', x:144, z:14, rot:-Math.PI/2, rented:false, paidUntil:0, exterior:[]},
+    {id:'G', label:'Dom G', x:144, z:33, rot:-Math.PI/2, rented:false, paidUntil:0, exterior:[]}
   ];
   let homeCur = HOMES[0];
   function setActiveHome(H){ homeCur = H; HOME.x = H.x; HOME.z = H.z; HOME.rot = H.rot; }
@@ -365,13 +412,21 @@
   // Jadąc Długą na wschód (+x) za domami nr 10 i 6: rondo, a jego lewy zjazd (w stronę -z) prowadzi do wielkiego, pustego budynku.
   const RB = {x:130, z:ROAD_Z, rOut:14, rIn:5.5};
   const SUPER = {x:130, z:-76, w:44, d:24, h:7.5};                 // front budynku (+z) na z = -64
+  const PAINT = {x:93, z:46, w:12, d:9, h:3.8};                    // lakiernik za salonem (dalej wzdłuż Poprzecznej)
+  const MECH = {x:62, z:42, w:14, d:11, h:4.4};                    // mechanik po zachodniej stronie Poprzecznej (naprzeciw salonu i lakiernika); drzwi na wschód, wjazd autem
+  const CAR = {x:93, z:25, w:16, d:10, h:4.2};                     // salon samochodowy: w – wzdłuż Z świata, d – wzdłuż X
   const ROUND_COLL = [];                                            // kolizje wyspy środkowej (okręgi, jak pnie drzew)
   const NEW_STREET_EDGE = ROAD_W/2 + SIDEWALK_GAP + SIDEWALK_W;
   const onNewStreets = (x, z, m) =>
     Math.hypot(x - RB.x, z - RB.z) < RB.rOut + 3 + m ||                                         // rondo z chodnikiem
     (x > 78 - m && x < RB.x && Math.abs(z - ROAD_Z) < NEW_STREET_EDGE + m) ||                   // przedłużenie Długiej
     (Math.abs(x - RB.x) < NEW_STREET_EDGE + m && z < RB.z && z > SUPER.z + SUPER.d/2 - m) ||    // zjazd do supermarketu
-    (Math.abs(x - SUPER.x) < SUPER.w/2 + m && z < -52 + m && z > SUPER.z - SUPER.d/2 - m);      // parking i budynek
+    (Math.abs(x - SUPER.x) < SUPER.w/2 + m && z < -52 + m && z > SUPER.z - SUPER.d/2 - m) ||    // parking i budynek
+    (Math.abs(x - RB.x) < 22 + m && z > RB.z + 8 - m && z < 90 + m) ||                          // ulica Społeczna z domami i sklepem odzieżowym
+    (Math.abs(x - POP_X) < POP_EDGE + m && z > SIDE_ROAD_START - m && z < POP_END + m) ||       // ulica Poprzeczna
+    (Math.abs(x - CAR.x) < CAR.d/2 + 2 + m && Math.abs(z - CAR.z) < CAR.w/2 + 2 + m) ||        // salon samochodowy
+    (Math.abs(x - MECH.x) < MECH.d/2 + 4 + m && Math.abs(z - MECH.z) < MECH.w/2 + 2 + m) ||    // mechanik
+    (Math.abs(x - PAINT.x) < PAINT.d/2 + 2 + m && Math.abs(z - PAINT.z) < PAINT.w/2 + 2 + m);  // lakiernik                            // ulica Społeczna z domami i sklepem odzieżowym
   (function buildRoundabout(){
     const lamb = c => new THREE.MeshLambertMaterial({color:c});
     const asphaltTex = len => { const t = roadTex.clone(); t.needsUpdate = true; t.repeat.set(len/TILE, 1); return t; };
@@ -380,10 +435,10 @@
     const ext = new THREE.Mesh(new THREE.PlaneGeometry(extLen, ROAD_W), new THREE.MeshLambertMaterial({map:asphaltTex(extLen)}));
     ext.rotation.x = -Math.PI/2; ext.position.set(80 + extLen/2, 0.02, ROAD_Z); ext.receiveShadow = true; street.add(ext);
     // chodniki wzdłuż przedłużenia
-    const swLen = (RB.x - 14) - 80;
     [-1,1].forEach(sd => {
+      const sx0 = sd === 1 ? POP_X + POP_EDGE : 80, swLen = (RB.x - 14) - sx0;   // północny chodnik zaczyna się za wlotem Poprzecznej
       const sw = new THREE.Mesh(new THREE.BoxGeometry(swLen, 0.2, SIDEWALK_W), walkMat);
-      sw.position.set(80 + swLen/2, 0.1, ROAD_Z + sd*SIDEWALK_OFFSET); sw.receiveShadow = true; street.add(sw);
+      sw.position.set(sx0 + swLen/2, 0.1, ROAD_Z + sd*SIDEWALK_OFFSET); sw.receiveShadow = true; street.add(sw);
     });
     // 2) rondo: asfaltowa tarcza, białe łuki krawędzi (z przerwami przy wjazdach), wyspa z drzewem
     const grainTex = (rx, ry) => {                                   // asfalt jak na Długiej (te same kolory i ziarno), bez linii
@@ -395,7 +450,7 @@
     const disc = new THREE.Mesh(new THREE.CircleGeometry(RB.rOut, 72), new THREE.MeshLambertMaterial({map:grainTex(RB.rOut*2/TILE, RB.rOut*2/TILE)}));
     disc.rotation.x = -Math.PI/2; disc.position.set(RB.x, 0.03, RB.z); disc.receiveShadow = true; street.add(disc);
     const gap = 0.47, edgeMat = new THREE.MeshBasicMaterial({color:0xe8e8e8});
-    [[Math.PI/2 + gap, Math.PI - gap], [Math.PI + gap, 2.5*Math.PI - gap]].forEach(([a0,a1]) => {
+    [[Math.PI/2 + gap, Math.PI - gap], [Math.PI + gap, 1.5*Math.PI - gap], [1.5*Math.PI + gap, 2.5*Math.PI - gap]].forEach(([a0,a1]) => {
       const arc = new THREE.Mesh(new THREE.RingGeometry(RB.rOut-0.55, RB.rOut-0.4, 48, 1, a0, a1-a0), edgeMat);
       arc.rotation.x = -Math.PI/2; arc.position.set(RB.x, 0.04, RB.z); street.add(arc);
     });
@@ -421,6 +476,29 @@
       const sw = new THREE.Mesh(new THREE.BoxGeometry(SIDEWALK_W, 0.2, exSwLenAbs), walkMat);
       sw.position.set(RB.x + sd*SIDEWALK_OFFSET, 0.1, (RB.z - 13 + exitEnd)/2); sw.receiveShadow = true; street.add(sw);
     });
+    // 3b) prawy zjazd (w stronę +z): ulica Społeczna – 5 domów gracza i sklep z ubraniami
+    const SPOL_END = 84, spStart = RB.z + 12.5, spLen = SPOL_END - spStart;
+    const spG = new THREE.Group(); spG.position.set(RB.x, 0, (spStart + SPOL_END)/2); spG.rotation.y = Math.PI/2; street.add(spG);
+    const spRoad = new THREE.Mesh(new THREE.PlaneGeometry(spLen, ROAD_W), new THREE.MeshLambertMaterial({map:asphaltTex(spLen)}));
+    spRoad.rotation.x = -Math.PI/2; spRoad.position.y = 0.02; spRoad.receiveShadow = true; spG.add(spRoad);
+    const spSwLen = SPOL_END - (RB.z + 13);
+    [-1,1].forEach(sd => {
+      const sw = new THREE.Mesh(new THREE.BoxGeometry(SIDEWALK_W, 0.2, spSwLen), walkMat);
+      sw.position.set(RB.x + sd*SIDEWALK_OFFSET, 0.1, (RB.z + 13 + SPOL_END)/2); sw.receiveShadow = true; street.add(sw);
+    });
+    {   // tabliczka „SPOŁECZNA” przy wlocie (dwie strony – czytelna z obu kierunków)
+      const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128;
+      const g3 = cv.getContext('2d'); g3.fillStyle = '#174b78'; g3.fillRect(0,0,512,128);
+      g3.strokeStyle = '#fff'; g3.lineWidth = 9; g3.strokeRect(6,6,500,116);
+      g3.fillStyle = '#fff'; g3.font = 'bold 62px sans-serif'; g3.textAlign = 'center'; g3.textBaseline = 'middle'; g3.fillText('SPOŁECZNA', 256, 66);
+      const tx = new THREE.CanvasTexture(cv); tx.anisotropy = 8;
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 3.2, 10), new THREE.MeshLambertMaterial({color:0x55585c}));
+      pole.position.set(RB.x + 7.2, 1.6, RB.z + 17); pole.castShadow = true; street.add(pole); solidPole(RB.x + 7.2, RB.z + 17);
+      [1,-1].forEach(sd => {
+        const face = new THREE.Mesh(new THREE.PlaneGeometry(2.55, 0.64), new THREE.MeshBasicMaterial({map:tx, side:THREE.FrontSide}));
+        face.position.set(RB.x + 7.2, 2.65, RB.z + 17 + sd*0.11); if(sd < 0) face.rotation.y = Math.PI; street.add(face);
+      });
+    }
     // 4) parking przed supermarketem
     const apron = new THREE.Mesh(new THREE.PlaneGeometry(SUPER.w, 12), new THREE.MeshLambertMaterial({map:grainTex(SUPER.w/TILE, 12/TILE)}));
     apron.rotation.x = -Math.PI/2; apron.position.set(SUPER.x, 0.03, -58); apron.receiveShadow = true; street.add(apron);
@@ -563,6 +641,7 @@
   // Supermarket Pandy (z wnętrzem, do którego można wejść)
   const supWallMat = new THREE.MeshLambertMaterial({color:0xdcd6c8});
   const supExterior = [];
+  let supRoof = null;                                                           // dach: w środku niewidoczny, ale nadal rzuca cień (stałe oświetlenie wnętrza)
   (function buildSupermarket(){
     const SX = SUPER.x, SZ = SUPER.z, w = SUPER.w, d = SUPER.d, H = 6, t = 0.4, gap = 5, fz = d/2;
     const grp = new THREE.Group(); grp.position.set(SX, 0, SZ); scene.add(grp);
@@ -584,7 +663,7 @@
     box(seg,H,t,supWallMat, (gap/2+seg/2),H/2,fz-t/2,true);
     box(gap,H-3.4,t,supWallMat,0,3.4+(H-3.4)/2,fz-t/2,false);                    // nadproże nad wejściem
     // dach (ukrywany w środku), sufit, podłoga
-    supExterior.push(box(w+0.6,0.4,d+0.6,lamb(0x5f656b),0,H+0.2,0,false));
+    supRoof = box(w+0.6,0.4,d+0.6,lamb(0x5f656b),0,H+0.2,0,false);              // nie trafia do supExterior – patrz updateSupermarket
     const ceil = new THREE.Mesh(new THREE.PlaneGeometry(w-2*t,d-2*t), lamb(0xf4f4f0));
     ceil.rotation.x = Math.PI/2; ceil.position.set(0,H,0); grp.add(ceil);
     const ft = tex(128,128,(g)=>{ g.fillStyle='#e9e9e4'; g.fillRect(0,0,128,128); g.fillStyle='#c9ccc8'; g.fillRect(0,0,64,64); g.fillRect(64,64,64,64); });
@@ -678,6 +757,9 @@
     if(inside === supInside) return;
     supInside = inside;
     supExterior.forEach(m => m.visible = !inside);
+    // Dach znika z widoku (kamera patrzy z góry), ale dalej zasłania słońce: bez tego po wejściu słońce zalewałoby wnętrze
+    // i oświetlenie zmieniałoby się skokowo. Teraz wnętrze wygląda tak samo z zewnątrz i w środku.
+    if(supRoof){ supRoof.material.colorWrite = !inside; supRoof.material.depthWrite = !inside; }
     if(!inside && basket){ basket = null; renderBasket(); toast('Wyszedłeś bez płacenia – koszyk odłożony, towary wróciły na regały'); }
   }
 
@@ -1269,7 +1351,522 @@
     say(msg || `Witaj w Mebelku! Mam solidne biurko z szufladami za ${DESK_PRICE} monet 🪙 (w ekwipunku zajmie ${DESK_SLOTS} slotów) wygodne krzesło za ${CHAIR_PRICE} monet 🪙 (1 slot), pojemną szafę za ${WARDROBE_PRICE} monet 🪙 (1 slot) i lampę sufitową za ${LAMP_PRICE} monet 🪙 (1 slot). Meble postawisz w dowolnym miejscu w swoim domu, a lampę zamontujesz na jego suficie.`,
       [{label:`Kup biurko (${DESK_PRICE} 🪙)`, fn:buyDesk}, {label:`Kup krzesło (${CHAIR_PRICE} 🪙)`, fn:buyChair}, {label:`Kup szafę (${WARDROBE_PRICE} 🪙)`, fn:buyWardrobe}, {label:`Kup lampę (${LAMP_PRICE} 🪙)`, fn:buyLamp}, {label:'Wyjdź', fn:closeDialog}], '🪑 Janusz, sprzedawca mebli', 'furn');
   }
-  const dlgDist = () => dlgWho === 'shop' ? shopNpcDist() : dlgWho === 'bank' ? bankNpcDist() : dlgWho === 'furn' ? furnNpcDist() : dlgWho === 'home' ? (dlgHome ? Math.hypot(player.position.x-homeDoorPos(dlgHome).x, player.position.z-homeDoorPos(dlgHome).z) : 0) : npcDist();
+
+  // ===== Sklep z ubraniami przy ulicy Społecznej (wschodnia strona, drzwi na zachód – w stronę jezdni) =====
+  const CLOTH = {x:144, z:56, w:10, d:7, h:3.6};                 // w – wzdłuż osi Z świata, d – wzdłuż osi X świata
+  BUILDINGS.push({x:CLOTH.x, z:CLOTH.z, w:CLOTH.d, d:CLOTH.w, open:true});
+  const HAT_PRICE = 10;
+  const clothWallMat = new THREE.MeshLambertMaterial({color:0xf4e4ee});
+  const clothExterior = [];
+  let clothInside = false, clothNpc = null;
+  const clothNpcDist = () => clothNpc ? Math.hypot(player.position.x - clothNpc.position.x, player.position.z - clothNpc.position.z) : 99;
+  const clothLight = new THREE.PointLight(0xfff0e8, 0, 12);
+  (function buildClothShop(){
+    const CX = CLOTH.x, CZ = CLOTH.z, w = CLOTH.w, d = CLOTH.d, h = CLOTH.h, t = 0.3, gap = 2.4;
+    const grp = new THREE.Group(); grp.position.set(CX, 0, CZ); grp.rotation.y = -Math.PI/2; scene.add(grp);   // front (lokalne +z) → -x
+    const lamb = c => new THREE.MeshLambertMaterial({color:c});
+    const put = (m, px, py, pz) => { m.position.set(px,py,pz); m.castShadow = m.receiveShadow = true; grp.add(m); return m; };
+    const col = (px, pz, bw, bd) => WALLS.push({x:CX - pz, z:CZ + px, w:bd, d:bw});                         // lokalne → świat (obrót -90°)
+    const box = (bw,bh,bd,mat,px,py,pz,collide) => { if(collide) col(px,pz,bw,bd); return put(new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), mat), px, py, pz); };
+    const dark = lamb(0x4e342e), pink = lamb(0xd1477a), metal = lamb(0xb0b4b8);
+
+    box(w, h, t, clothWallMat, 0, h/2, -d/2+t/2, true);
+    box(t, h, d, clothWallMat, -w/2+t/2, h/2, 0, true);
+    box(t, h, d, clothWallMat,  w/2-t/2, h/2, 0, true);
+    const seg = (w-gap)/2;
+    box(seg, h, t, clothWallMat, -(gap/2+seg/2), h/2, d/2-t/2, true);
+    box(seg, h, t, clothWallMat,  (gap/2+seg/2), h/2, d/2-t/2, true);
+    box(gap, h-2.7, t, clothWallMat, 0, 2.7+(h-2.7)/2, d/2-t/2, false);
+
+    clothExterior.push(box(w+0.6, 0.4, d+0.6, lamb(0x7b3f5c), 0, h+0.2, 0, false));
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(w-2*t, d-2*t), lamb(0xfaf3f6));
+    ceil.rotation.x = Math.PI/2; ceil.position.set(0, h, 0); grp.add(ceil);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(w-2*t, d-2*t), lamb(0xc9b4a2));
+    floor.rotation.x = -Math.PI/2; floor.position.set(0, 0.04, 0); floor.receiveShadow = true; grp.add(floor);
+    box(2, 0.03, 0.9, pink, 0, 0.06, d/2-0.8, false);
+
+    const glass = new THREE.MeshLambertMaterial({color:0x9fd3f0, transparent:true, opacity:0.55});
+    [-1,1].forEach(sd => box(2.4, 1.4, 0.06, glass, sd*3.6, 1.8, d/2+0.03, false));
+    clothExterior.push(box(5.0, 0.1, 1.3, pink, 0, 2.7, d/2+0.65, false));
+    const sc = document.createElement('canvas'); sc.width = 512; sc.height = 128;
+    const sg = sc.getContext('2d'); sg.fillStyle = '#7b3f5c'; sg.fillRect(0,0,512,128);
+    sg.fillStyle = '#ffd6e8'; sg.font = 'bold 60px sans-serif'; sg.textAlign = 'center'; sg.textBaseline = 'middle'; sg.fillText('👕 UBRANIA 🎩', 256, 68);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.15), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sc)}));
+    sign.position.set(0, 3.1, d/2+0.04); grp.add(sign); clothExterior.push(sign);
+
+    // wieszaki z ubraniami przy tylnej ścianie (dekoracja)
+    const cc = [0xc62828,0x1565c0,0x2e7d32,0xf9a825,0x6a1b9a,0x00838f];
+    [-2.6,0.2].forEach(rx => {
+      box(2.4, 0.05, 0.05, metal, rx, 1.7, -d/2+t+0.5, false);
+      col(rx, -d/2+t+0.5, 2.4, 0.5);
+      for(let i=0;i<7;i++) box(0.16, 0.8, 0.3, lamb(cc[(i+(rx>0?2:0))%cc.length]), rx-1.0+i*0.33, 1.25, -d/2+t+0.5, false);
+    });
+    // stojak z kapeluszem i ceną
+    box(0.5, 0.9, 0.5, dark, -3.6, 0.45, 1.6, true);
+    const hd = new THREE.Group(), hmat = new THREE.MeshLambertMaterial({color:0x222222});
+    const hb = new THREE.Mesh(new THREE.CylinderGeometry(0.42,0.42,0.05,16), hmat);
+    const ht = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.27,0.35,16), hmat); ht.position.y = 0.2;
+    hd.add(hb, ht); hd.position.set(-3.6, 0.95, 1.6); hd.children.forEach(m => m.castShadow = true); grp.add(hd);
+    const pc = document.createElement('canvas'); pc.width = 256; pc.height = 128;
+    const pg = pc.getContext('2d'); pg.fillStyle = '#fff6d6'; pg.fillRect(0,0,256,128); pg.strokeStyle = '#d1477a'; pg.lineWidth = 8; pg.strokeRect(4,4,248,120);
+    pg.fillStyle = '#222'; pg.textAlign = 'center'; pg.textBaseline = 'middle'; pg.font = 'bold 40px sans-serif'; pg.fillText('KAPELUSZ', 128, 40);
+    pg.font = 'bold 44px sans-serif'; pg.fillStyle = '#c0392b'; pg.fillText(HAT_PRICE + ' monet', 128, 92);
+    const price = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.4), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(pc)}));
+    price.position.set(-3.6, 0.7, 1.86); grp.add(price);
+
+    // lada sprzedawcy
+    box(3.7, 1.1, 0.8, dark, 2.45, 0.55, -1.2, true);
+    box(3.9, 0.08, 1.0, lamb(0xd7b98a), 2.45, 1.14, -1.2, false);
+    box(0.5, 0.35, 0.4, lamb(0x222222), 3.4, 1.36, -1.2, false);
+    const lampM = new THREE.MeshBasicMaterial({color:0xfff4cc});
+    [[-2.2,0.6],[2.2,0.6],[0,-1.6]].forEach(q => put(new THREE.Mesh(new THREE.BoxGeometry(1.2,0.06,0.5), lampM), q[0], h-0.04, q[1]));
+
+    // sprzedawczyni
+    const npc = new THREE.Group();
+    const nb = (bw,bh,bd,c,x,y,z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), lamb(c)); m.position.set(x,y,z); m.castShadow = true; npc.add(m); };
+    nb(0.7,0.9,0.4,0xd1477a,0,1.25,0); nb(0.5,0.5,0.5,0xf0c8a0,0,1.95,0); nb(0.56,0.2,0.56,0x6d3b1a,0,2.25,-0.02); nb(0.56,0.45,0.1,0x6d3b1a,0,2.0,-0.25);
+    nb(0.08,0.08,0.02,0x000000,-0.12,2.0,0.26); nb(0.08,0.08,0.02,0x000000,0.12,2.0,0.26);
+    nb(0.25,0.8,0.25,0xd1477a,-0.48,1.25,0); nb(0.25,0.8,0.25,0xd1477a,0.48,1.25,0);
+    nb(0.25,0.8,0.25,0x37474f,-0.18,0.4,0); nb(0.25,0.8,0.25,0x37474f,0.18,0.4,0);
+    npc.position.set(CX + 2.3, 0, CZ + 2.45); npc.rotation.y = -Math.PI/2;
+    scene.add(npc); clothNpc = npc;
+    const tag = (draw, sw, sh, y) => {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 64; draw(c.getContext('2d'));
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true}));
+      sp.scale.set(sw, sh, 1); sp.position.set(npc.position.x, y, npc.position.z); scene.add(sp); return sp;
+    };
+    tag(g => { g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0,8,256,48); g.fillStyle = '#fff'; g.font = 'bold 26px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('Ola • ubrania', 128, 33); }, 1.8, 0.45, 2.7);
+    clothNpc.userData.mark = tag(g => { g.fillStyle = '#ffd54a'; g.strokeStyle = '#000'; g.lineWidth = 6; g.font = 'bold 60px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.strokeText('!', 128, 34); g.fillText('!', 128, 34); }, 1.0, 0.25, 3.1);
+    clothLight.position.set(CX, 3.0, CZ); scene.add(clothLight);
+  })();
+  function updateClothInterior(dt, time){
+    const dx = player.position.x - clothNpc.position.x, dz = player.position.z - clothNpc.position.z;
+    const target = (clothInside && Math.hypot(dx,dz) < 7) ? Math.atan2(dx, dz) : -Math.PI/2;
+    clothNpc.rotation.y += Math.atan2(Math.sin(target - clothNpc.rotation.y), Math.cos(target - clothNpc.rotation.y)) * Math.min(1, dt*5);
+    const mk = clothNpc.userData.mark; mk.position.y = 3.1 + Math.sin(time*3)*0.07;
+    const inside = Math.abs(player.position.x - CLOTH.x) < CLOTH.d/2 - 0.15 && Math.abs(player.position.z - CLOTH.z) < CLOTH.w/2 - 0.15;
+    if(inside === clothInside) return;
+    clothInside = inside;
+    clothExterior.forEach(m => m.visible = !inside);
+    clothWallMat.transparent = false; clothWallMat.opacity = 1; clothWallMat.depthWrite = true;
+  }
+  function buyHat(){
+    if(coins() < HAT_PRICE){ toast(`Kapelusz kosztuje ${HAT_PRICE} monet 🪙 (masz ${coins()})`); return; }
+    for(let i=0;i<HAT_PRICE;i++) removeOne(inv.findIndex(x => x && x.id === 'coin'));
+    if(!addItem('hat')){
+      for(let i=0;i<HAT_PRICE;i++) addItem('coin');
+      toast('Ekwipunek pełny – zrób miejsce na kapelusz'); renderInv(); return;
+    }
+    renderInv(); renderShop(); openClothTalk('Dziękuję za zakup kapelusza! Czy mogę jeszcze w czymś pomóc?');
+    toast('Kupiono kapelusz 🎩 – załóż go w ekwipunku (I)');
+  }
+  function openClothTalk(msg){
+    say(msg || `Witaj w sklepie z ubraniami! Mam elegancki kapelusz za ${HAT_PRICE} monet 🪙. Założysz go w ekwipunku (I).`,
+      [{label:`Kup kapelusz (${HAT_PRICE} 🪙)`, fn:buyHat}, {label:'Wyjdź', fn:closeDialog}], '👗 Ola, sprzedawczyni', 'cloth');
+  }
+
+  // ===== Salon samochodowy przy ulicy Poprzecznej (wschodnia strona, drzwi na zachód) =====
+
+  const CAR_PRICE = 300, PLAYER_CAR_COLOR = 0x16a085;
+  const SIG_ON = 0xffa000, SIG_OFF = 0x5c3c08;                               // kierunkowskaz: zapalony / zgaszony
+  let blinkT = 0;                                                            // zegar migania (aktualizowany w updateTraffic)
+  function buildCarModel(color){                                   // identyczna bryła jak auta jeżdżące po ulicy; przód auta = +Z grupy zwróconej
+    const g = new THREE.Group();
+    const lm = c => new THREE.MeshLambertMaterial({color:c});
+    const part = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x,y,z); o.castShadow = true; g.add(o); return o; };
+    const bodyMat = lm(color);
+    part(new THREE.BoxGeometry(4.2,.7,1.9), bodyMat, 0, .68, 0);
+    part(new THREE.BoxGeometry(2.3,.62,1.7), bodyMat, -.2, 1.3, 0);
+    part(new THREE.BoxGeometry(2.35,.45,1.72), lm(0x2b3a46), -.2, 1.32, 0).scale.set(.97,1,1);
+    part(new THREE.BoxGeometry(.04,.14,1.5), new THREE.MeshBasicMaterial({color:0xfff2b0}), 2.11, .78, 0);
+    part(new THREE.BoxGeometry(.04,.14,1.5), new THREE.MeshBasicMaterial({color:0xc01818}), -2.11, .78, 0);
+    const sigGeo = new THREE.BoxGeometry(.1,.17,.3), sigL = new THREE.MeshBasicMaterial({color:SIG_OFF}), sigR = new THREE.MeshBasicMaterial({color:SIG_OFF});
+    [2.12,-2.12].forEach(x => { part(sigGeo, sigL, x, .78, -.84); part(sigGeo, sigR, x, .78, .84); });   // lokalny +z = prawa strona
+    const wheelGeo = new THREE.CylinderGeometry(.36,.36,.26,14), wheelMat = lm(0x16161a), wheels = [];
+    [[1.3,.95],[1.3,-.95],[-1.3,.95],[-1.3,-.95]].forEach(([x,z]) => {
+      const pivot = new THREE.Group(); pivot.position.set(x, .36, z); g.add(pivot);
+      const w = new THREE.Mesh(wheelGeo, wheelMat); w.rotation.x = Math.PI/2; w.castShadow = true; pivot.add(w); wheels.push(pivot);
+    });
+    g.rotation.y = -Math.PI/2;                                      // przód (+X modelu) → +Z grupy zewnętrznej
+    const wrap = new THREE.Group(); wrap.add(g);
+    return {group:wrap, wheels, bodyMat, sigL, sigR};
+  }
+  BUILDINGS.push({x:CAR.x, z:CAR.z, w:CAR.d, d:CAR.w, open:true});
+  const carWallMat = new THREE.MeshLambertMaterial({color:0xe9edf2});
+  const carExterior = [];
+  let carInside = false, carNpc = null;
+  const carNpcDist = () => carNpc ? Math.hypot(player.position.x - carNpc.position.x, player.position.z - carNpc.position.z) : 99;
+  const carLight = new THREE.PointLight(0xf2f6ff, 0, 14);
+  (function buildCarShop(){
+    const CX = CAR.x, CZ = CAR.z, w = CAR.w, d = CAR.d, h = CAR.h, t = 0.3, gap = 3.2;
+    const grp = new THREE.Group(); grp.position.set(CX, 0, CZ); grp.rotation.y = -Math.PI/2; scene.add(grp);   // front (lokalne +z) → -x
+    const lamb = c => new THREE.MeshLambertMaterial({color:c});
+    const put = (m, px, py, pz) => { m.position.set(px,py,pz); m.castShadow = m.receiveShadow = true; grp.add(m); return m; };
+    const col = (px, pz, bw, bd) => WALLS.push({x:CX - pz, z:CZ + px, w:bd, d:bw});
+    const box = (bw,bh,bd,mat,px,py,pz,collide) => { if(collide) col(px,pz,bw,bd); return put(new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), mat), px, py, pz); };
+    const dark = lamb(0x37474f), red = lamb(0xc62828);
+
+    box(w, h, t, carWallMat, 0, h/2, -d/2+t/2, true);
+    box(t, h, d, carWallMat, -w/2+t/2, h/2, 0, true);
+    box(t, h, d, carWallMat,  w/2-t/2, h/2, 0, true);
+    const seg = (w-gap)/2;
+    box(seg, h, t, carWallMat, -(gap/2+seg/2), h/2, d/2-t/2, true);
+    box(seg, h, t, carWallMat,  (gap/2+seg/2), h/2, d/2-t/2, true);
+    box(gap, h-2.9, t, carWallMat, 0, 2.9+(h-2.9)/2, d/2-t/2, false);
+
+    carExterior.push(box(w+0.6, 0.4, d+0.6, lamb(0x455a64), 0, h+0.2, 0, false));
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(w-2*t, d-2*t), lamb(0xf7f9fb));
+    ceil.rotation.x = Math.PI/2; ceil.position.set(0, h, 0); grp.add(ceil);
+    const fc = document.createElement('canvas'); fc.width = fc.height = 128;
+    const fg = fc.getContext('2d'); fg.fillStyle = '#cfd4d8'; fg.fillRect(0,0,128,128); fg.fillStyle = '#b9bfc4'; fg.fillRect(0,0,64,64); fg.fillRect(64,64,64,64);
+    const ft = new THREE.CanvasTexture(fc); ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set((w-2*t)/2, (d-2*t)/2);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(w-2*t, d-2*t), new THREE.MeshLambertMaterial({map:ft}));
+    floor.rotation.x = -Math.PI/2; floor.position.set(0, 0.04, 0); floor.receiveShadow = true; grp.add(floor);
+    box(2.4, 0.03, 0.9, red, 0, 0.06, d/2-0.8, false);
+
+    // duże witryny i szyld
+    const glass = new THREE.MeshLambertMaterial({color:0x9fd3f0, transparent:true, opacity:0.5});
+    [-1,1].forEach(sd => box(5.4, 2.3, 0.06, glass, sd*5.1, 1.6, d/2+0.03, false));
+    carExterior.push(box(6.0, 0.1, 1.3, red, 0, 2.95, d/2+0.65, false));
+    const sc = document.createElement('canvas'); sc.width = 768; sc.height = 128;
+    const sg = sc.getContext('2d'); sg.fillStyle = '#263238'; sg.fillRect(0,0,768,128);
+    sg.fillStyle = '#ffffff'; sg.textAlign = 'center'; sg.textBaseline = 'middle';
+    let fs = 70; sg.font = `bold ${fs}px sans-serif`;
+    while(sg.measureText('SALON SAMOCHODOWY').width > 680 && fs > 24){ fs -= 2; sg.font = `bold ${fs}px sans-serif`; }   // napis zawsze mieści się na szyldzie
+    sg.fillText('SALON SAMOCHODOWY', 384, 68);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 1.2), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sc)}));
+    sign.position.set(0, 3.55, d/2+0.04); grp.add(sign); carExterior.push(sign);
+
+    // puste podesty wystawowe (nic jeszcze nie ma na sprzedaż)
+    [[-4.6,-0.6],[2.2,-0.6]].forEach(q => {
+      put(new THREE.Mesh(new THREE.CylinderGeometry(1.5,1.5,0.18,28), lamb(0x90a4ae)), q[0], 0.13, q[1]);
+      col(q[0], q[1], 2.4, 2.4);
+    });
+    box(2.8, 0.18, 4.9, lamb(0x90a4ae), -1.2, 0.13, -0.6, false);                  // podest z autem na sprzedaż
+    col(-1.2, -0.6, 2.8, 4.9);
+    const dispCar = buildCarModel(PLAYER_CAR_COLOR); dispCar.group.position.set(-1.2, 0.22, -0.6); grp.add(dispCar.group);   // przodem do witryny
+    const pc = document.createElement('canvas'); pc.width = 512; pc.height = 160;
+    const pg = pc.getContext('2d'); pg.fillStyle = '#263238'; pg.fillRect(0,0,512,160); pg.strokeStyle = '#c62828'; pg.lineWidth = 8; pg.strokeRect(4,4,504,152);
+    pg.fillStyle = '#fff'; pg.textAlign = 'center'; pg.textBaseline = 'middle'; pg.font = 'bold 46px sans-serif'; pg.fillText('AUTO NA SPRZEDAŻ', 256, 60); pg.font = 'bold 40px sans-serif'; pg.fillStyle = '#ffd54a'; pg.fillText(CAR_PRICE + ' monet', 256, 114);
+    const poster = new THREE.Mesh(new THREE.PlaneGeometry(4, 1.25), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(pc)}));
+    poster.position.set(-2.0, 2.3, -d/2 + t + 0.02); grp.add(poster);
+
+    // biurko doradcy
+    box(3.2, 1.0, 0.8, dark, 5.6, 0.5, -2.6, true);
+    box(3.4, 0.08, 1.0, lamb(0xd7b98a), 5.6, 1.04, -2.6, false);
+    box(0.5, 0.35, 0.4, lamb(0x222222), 6.3, 1.26, -2.6, false);
+    const lampM = new THREE.MeshBasicMaterial({color:0xfff4cc});
+    [[-4,0.5],[0,0.5],[4,0.5]].forEach(q => put(new THREE.Mesh(new THREE.BoxGeometry(1.6,0.06,0.6), lampM), q[0], h-0.04, q[1]));
+
+    // doradca
+    const npc = new THREE.Group();
+    const nb = (bw,bh,bd,c,x,y,z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), lamb(c)); m.position.set(x,y,z); m.castShadow = true; npc.add(m); };
+    nb(0.7,0.9,0.4,0x263238,0,1.25,0); nb(0.2,0.7,0.04,0xc62828,0,1.3,0.21); nb(0.5,0.5,0.5,0xe0ac69,0,1.95,0); nb(0.56,0.14,0.56,0x2b2b2b,0,2.25,-0.02);
+    nb(0.08,0.08,0.02,0x000000,-0.12,2.0,0.26); nb(0.08,0.08,0.02,0x000000,0.12,2.0,0.26);
+    nb(0.25,0.8,0.25,0x263238,-0.48,1.25,0); nb(0.25,0.8,0.25,0x263238,0.48,1.25,0);
+    nb(0.25,0.8,0.25,0x1c2429,-0.18,0.4,0); nb(0.25,0.8,0.25,0x1c2429,0.18,0.4,0);
+    npc.position.set(CX + 3.4, 0, CZ + 5.6); npc.rotation.y = -Math.PI/2;   // lokalnie (5.6, -3.4)
+    scene.add(npc); carNpc = npc;
+    const tag = (draw, sw, sh, y) => {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 64; draw(c.getContext('2d'));
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true}));
+      sp.scale.set(sw, sh, 1); sp.position.set(npc.position.x, y, npc.position.z); scene.add(sp); return sp;
+    };
+    tag(g => { g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0,8,256,48); g.fillStyle = '#fff'; g.font = 'bold 26px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('Darek • auta', 128, 33); }, 1.8, 0.45, 2.7);
+    carLight.position.set(CX, 3.4, CZ); scene.add(carLight);
+  })();
+  function updateCarInterior(dt, time){
+    const dx = player.position.x - carNpc.position.x, dz = player.position.z - carNpc.position.z;
+    const target = (carInside && Math.hypot(dx,dz) < 8) ? Math.atan2(dx, dz) : -Math.PI/2;
+    carNpc.rotation.y += Math.atan2(Math.sin(target - carNpc.rotation.y), Math.cos(target - carNpc.rotation.y)) * Math.min(1, dt*5);
+    const inside = Math.abs(player.position.x - CAR.x) < CAR.d/2 - 0.15 && Math.abs(player.position.z - CAR.z) < CAR.w/2 - 0.15;
+    if(inside === carInside) return;
+    carInside = inside;
+    carExterior.forEach(m => m.visible = !inside);
+    carWallMat.transparent = false; carWallMat.opacity = 1; carWallMat.depthWrite = true;
+  }
+  function buyCar(){
+    if(hasCar){ toast('Masz już auto 🚗'); return; }
+    if(!payAny(CAR_PRICE, 'zakup auta')){ toast(`Auto kosztuje ${CAR_PRICE} monet 🪙 – masz ${coins()}${bank.opened?` + ${bank.balance} na koncie`:''}`); return; }
+    placeCar(POP_X + 2.6, CAR.z, 0);
+    closeDialog(); renderInv(); renderShop();
+    toast('Kupiłeś auto 🚗 Czeka przed salonem na ulicy Poprzecznej – podejdź i naciśnij F');
+  }
+  function openCarTalk(){
+    if(hasCar){ say('Auto już masz – jeździ się nim świetnie! Na razie nic więcej nie mamy na sprzedaż 🚗', [{label:'Wyjdź', fn:closeDialog}], '🚗 Darek, doradca', 'car'); return; }
+    say(`Witaj w salonie samochodowym! Mam jedno auto na sprzedaż – wygląda jak te na ulicach, ale jest twoje. Cena: ${CAR_PRICE} 🪙. Płacisz monetami przy sobie, a brakującą część pobiorę z konta bankowego. Po zakupie auto czeka przed salonem.`,
+      [{label:`Kup auto (${CAR_PRICE} 🪙)`, fn:buyCar}, {label:'Wyjdź', fn:closeDialog}], '🚗 Darek, doradca', 'car');
+  }
+
+  // ===== Lakiernik za salonem: przemalowanie auta na dowolny kolor RGB za 50 monet =====
+  const PAINT_PRICE = 50;
+  BUILDINGS.push({x:PAINT.x, z:PAINT.z, w:PAINT.d, d:PAINT.w, open:true});
+  const paintWallMat = new THREE.MeshLambertMaterial({color:0xeceff1});
+  const paintExterior = [];
+  let paintInside = false, paintNpc = null, paintUiOpen = false, paintOrig = 0;
+  const paintNpcDist = () => paintNpc ? Math.hypot(player.position.x - paintNpc.position.x, player.position.z - paintNpc.position.z) : 99;
+  const paintLight = new THREE.PointLight(0xfff4e8, 0, 13);
+  (function buildPaintShop(){
+    const CX = PAINT.x, CZ = PAINT.z, w = PAINT.w, d = PAINT.d, h = PAINT.h, t = 0.3, gap = 2.6;
+    const grp = new THREE.Group(); grp.position.set(CX, 0, CZ); grp.rotation.y = -Math.PI/2; scene.add(grp);   // front (lokalne +z) → -x
+    const lamb = c => new THREE.MeshLambertMaterial({color:c});
+    const put = (m, px, py, pz) => { m.position.set(px,py,pz); m.castShadow = m.receiveShadow = true; grp.add(m); return m; };
+    const col = (px, pz, bw, bd) => WALLS.push({x:CX - pz, z:CZ + px, w:bd, d:bw});
+    const box = (bw,bh,bd,mat,px,py,pz,collide) => { if(collide) col(px,pz,bw,bd); return put(new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), mat), px, py, pz); };
+    const dark = lamb(0x37474f), orange = lamb(0xef6c00);
+
+    box(w, h, t, paintWallMat, 0, h/2, -d/2+t/2, true);
+    box(t, h, d, paintWallMat, -w/2+t/2, h/2, 0, true);
+    box(t, h, d, paintWallMat,  w/2-t/2, h/2, 0, true);
+    const seg = (w-gap)/2;
+    box(seg, h, t, paintWallMat, -(gap/2+seg/2), h/2, d/2-t/2, true);
+    box(seg, h, t, paintWallMat,  (gap/2+seg/2), h/2, d/2-t/2, true);
+    box(gap, h-2.8, t, paintWallMat, 0, 2.8+(h-2.8)/2, d/2-t/2, false);
+
+    paintExterior.push(box(w+0.6, 0.4, d+0.6, lamb(0x5d4037), 0, h+0.2, 0, false));
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(w-2*t, d-2*t), lamb(0xf7f9fb));
+    ceil.rotation.x = Math.PI/2; ceil.position.set(0, h, 0); grp.add(ceil);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(w-2*t, d-2*t), lamb(0xb0b6ba));
+    floor.rotation.x = -Math.PI/2; floor.position.set(0, 0.04, 0); floor.receiveShadow = true; grp.add(floor);
+    box(2.4, 0.03, 0.9, orange, 0, 0.06, d/2-0.8, false);
+
+    const glass = new THREE.MeshLambertMaterial({color:0x9fd3f0, transparent:true, opacity:0.5});
+    [-1,1].forEach(sd => box(3.0, 1.6, 0.06, glass, sd*4.0, 1.8, d/2+0.03, false));
+    paintExterior.push(box(4.4, 0.1, 1.3, orange, 0, 2.8, d/2+0.65, false));
+    const sc = document.createElement('canvas'); sc.width = 512; sc.height = 128;
+    const sg = sc.getContext('2d'); sg.fillStyle = '#263238'; sg.fillRect(0,0,512,128);
+    const sw = [ '#e53935','#fb8c00','#fdd835','#43a047','#1e88e5','#8e24aa' ]; sw.forEach((c,i) => { sg.fillStyle = c; sg.fillRect(16 + i*16, 108, 14, 12); });
+    sg.fillStyle = '#fff'; sg.textAlign = 'center'; sg.textBaseline = 'middle';
+    let fs = 70; sg.font = `bold ${fs}px sans-serif`;
+    while(sg.measureText('LAKIERNIK').width > 440 && fs > 24){ fs -= 2; sg.font = `bold ${fs}px sans-serif`; }
+    sg.fillText('LAKIERNIK', 266, 56);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.15), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sc)}));
+    sign.position.set(0, 3.3, d/2+0.04); grp.add(sign); paintExterior.push(sign);
+
+    // paleta kolorów i plakat na tylnej ścianie
+    const pal = [0xe53935,0xfb8c00,0xfdd835,0x43a047,0x00acc1,0x1e88e5,0x8e24aa,0xec407a];
+    pal.forEach((c,i) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(0.7,0.9), new THREE.MeshBasicMaterial({color:c})); m.position.set(-5.0 + i*0.85, 2.3, -d/2 + t + 0.02); grp.add(m); });
+    const pc = document.createElement('canvas'); pc.width = 640; pc.height = 96;
+    const pg = pc.getContext('2d'); pg.fillStyle = '#263238'; pg.fillRect(0,0,640,96); pg.strokeStyle = '#ef6c00'; pg.lineWidth = 6; pg.strokeRect(3,3,634,90);
+    pg.fillStyle = '#fff'; pg.textAlign = 'center'; pg.textBaseline = 'middle'; pg.font = 'bold 40px sans-serif'; pg.fillText('PRZEMALUJ AUTO – ' + PAINT_PRICE + ' MONET', 320, 50);
+    const poster = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 0.8), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(pc)}));
+    poster.position.set(-2.4, 3.3, -d/2 + t + 0.02); grp.add(poster);
+    // regał z puszkami farby
+    box(5.6, 0.06, 0.5, dark, -2.4, 1.1, -d/2+t+0.3, false);
+    for(let i=0;i<10;i++) put(new THREE.Mesh(new THREE.CylinderGeometry(0.17,0.17,0.3,12), lamb(pal[i%pal.length])), -4.9 + i*0.55, 1.28, -d/2+t+0.3);
+    box(0.08, 1.1, 0.08, dark, -5.1, 0.55, -d/2+t+0.3, false); box(0.08, 1.1, 0.08, dark, 0.3, 0.55, -d/2+t+0.3, false);
+    [[-4.6,-3.4],[-3.9,-3.4],[-4.25,-2.75]].forEach(q => { put(new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.5,14), lamb(0x1e88e5)), q[0], 0.29, q[1]); col(q[0], q[1], 0.6, 0.6); });
+
+    // lada i lakiernik
+    box(3.6, 1.1, 0.8, dark, 3.6, 0.55, -1.6, true);
+    box(3.8, 0.08, 1.0, lamb(0xd7b98a), 3.6, 1.14, -1.6, false);
+    box(0.5, 0.35, 0.4, lamb(0x222222), 4.5, 1.36, -1.6, false);
+    const lampM = new THREE.MeshBasicMaterial({color:0xfff4cc});
+    [[-3.5,0.4],[0,0.4],[3.5,0.4]].forEach(q => put(new THREE.Mesh(new THREE.BoxGeometry(1.6,0.06,0.6), lampM), q[0], h-0.04, q[1]));
+    const npc = new THREE.Group();
+    const nb = (bw,bh,bd,c,x,y,z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), lamb(c)); m.position.set(x,y,z); m.castShadow = true; npc.add(m); };
+    nb(0.7,0.9,0.4,0xef6c00,0,1.25,0); nb(0.5,0.5,0.5,0xe0ac69,0,1.95,0); nb(0.56,0.14,0.56,0x37474f,0,2.25,-0.02);
+    nb(0.5,0.22,0.12,0xeeeeee,0,1.82,0.27);                                          // maska
+    nb(0.08,0.08,0.02,0x000000,-0.12,2.02,0.26); nb(0.08,0.08,0.02,0x000000,0.12,2.02,0.26);
+    nb(0.25,0.8,0.25,0xef6c00,-0.48,1.25,0); nb(0.25,0.8,0.25,0xef6c00,0.48,1.25,0);
+    nb(0.25,0.8,0.25,0x37474f,-0.18,0.4,0); nb(0.25,0.8,0.25,0x37474f,0.18,0.4,0);
+    npc.position.set(CX + 2.7, 0, CZ + 3.6); npc.rotation.y = -Math.PI/2;               // lokalnie (3.6, -2.7)
+    scene.add(npc); paintNpc = npc;
+    const tag = (draw, sw2, sh, y) => {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 64; draw(c.getContext('2d'));
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true}));
+      sp.scale.set(sw2, sh, 1); sp.position.set(npc.position.x, y, npc.position.z); scene.add(sp); return sp;
+    };
+    tag(g => { g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0,8,256,48); g.fillStyle = '#fff'; g.font = 'bold 26px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('Wojtek • lakier', 128, 33); }, 1.8, 0.45, 2.7);
+    paintLight.position.set(CX, 3.2, CZ); scene.add(paintLight);
+  })();
+  function updatePaintInterior(dt, time){
+    const dx = player.position.x - paintNpc.position.x, dz = player.position.z - paintNpc.position.z;
+    const target = (paintInside && Math.hypot(dx,dz) < 8) ? Math.atan2(dx, dz) : -Math.PI/2;
+    paintNpc.rotation.y += Math.atan2(Math.sin(target - paintNpc.rotation.y), Math.cos(target - paintNpc.rotation.y)) * Math.min(1, dt*5);
+    const inside = Math.abs(player.position.x - PAINT.x) < PAINT.d/2 - 0.15 && Math.abs(player.position.z - PAINT.z) < PAINT.w/2 - 0.15;
+    if(inside === paintInside) return;
+    paintInside = inside;
+    paintExterior.forEach(m => m.visible = !inside);
+    paintWallMat.transparent = false; paintWallMat.opacity = 1; paintWallMat.depthWrite = true;
+  }
+  // okno wyboru koloru RGB (podgląd na żywo na samym aucie)
+  const paintUI = document.createElement('div'); paintUI.id = 'paintUI';
+  paintUI.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(330px,calc(100vw - 28px));background:rgba(20,24,30,.97);color:#fff;border-radius:14px;padding:16px;display:none;z-index:40;box-sizing:border-box;font-size:14px';
+  const pRow = (id, name, col) => `<div style="display:flex;align-items:center;gap:8px;margin:8px 0"><b style="width:16px;color:${col}">${name}</b><input id="${id}" type="range" min="0" max="255" value="0" style="flex:1"><input id="${id}n" type="number" min="0" max="255" value="0" style="width:58px;padding:3px;border-radius:6px;border:0;background:#2b3340;color:#fff"></div>`;
+  paintUI.innerHTML = `<h3 style="margin:0 0 10px">🎨 Lakiernik – wybierz kolor</h3>
+    <div id="paintSwatch" style="height:54px;border-radius:10px;border:2px solid rgba(255,255,255,.25);margin-bottom:10px"></div>
+    <div style="display:flex;align-items:center;gap:10px"><span>Paleta:</span><input id="paintPick" type="color" style="width:56px;height:32px;border:0;background:none;padding:0"><span id="paintHex" style="opacity:.8;font-family:monospace"></span></div>
+    ${pRow('paintR','R','#ff6b6b')}${pRow('paintG','G','#6bff8a')}${pRow('paintB','B','#6bb5ff')}
+    <div style="opacity:.75;font-size:12px;margin:4px 0 10px">Podgląd widzisz na swoim aucie przed lakiernią.</div>
+    <div style="display:flex;gap:8px"><button id="paintOk" type="button" style="flex:1;padding:10px;border:0;border-radius:8px;background:#2e7d32;color:#fff;cursor:pointer;font-size:14px"></button><button id="paintNo" type="button" style="padding:10px 14px;border:0;border-radius:8px;background:#555;color:#fff;cursor:pointer;font-size:14px">Anuluj</button></div>`;
+  document.body.appendChild(paintUI);
+  const pEl = id => document.getElementById(id);
+  pEl('paintOk').innerHTML = coinHTML(`Maluj (${PAINT_PRICE} 🪙)`);
+  function paintSet(r, g, b){
+    const c = v => Math.max(0, Math.min(255, Math.round(+v || 0)));
+    r = c(r); g = c(g); b = c(b);
+    const hex = '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+    pEl('paintR').value = pEl('paintRn').value = r; pEl('paintG').value = pEl('paintGn').value = g; pEl('paintB').value = pEl('paintBn').value = b;
+    pEl('paintPick').value = hex; pEl('paintHex').textContent = hex.toUpperCase() + `  (${r}, ${g}, ${b})`; pEl('paintSwatch').style.background = hex;
+    pcar.bodyMat.color.setRGB(r/255, g/255, b/255);
+  }
+  ['R','G','B'].forEach(k => ['','n'].forEach(sfx => { pEl('paint'+k+sfx).oninput = e => {
+    const v = {R:pEl('paintR').value, G:pEl('paintG').value, B:pEl('paintB').value}; v[k] = e.target.value; paintSet(v.R, v.G, v.B);
+  }; }));
+  pEl('paintPick').oninput = () => { const h = pEl('paintPick').value; paintSet(parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)); };
+  function closePaintUI(cancel){
+    if(!paintUiOpen) return;
+    if(cancel) pcar.bodyMat.color.setHex(paintOrig);
+    paintUiOpen = false; paintUI.style.display = 'none';
+  }
+  function openPaintUI(){
+    closeDialog(); paintOrig = pcar.bodyMat.color.getHex();
+    const c = pcar.bodyMat.color; paintUiOpen = true; paintUI.style.display = 'block';
+    paintSet(c.r*255, c.g*255, c.b*255);
+    if(document.pointerLockElement) try{ document.exitPointerLock(); }catch(e){}
+  }
+  function paintCarNear(){ return hasCar && !carDriving && Math.hypot(pcar.group.position.x - (PAINT.x - 9), pcar.group.position.z - PAINT.z) < 18; }
+  pEl('paintOk').onclick = () => {
+    if(!paintCarNear()){ toast('Auto musi stać przed lakiernią 🚗'); return; }
+    const chosen = pcar.bodyMat.color.getHex();
+    pcar.bodyMat.color.setHex(paintOrig);                                              // płatność przy oryginalnym kolorze – gdy zabraknie monet, nic się nie zmienia
+    if(!payAny(PAINT_PRICE, 'malowanie auta')){ pcar.bodyMat.color.setHex(chosen); toast(`Malowanie kosztuje ${PAINT_PRICE} monet 🪙 – masz ${coins()}${bank.opened?` + ${bank.balance} na koncie`:''}`); return; }
+    pcar.bodyMat.color.setHex(chosen); paintOrig = chosen; closePaintUI(false); renderInv(); renderShop();
+    toast('Auto przemalowane 🎨');
+  };
+  pEl('paintNo').onclick = () => closePaintUI(true);
+  paintUI.addEventListener('keydown', e => { e.stopPropagation(); if(e.code === 'Escape') closePaintUI(true); });
+  paintUI.addEventListener('keyup', e => e.stopPropagation());
+  function openPaintTalk(){
+    if(!hasCar){ say('Witaj w lakierni! Przemaluję ci auto na dowolny kolor, ale najpierw kup je w salonie obok 🚗', [{label:'Wyjdź', fn:closeDialog}], '🎨 Wojtek, lakiernik', 'paint'); return; }
+    if(!paintCarNear()){ say('Witaj w lakierni! Podjedź swoim autem pod lakiernię (stań przed budynkiem), a potem wróć do mnie – przemaluję je na dowolny kolor 🎨', [{label:'Wyjdź', fn:closeDialog}], '🎨 Wojtek, lakiernik', 'paint'); return; }
+    say(`Witaj w lakierni! Przemaluję twoje auto na dowolny kolor RGB za ${PAINT_PRICE} 🪙. Płacisz monetami przy sobie, a brakującą część pobiorę z konta bankowego. Podgląd zobaczysz na żywo na aucie.`,
+      [{label:`Przemaluj auto (${PAINT_PRICE} 🪙)`, fn:openPaintUI}, {label:'Wyjdź', fn:closeDialog}], '🎨 Wojtek, lakiernik', 'paint');
+  }
+
+  // ===== Mechanik na Poprzecznej (zachodnia strona): wjeżdżasz autem do środka, wysiadasz i rozmawiasz – ulepszenie skrętu =====
+  const MECH_PRICES = [40, 80, 140];                                     // cena kolejnych poziomów skrętu (maks. 3)
+  const MECH_TITLES = ['Sportowa kolumna kierownicza', 'Szybsza przekładnia i sztywniejsze zawieszenie', 'Pełny pakiet rajdowy'];
+  BUILDINGS.push({x:MECH.x, z:MECH.z, w:MECH.d, d:MECH.w, open:true});
+  const mechWallMat = new THREE.MeshLambertMaterial({color:0xdfe3e6});
+  const mechExterior = [];
+  let mechInside = false, mechNpc = null;
+  const mechNpcDist = () => mechNpc ? Math.hypot(player.position.x - mechNpc.position.x, player.position.z - mechNpc.position.z) : 99;
+  const mechLight = new THREE.PointLight(0xfff4e8, 0, 15);
+  (function buildMechanic(){
+    const CX = MECH.x, CZ = MECH.z, w = MECH.w, d = MECH.d, h = MECH.h, t = 0.3, gap = 4.6;
+    const grp = new THREE.Group(); grp.position.set(CX, 0, CZ); grp.rotation.y = Math.PI/2; scene.add(grp);   // front (lokalne +z) → +x (w stronę ulicy)
+    const lamb = c => new THREE.MeshLambertMaterial({color:c});
+    const put = (m, px, py, pz) => { m.position.set(px,py,pz); m.castShadow = m.receiveShadow = true; grp.add(m); return m; };
+    const col = (px, pz, bw, bd) => WALLS.push({x:CX + pz, z:CZ - px, w:bd, d:bw});
+    const box = (bw,bh,bd,mat,px,py,pz,collide) => { if(collide) col(px,pz,bw,bd); return put(new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), mat), px, py, pz); };
+    const dark = lamb(0x37474f), blue = lamb(0x1565c0), yellow = lamb(0xfdd835), steel = lamb(0x90a4ae);
+
+    box(w, h, t, mechWallMat, 0, h/2, -d/2+t/2, true);
+    box(t, h, d, mechWallMat, -w/2+t/2, h/2, 0, true);
+    box(t, h, d, mechWallMat,  w/2-t/2, h/2, 0, true);
+    const seg = (w-gap)/2;
+    box(seg, h, t, mechWallMat, -(gap/2+seg/2), h/2, d/2-t/2, true);
+    box(seg, h, t, mechWallMat,  (gap/2+seg/2), h/2, d/2-t/2, true);
+    box(gap, h-3.3, t, mechWallMat, 0, 3.3+(h-3.3)/2, d/2-t/2, false);          // nadproże – brama jest podniesiona, wjazd wolny
+
+    mechExterior.push(box(w+0.6, 0.4, d+0.6, lamb(0x455a64), 0, h+0.2, 0, false));
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(w-2*t, d-2*t), lamb(0xf7f9fb));
+    ceil.rotation.x = Math.PI/2; ceil.position.set(0, h, 0); grp.add(ceil);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(w-2*t, d-2*t), lamb(0x9aa1a6));
+    floor.rotation.x = -Math.PI/2; floor.position.set(0, 0.04, 0); floor.receiveShadow = true; grp.add(floor);
+    const apron = new THREE.Mesh(new THREE.PlaneGeometry(gap+2.4, 2.3), lamb(0x8a9196));                // płyta przed wjazdem
+    apron.rotation.x = -Math.PI/2; apron.position.set(0, 0.035, d/2+1.15); apron.receiveShadow = true; grp.add(apron);
+
+    // stanowisko serwisowe na środku (obrys w żółtych pasach)
+    box(2.9, 0.03, 5.2, yellow, 0, 0.06, 0, false);
+    box(2.5, 0.035, 4.8, dark, 0, 0.065, 0, false);
+    box(2.4, 0.04, 0.12, yellow, 0, 0.09, d/2-0.9, false);
+
+    const glass = new THREE.MeshLambertMaterial({color:0x9fd3f0, transparent:true, opacity:0.5});
+    [-1,1].forEach(sd => box(3.0, 1.6, 0.06, glass, sd*(gap/2+seg/2), 1.9, d/2+0.03, false));
+    const sc = document.createElement('canvas'); sc.width = 512; sc.height = 128;
+    const sg = sc.getContext('2d'); sg.fillStyle = '#0d2a4a'; sg.fillRect(0,0,512,128);
+    sg.fillStyle = '#fdd835'; for(let i=0;i<16;i++) sg.fillRect(i*32, 112, 16, 10);
+    sg.fillStyle = '#fff'; sg.textAlign = 'center'; sg.textBaseline = 'middle';
+    let fs = 74; sg.font = `bold ${fs}px sans-serif`;
+    while(sg.measureText('MECHANIK').width > 440 && fs > 24){ fs -= 2; sg.font = `bold ${fs}px sans-serif`; }
+    sg.fillText('MECHANIK', 256, 52);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.15), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sc)}));
+    sign.position.set(0, 3.85, d/2+0.04); grp.add(sign); mechExterior.push(sign);
+
+    // plakat na tylnej ścianie
+    const pc = document.createElement('canvas'); pc.width = 640; pc.height = 96;
+    const pg = pc.getContext('2d'); pg.fillStyle = '#0d2a4a'; pg.fillRect(0,0,640,96); pg.strokeStyle = '#fdd835'; pg.lineWidth = 6; pg.strokeRect(3,3,634,90);
+    pg.fillStyle = '#fff'; pg.textAlign = 'center'; pg.textBaseline = 'middle'; pg.font = 'bold 38px sans-serif'; pg.fillText('ULEPSZ SKRĘT – OD ' + MECH_PRICES[0] + ' MONET', 320, 50);
+    const poster = new THREE.Mesh(new THREE.PlaneGeometry(5.4, 0.8), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(pc)}));
+    poster.position.set(1.5, 3.2, -d/2 + t + 0.02); grp.add(poster);
+
+    // wyposażenie: stosy opon i beczki pod tylną ścianą, szafka z narzędziami
+    const tireM = lamb(0x1b1b1f), barrelM = lamb(0x1e88e5);
+    [[5.3,-4.7],[5.3,-3.9],[4.3,-4.7]].forEach(q => { for(let k=0;k<3;k++) put(new THREE.Mesh(new THREE.CylinderGeometry(0.46,0.46,0.22,16), tireM), q[0], 0.15 + k*0.23, q[1]); col(q[0], q[1], 0.95, 0.95); });
+    [[-5.4,-4.8],[-4.5,-4.8]].forEach(q => { put(new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.85,14), barrelM), q[0], 0.46, q[1]); col(q[0], q[1], 0.62, 0.62); });
+    box(0.7, 1.1, 1.4, blue, -2.4, 0.55, -d/2+t+0.75, true);                             // szafka z narzędziami
+    box(0.72, 0.06, 1.44, steel, -2.4, 1.13, -d/2+t+0.75, false);
+    // ława robocza przy bocznej ścianie (świat: +z), przy niej mechanik
+    box(0.7, 1.0, 4.4, dark, -6.2, 0.5, -1.5, true);
+    box(0.76, 0.07, 4.5, lamb(0xd7b98a), -6.2, 1.03, -1.5, false);
+    box(0.4, 0.3, 0.5, lamb(0xe53935), -6.2, 1.22, -0.2, false);                       // skrzynka narzędziowa
+    box(0.1, 0.9, 0.1, steel, -6.2, 1.5, -2.8, false);                                  // imadło
+    const lampM = new THREE.MeshBasicMaterial({color:0xfff4cc});
+    [[-3.5,-2.4],[3.5,-2.4],[-3.5,2.4],[3.5,2.4]].forEach(q => put(new THREE.Mesh(new THREE.BoxGeometry(1.8,0.06,0.6), lampM), q[0], h-0.04, q[1]));
+
+    // mechanik: niebieski kombinezon, czapka
+    const npc = new THREE.Group();
+    const nb = (bw,bh,bd,c,x,y,z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), lamb(c)); m.position.set(x,y,z); m.castShadow = true; npc.add(m); };
+    nb(0.7,0.9,0.4,0x1565c0,0,1.25,0); nb(0.5,0.5,0.5,0xd9a066,0,1.95,0); nb(0.56,0.16,0.6,0xfdd835,0,2.28,0.02);
+    nb(0.08,0.08,0.02,0x000000,-0.12,2.0,0.26); nb(0.08,0.08,0.02,0x000000,0.12,2.0,0.26);
+    nb(0.3,0.06,0.02,0x5d4037,0,1.82,0.26);                                           // wąsy
+    nb(0.25,0.8,0.25,0x1565c0,-0.48,1.25,0); nb(0.25,0.8,0.25,0x1565c0,0.48,1.25,0);
+    nb(0.25,0.8,0.25,0x0d47a1,-0.18,0.4,0); nb(0.25,0.8,0.25,0x0d47a1,0.18,0.4,0);
+    nb(0.08,0.5,0.08,0x9e9e9e,0.62,1.05,0.15);                                         // klucz w dłoni
+    npc.position.set(CX - 2.4, 0, CZ + 4.9); npc.rotation.y = Math.PI;                   // domyślnie patrzy w stronę stanowiska
+    scene.add(npc); mechNpc = npc;
+    const tag = (draw, sw2, sh, y) => {
+      const c = document.createElement('canvas'); c.width = 256; c.height = 64; draw(c.getContext('2d'));
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true}));
+      sp.scale.set(sw2, sh, 1); sp.position.set(npc.position.x, y, npc.position.z); scene.add(sp); return sp;
+    };
+    tag(g => { g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0,8,256,48); g.fillStyle = '#fff'; g.font = 'bold 26px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('Staszek • mechanik', 128, 33); }, 1.9, 0.45, 2.75);
+    mechLight.position.set(CX, 3.4, CZ); scene.add(mechLight);
+  })();
+  function updateMechInterior(dt, time){
+    const dx = player.position.x - mechNpc.position.x, dz = player.position.z - mechNpc.position.z;
+    const target = (mechInside && Math.hypot(dx,dz) < 8) ? Math.atan2(dx, dz) : Math.PI;
+    mechNpc.rotation.y += Math.atan2(Math.sin(target - mechNpc.rotation.y), Math.cos(target - mechNpc.rotation.y)) * Math.min(1, dt*5);
+    const inside = Math.abs(player.position.x - MECH.x) < MECH.d/2 - 0.15 && Math.abs(player.position.z - MECH.z) < MECH.w/2 - 0.15;
+    if(inside === mechInside) return;
+    mechInside = inside;
+    mechExterior.forEach(m => m.visible = !inside);
+    mechWallMat.transparent = false; mechWallMat.opacity = 1; mechWallMat.depthWrite = true;
+  }
+  // auto musi stać w środku warsztatu (cały zmieścić się za bramą)
+  function mechCarInside(){ return hasCar && !carDriving && Math.abs(pcar.group.position.x - MECH.x) < MECH.d/2 - 2.4 && Math.abs(pcar.group.position.z - MECH.z) < 3.5; }
+  function buySteer(){
+    if(steerLvl >= MECH_PRICES.length){ openMechTalk(); return; }
+    if(!mechCarInside()){ toast('Auto musi stać w warsztacie 🚗'); closeDialog(); return; }
+    const price = MECH_PRICES[steerLvl];
+    if(!payAny(price, 'ulepszenie skrętu')){ toast(`Ulepszenie kosztuje ${price} monet 🪙 – masz ${coins()}${bank.opened?` + ${bank.balance} na koncie`:''}`); return; }
+    steerLvl++; renderInv(); renderShop();
+    toast(`Skręt ulepszony 🔧 poziom ${steerLvl}/${MECH_PRICES.length}`);
+    openMechTalk();
+  }
+  function openMechTalk(){
+    const W = '🔧 Staszek, mechanik';
+    if(!hasCar){ say('Witaj w warsztacie! Ulepszam skręt w samochodach, ale najpierw musisz mieć auto – kup je w salonie po drugiej stronie ulicy 🚗', [{label:'Wyjdź', fn:closeDialog}], W, 'mech'); return; }
+    if(!mechCarInside()){ say('Witaj w warsztacie! Wjedź swoim autem do środka, na stanowisko z żółtymi pasami, wysiądź (Shift) i wróć do mnie – wtedy ulepszę ci skręt 🔧', [{label:'Wyjdź', fn:closeDialog}], W, 'mech'); return; }
+    if(steerLvl >= MECH_PRICES.length){ say(`Twoje auto ma już pełny pakiet rajdowy – skręt na poziomie ${steerLvl}/${MECH_PRICES.length}. Lepiej już się nie da! 🏁`, [{label:'Wyjdź', fn:closeDialog}], W, 'mech'); return; }
+    const price = MECH_PRICES[steerLvl];
+    say(`Fajne auto! Mogę poprawić jego skręt, żeby wchodziło w zakręty dużo lepiej. Teraz masz poziom ${steerLvl}/${MECH_PRICES.length}. Następny: ${MECH_TITLES[steerLvl]} – ${price} 🪙. Płacisz monetami przy sobie, a brakującą część pobiorę z konta bankowego.`,
+      [{label:`Ulepsz skręt (${price} 🪙)`, fn:buySteer}, {label:'Wyjdź', fn:closeDialog}], W, 'mech');
+  }
+  const dlgDist = () => dlgWho === 'mech' ? mechNpcDist() : dlgWho === 'paint' ? paintNpcDist() : dlgWho === 'car' ? carNpcDist() : dlgWho === 'cloth' ? clothNpcDist() : dlgWho === 'shop' ? shopNpcDist() : dlgWho === 'bank' ? bankNpcDist() : dlgWho === 'furn' ? furnNpcDist() : dlgWho === 'home' ? (dlgHome ? Math.hypot(player.position.x-homeDoorPos(dlgHome).x, player.position.z-homeDoorPos(dlgHome).z) : 0) : npcDist();
 
   // ===== Ustawianie biurka w domu =====
   const placedDesks = [];
@@ -1807,6 +2404,7 @@
     treeColl.push({x:t.x, z:t.z, r:0.35*t.s + 0.3});
   });
   ROUND_COLL.forEach(c => treeColl.push(c));   // wyspa ronda
+  SIGN_COLL.forEach(c => treeColl.push(c));    // słupki znaków i tabliczek ulic
   scene.add(trunkM, crownM);
 
   // Postać
@@ -2085,13 +2683,13 @@
     homeWallMat.transparent=false;homeWallMat.opacity=1;homeWallMat.depthWrite=true;
   }
 
-  // ===== Ruch uliczny: 4 samochody NPC =====
-  // Jeżdżą ruchem prawostronnym po Długiej, ulicy bocznej, rondzie i zjeździe do parkingu supermarketu. Gdy dojadą do końca trasy, znikają,
+  // ===== Ruch uliczny: 6 samochodów NPC =====
+  // Jeżdżą ruchem prawostronnym po Długiej, Krótkiej, Poprzecznej, Społecznej, rondzie i zjeździe do parkingu supermarketu. Gdy dojadą do końca trasy, znikają,
   // a po chwili pojawia się nowe auto (inny kolor) na losowo wybranym wjeździe.
   const TRAFFIC_LANE_E = ROAD_Z + 2.5, TRAFFIC_LANE_W = ROAD_Z - 2.5;     // pasy głównej jezdni (jadąc na +x prawa strona to +z)
   const TR_R = 9.7;                                                          // promień pasa jazdy na rondzie (wyspa ma 5,5, asfalt 14)
   const LANE_SOUTH = RB.x + 2.5, LANE_NORTH = RB.x - 2.5;                    // pasy zjazdu do supermarketu: na południe (-z) i z powrotem
-  const circ = (from, to) => { const pts = []; for(let a = from; a > to - 0.01; a -= 0.5) pts.push([RB.x + Math.cos(a)*TR_R, RB.z + Math.sin(a)*TR_R]); return pts; };   // rondo: kierunek przeciwny do ruchu wskazówek w mapie (wyspa po lewej)
+  const circ = (from, to) => { const pts = []; for(let a = from; a > to - 0.01; a -= 0.5) pts.push([RB.x + Math.cos(a)*TR_R, RB.z + Math.sin(a)*TR_R, 1]); return pts; };   // trzeci element = 1: punkt na rondzie (do kierunkowskazów)   // rondo: kierunek przeciwny do ruchu wskazówek w mapie (wyspa po lewej)
   const parkSlot = () => { const west = Math.random() < 0.5; return {west, x: west ? [112,116,120,124][Math.floor(Math.random()*4)] : [140,144,148][Math.floor(Math.random()*3)]}; };
   const toParking = () => {                                                  // zjazd z ronda na parking i zaparkowanie przodem do budynku
     const sl = parkSlot(), pts = [[LANE_SOUTH,-27],[LANE_SOUTH,-50]];
@@ -2105,8 +2703,9 @@
                     : [[sl.x,-59.3],[sl.x,-57.3],[sl.x-2.2,-55],[129.5,-53.5],[LANE_NORTH,-50.5]]).concat([[LANE_NORTH,-27]]);
   };
   const westExit = [[118,TRAFFIC_LANE_W],[112,TRAFFIC_LANE_W],[-79,TRAFFIC_LANE_W]];
+  const SPOL_CAR_END = 82;                                                  // koniec trasy aut na Społecznej (jezdnia kończy się na 84)
   const withPark = pts => { pts.park = true; return pts; };
-  const withYield = (pts, kind) => { pts.yield = {wp:1, kind}; return pts; };      // wp = punkt linii zatrzymania; kind = kierunek skrętu
+  const withYield = (pts, kind, jx) => { pts.yield = {wp:1, kind, jx: jx || 0}; return pts; };      // wp = punkt linii zatrzymania; kind = kierunek skrętu
   const TRAFFIC_ROUTES = [
     // Długa na wschód → rondo → parking supermarketu
     () => withPark([[-79,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,-0.9), [[136,-23]], toParking())),
@@ -2123,7 +2722,25 @@
     // z Długiej w prawo w ulicę boczną
     () => [[-79,TRAFFIC_LANE_E],[-9,TRAFFIC_LANE_E],[-2.5,-8],[-2.5,-3],[-2.5,71]],
     // wyjazd z parkingu → rondo → Długa na zachód
-    () => [].concat(fromParking(), circ(-1.9,-2.4), westExit)
+    () => [].concat(fromParking(), circ(-1.9,-2.4), westExit),
+    // ===== Ulica Poprzeczna (x = POP_X): pasy x-2,5 (na +z) i x+2,5 (na -z) =====
+    // z Długiej w prawo w Poprzeczną
+    () => [[-79,TRAFFIC_LANE_E],[POP_X-9,TRAFFIC_LANE_E],[POP_X-2.5,-8],[POP_X-2.5,-3],[POP_X-2.5,POP_END-1]],
+    // Poprzeczna → w prawo na Długą → rondo → parking
+    () => withYield(withPark([[POP_X+2.5,POP_END-1],[POP_X+2.5,-6.5],[POP_X+5.5,TRAFFIC_LANE_E],[POP_X+14,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,-0.9), [[136,-23]], toParking())), 'right', POP_X),
+    // Poprzeczna → w prawo na Długą → okrążenie ronda → powrót na zachód
+    () => withYield([[POP_X+2.5,POP_END-1],[POP_X+2.5,-6.5],[POP_X+5.5,TRAFFIC_LANE_E],[POP_X+14,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,-2.4), westExit), 'right', POP_X),
+    // Poprzeczna → w LEWO na Długą (na zachód): ustąpić jadącym z obu stron
+    () => withYield([[POP_X+2.5,POP_END-1],[POP_X+2.5,-6.5],[POP_X+2.2,-10],[POP_X+0.5,-14],[POP_X-3,TRAFFIC_LANE_W],[POP_X-8,TRAFFIC_LANE_W],[-79,TRAFFIC_LANE_W]], 'left', POP_X),
+    // ===== Ulica Społeczna (x = RB.x): pasy RB.x-2,5 (na +z, zjazd z ronda) i RB.x+2,5 (na -z, wjazd na rondo) =====
+    // Długa na wschód → rondo → zjazd w Społeczną
+    () => [[-79,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,2.0), [[RB.x-2.5,-4.6],[RB.x-2.5,-1],[RB.x-2.5,SPOL_CAR_END]]),
+    // Społeczna → rondo → parking supermarketu
+    () => withPark([[RB.x+2.5,SPOL_CAR_END],[RB.x+2.5,0]].concat(circ(1.3,-0.7), [[136,-23]], toParking())),
+    // Społeczna → rondo → pełne okrążenie → Długa na zachód
+    () => [[RB.x+2.5,SPOL_CAR_END],[RB.x+2.5,0]].concat(circ(1.3,-2.4), westExit),
+    // parking supermarketu → rondo (pełne 3/4 okrążenia) → Społeczna
+    () => [].concat(fromParking(), circ(-1.9,-4.4), [[RB.x-2.5,-1],[RB.x-2.5,SPOL_CAR_END]])
   ];
   const TRAFFIC_COLORS = [0xc0392b,0x2e6fb5,0xe0b020,0x2e8b57,0xeeeeee,0x6c3483,0xe67e22,0x333840];
   const trafficCars = [];
@@ -2140,15 +2757,78 @@
     part(new THREE.BoxGeometry(.04,.14,1.5), new THREE.MeshBasicMaterial({color:0xc01818}), -2.11, .78, 0);
     const wheelGeo = new THREE.CylinderGeometry(.36,.36,.26,14), wheelMat = lm(0x16161a);
     [[1.3,.95],[1.3,-.95],[-1.3,.95],[-1.3,-.95]].forEach(([x,z]) => { const w = part(wheelGeo, wheelMat, x, .36, z); w.rotation.x = Math.PI/2; });
+    // kierunkowskazy: lokalny +x = przód auta, +z = prawa strona (ruch prawostronny)
+    const sigGeo = new THREE.BoxGeometry(.1,.17,.3), sigL = new THREE.MeshBasicMaterial({color:SIG_OFF}), sigR = new THREE.MeshBasicMaterial({color:SIG_OFF});
+    [2.12,-2.12].forEach(x => { part(sigGeo, sigL, x, .78, -.84); part(sigGeo, sigR, x, .78, .84); });
     g.visible = false; scene.add(g);
-    return {group:g, bodyMat, active:false, wait:0.5, route:null, wp:1, heading:0, speed:0, cruise:9};
+    return {group:g, bodyMat, sigL, sigR, sig:0, sigT:0, active:false, wait:0.5, route:null, wp:1, heading:0, speed:0, cruise:9};
   }
-  for(let i=0;i<4;i++){ const c = makeTrafficCar(); c.wait = 0.5 + i*1.5; trafficCars.push(c); }   // różne opóźnienia startu
+  for(let i=0;i<6;i++){ const c = makeTrafficCar(); c.wait = 0.5 + i*1.5; trafficCars.push(c); }   // różne opóźnienia startu
+
+  // ===== Auto gracza (kupione w salonie za 300 monet): W/S gaz i hamulec / wsteczny, A/D skręt, Spacja – ręczny, F – wsiądź / wysiądź =====
+  let hasCar = false, carDriving = false, carV = 0, carHeading = 0;
+  let steerLvl = 0;                                                    // poziom ulepszenia skrętu u mechanika (0–3)
+  const pcar = buildCarModel(PLAYER_CAR_COLOR);
+  pcar.group.visible = false; scene.add(pcar.group);
+  function placeCar(x, z, h){ hasCar = true; carHeading = h; carV = 0; pcar.group.position.set(x, 0.02, z); pcar.group.rotation.y = h; pcar.group.visible = true; }
+  // Kierunkowskazy gracza: Z – lewy, C – prawy, X – awaryjne. Skręt wyłącza się sam po wykonaniu manewru (jak w prawdziwym aucie).
+  let pSig = 0, pHazard = false, pSigStart = 0, pSigTurned = false;
+  function setPlayerSignal(v){ pSig = (pSig === v) ? 0 : v; pSigStart = carHeading; pSigTurned = false; }
+  addEventListener('keydown', e => {
+    if(e.repeat || isDead || isPaused || !carDriving) return;
+    if(e.code === 'KeyZ') setPlayerSignal(-1);
+    else if(e.code === 'KeyC') setPlayerSignal(1);
+    else if(e.code === 'KeyX') pHazard = !pHazard;
+  });
+  function updatePlayerSignals(steer){
+    if(carDriving && pSig){
+      const turned = pSig === 1 ? pSigStart - carHeading : carHeading - pSigStart;      // D (prawo) zmniejsza carHeading
+      if(turned > 0.6) pSigTurned = true;
+      if(pSigTurned && Math.abs(steer) < 0.1) pSig = 0;                                 // skręt zrobiony i kierownica prosto
+    }
+    const on = (blinkT % 0.8) < 0.4;
+    pcar.sigL.color.setHex(((pSig === -1) || pHazard) && on ? SIG_ON : SIG_OFF);
+    pcar.sigR.color.setHex(((pSig === 1) || pHazard) && on ? SIG_ON : SIG_OFF);
+  }
+  function enterCar(){
+    if(!hasCar || carDriving) return;
+    if(bikeMounted) dismountBike();
+    carDriving = true; carV = 0; player.visible = false; vy = 0;
+    player.position.set(pcar.group.position.x, 0, pcar.group.position.z);
+    toast('Jedziesz autem 🚗  W/S – gaz i hamulec, A/D – skręt, Spacja – ręczny, Z / C – kierunkowskazy, X – awaryjne, Shift – wysiądź');
+  }
+  function exitCar(){
+    if(!carDriving) return;
+    carDriving = false; carV = 0; player.visible = true; pSig = 0;                    // awaryjne zostają włączone po wysiadce
+    const side = 2.4, c = Math.cos(carHeading), sn = Math.sin(carHeading);          // wysiadasz z lewej strony auta
+    player.position.set(pcar.group.position.x + c*side, 0, pcar.group.position.z - sn*side);
+    facing = carHeading; player.rotation.y = facing; vy = 0;
+    toast('Wysiadłeś z auta');
+  }
+  function driveCar(ix, iz, dt){
+    const MAXF = 20, MAXR = 6;
+    if(iz > 0.05) carV += (carV < 0 ? 26 : 10)*iz*dt;
+    else if(iz < -0.05) carV -= (carV > 0 ? 26 : 8)*(-iz)*dt;
+    else { const f = 6*dt; carV = Math.abs(carV) <= f ? 0 : carV - Math.sign(carV)*f; }
+    if(keys.Space){ const f = 30*dt; carV = Math.abs(carV) <= f ? 0 : carV - Math.sign(carV)*f; }
+    carV = Math.max(-MAXR, Math.min(MAXF, carV));
+    const grip = Math.min(1, Math.abs(carV)/4);                                      // w miejscu nie da się skręcać
+    carHeading -= ix * 1.9*(1 + 0.3*steerLvl)/(1 + Math.abs(carV)/(22 + 10*steerLvl)) * grip * Math.sign(carV) * dt;   // ulepszenia: ostrzejszy skręt także przy dużej prędkości
+    player.position.x += Math.sin(carHeading)*carV*dt;
+    player.position.z += Math.cos(carHeading)*carV*dt;
+  }
+  function svApplyCar(c){
+    if(carDriving){ carDriving = false; carV = 0; player.visible = true; }
+    if(paintUiOpen) closePaintUI(false);
+    steerLvl = (c && c.has) ? Math.max(0, Math.min(MECH_PRICES.length, (+c.s) | 0)) : 0;
+    if(c && c.has && isFinite(+c.x) && isFinite(+c.z)){ placeCar(+c.x, +c.z, +c.r || 0); pcar.bodyMat.color.setHex(isFinite(+c.c) ? (+c.c & 0xffffff) : PLAYER_CAR_COLOR); }
+    else { hasCar = false; pcar.group.visible = false; pcar.bodyMat.color.setHex(PLAYER_CAR_COLOR); }
+  }
   function spawnTrafficCar(car){
     const route = TRAFFIC_ROUTES[Math.floor(Math.random()*TRAFFIC_ROUTES.length)]();
     const [sx, sz] = route[0];
     if(trafficCars.some(o => o !== car && o.active && Math.hypot(o.group.position.x-sx, o.group.position.z-sz) < 14)) return false;   // miejsce zajęte
-    car.route = route; car.wp = 1; car.parked = false; car.stuck = 0; car.yieldWait = 0;
+    car.route = route; car.wp = 1; car.parked = false; car.stuck = 0; car.yieldWait = 0; car.sig = 0; car.sigT = 0;
     car.heading = Math.atan2(route[1][1]-sz, route[1][0]-sx);
     car.cruise = 7 + Math.random()*4; car.speed = car.cruise;
     car.bodyMat.color.setHex(TRAFFIC_COLORS[Math.floor(Math.random()*TRAFFIC_COLORS.length)]);
@@ -2157,14 +2837,15 @@
     car.group.visible = true; car.active = true;
     return true;
   }
-  function junctionClear(car, kind){                                           // czy na głównej jezdni przy skrzyżowaniu z ulicą boczną (x=0) nikt nie nadjeżdża
+  function junctionClear(car, kind, jx){                                           // czy na głównej jezdni przy skrzyżowaniu z ulicą boczną (x=jx: Krótka 0, Poprzeczna POP_X) nikt nie nadjeżdża
     for(const o of trafficCars){
       if(o === car || !o.active) continue;
       const oz = o.group.position.z, ox = o.group.position.x;
       if(oz > -8 || oz < -20) continue;                                          // poza główną jezdnią
       const hx = Math.cos(o.heading);
-      if(hx > 0.5 && ox > -30 && ox < (kind === 'left' ? 8 : 12)) return false;  // z zachodu na wschód (pas wschodni)
-      if(kind === 'left' && hx < -0.5 && ox > -4 && ox < 32) return false;       // ze wschodu na zachód (pas zachodni)
+      const rx = ox - (jx || 0);
+      if(hx > 0.5 && rx > -30 && rx < (kind === 'left' ? 8 : 12)) return false;  // z zachodu na wschód (pas wschodni)
+      if(kind === 'left' && hx < -0.5 && rx > -4 && rx < 32) return false;       // ze wschodu na zachód (pas zachodni)
     }
     return true;
   }
@@ -2174,10 +2855,44 @@
       const dx = x - p.x, dz = z - p.z, fwd = dx*hx + dz*hz, lat = -dx*hz + dz*hx;
       return fwd > 0 && fwd < range && Math.abs(lat) < side;
     };
-    if(car.stuck < 4) for(const o of trafficCars) if(o !== car && o.active && check(o.group.position.x, o.group.position.z, 9, 2.3)) return true;
+    if(car.stuck < 4){                                                         // po 4 s zakleszczenia auto przejeżdża „przez” przeszkodę
+      for(const o of trafficCars) if(o !== car && o.active && check(o.group.position.x, o.group.position.z, 9, 2.3)) return true;
+      if(hasCar && !carDriving && pcar.group.visible && check(pcar.group.position.x, pcar.group.position.z, 8, 2.3)) return true;   // zaparkowane auto gracza
+    }
     return check(player.position.x, player.position.z, 8, 2.0);                // gracz na jezdni – auto zwalnia i staje
   }
+  // Kierunkowskaz: -1 lewy, 1 prawy, 0 brak. Na rondzie – prawy tylko przy zjeździe; poza rondem – gdy w ciągu ~20 m trasy
+  // czeka skręt o więcej niż ~30° (wjazd na rondo bez sygnalizowania).
+  function desiredSignal(car){
+    const r = car.route, i = car.wp, p = car.group.position;
+    if(i >= r.length) return 0;
+    if(r[i][2]){
+      const out1 = i+1 < r.length && !r[i+1][2];
+      const out2 = i+2 < r.length && r[i+1][2] && !r[i+2][2];
+      return (out1 || out2) ? 1 : 0;
+    }
+    let cx = p.x, cz = p.z, dist = 0, ang = null;
+    for(let j = i; j < r.length && !r[j][2] && dist < 20; j++){
+      const dx = r[j][0]-cx, dz = r[j][1]-cz, l = Math.hypot(dx, dz);
+      if(l > 0.01){ ang = Math.atan2(dz, dx); dist += l; }
+      cx = r[j][0]; cz = r[j][1];
+    }
+    if(ang === null) return 0;
+    let d = ang - car.heading; while(d > Math.PI) d -= Math.PI*2; while(d < -Math.PI) d += Math.PI*2;
+    return d > 0.55 ? 1 : (d < -0.55 ? -1 : 0);
+  }
   function updateTraffic(dt){
+    blinkT += dt;
+    const blinkOn = (blinkT % 0.8) < 0.4;
+    for(const car of trafficCars){
+      if(car.active && !car.parked){
+        const ds = desiredSignal(car);
+        if(ds){ car.sig = ds; car.sigT = 1.0; }                                // po manewrze kierunkowskaz świeci jeszcze ok. sekundy
+        else if(car.sigT > 0){ car.sigT -= dt; if(car.sigT <= 0) car.sig = 0; }
+      } else car.sig = 0;
+      car.sigL.color.setHex(car.sig === -1 && blinkOn ? SIG_ON : SIG_OFF);
+      car.sigR.color.setHex(car.sig === 1 && blinkOn ? SIG_ON : SIG_OFF);
+    }
     for(const car of trafficCars){
       if(!car.active){ car.wait -= dt; if(car.wait <= 0 && !spawnTrafficCar(car)) car.wait = 0.5; continue; }
       const p = car.group.position;
@@ -2190,7 +2905,7 @@
       const yw = car.route.yield && car.wp === car.route.yield.wp;               // jedzie do linii zatrzymania przed główną ulicą
       let mustWait = false;
       if(yw){
-        mustWait = !junctionClear(car, car.route.yield.kind) && car.yieldWait < 15;
+        mustWait = !junctionClear(car, car.route.yield.kind, car.route.yield.jx) && car.yieldWait < 15;
         car.yieldWait = mustWait ? car.yieldWait + dt : 0;
       }
       const want = Math.atan2(tz-p.z, tx-p.x);
@@ -2225,7 +2940,7 @@
   const miniMapCtx = miniMapCanvas.getContext('2d');
   const bigMapCtx = bigMapCanvas.getContext('2d');
   let fullMapOpen = false, mapView = null;
-  const MAP_BOUNDS = {minX:-92, maxX:143, minZ:-94, maxZ:82};
+  const MAP_BOUNDS = {minX:-92, maxX:152, minZ:-94, maxZ:92};
   function drawCityMap(ctx, canvas, view){
     const w=canvas.width, h=canvas.height;
     ctx.clearRect(0,0,w,h);
@@ -2247,6 +2962,8 @@
     mrect(80,ROAD_Z-11,RB.x-14,ROAD_Z+11,'#c4c1b5'); mrect(RB.x-11,RB.z-12,RB.x+11,-52,'#c4c1b5');
     mrect(80,ROAD_Z-ROAD_W/2,RB.x-12,ROAD_Z+ROAD_W/2,'#454b50'); mrect(RB.x-ROAD_W/2,RB.z-12,RB.x+ROAD_W/2,-52,'#454b50');
     mrect(SUPER.x-SUPER.w/2,-52,SUPER.x+SUPER.w/2,-64,'#454b50');
+    mrect(POP_X-POP_EDGE,SIDE_ROAD_START,POP_X+POP_EDGE,POP_END,'#c4c1b5'); mrect(POP_X-ROAD_W/2,SIDE_ROAD_START,POP_X+ROAD_W/2,POP_END,'#454b50');   // ulica Poprzeczna
+    mrect(RB.x-11,RB.z+12,RB.x+11,84,'#c4c1b5'); mrect(RB.x-ROAD_W/2,RB.z+12,RB.x+ROAD_W/2,84,'#454b50');   // ulica Społeczna
     {const c=pt(RB.x,RB.z);ctx.fillStyle='#454b50';ctx.beginPath();ctx.arc(c.x,c.y,RB.rOut*sx,0,Math.PI*2);ctx.fill();
      ctx.fillStyle='#8aa879';ctx.beginPath();ctx.arc(c.x,c.y,RB.rIn*sx,0,Math.PI*2);ctx.fill();}
     // Budynki z rzeczywistych współrzędnych świata
@@ -2256,7 +2973,7 @@
       ctx.fillRect(Math.min(q.x,r.x),r.y,Math.abs(r.x-q.x),q.y-r.y);ctx.strokeRect(Math.min(q.x,r.x),r.y,Math.abs(r.x-q.x),q.y-r.y);
     }
     // Podpisy najważniejszych miejsc
-    const labels=[['Real Shop',SHOP.x,SHOP.z],['Restauracja',REST.x,REST.z],['Bank',BANK.x,BANK.z],['Mebelek',FURN.x,FURN.z],...HOMES.map(H=>[H.owned?H.label+' (twój)':H.rented?H.label:H.label+' (wynajem / kupno)',H.x,H.z]),['Supermarket Pandy',SUPER.x,SUPER.z]];
+    const labels=[['Real Shop',SHOP.x,SHOP.z],['Restauracja',REST.x,REST.z],['Bank',BANK.x,BANK.z],['Mebelek',FURN.x,FURN.z],...HOMES.map(H=>[H.owned?H.label+' (twój)':H.rented?H.label:H.label+' (wynajem / kupno)',H.x,H.z]),['Supermarket Pandy',SUPER.x,SUPER.z],['Ubrania',CLOTH.x,CLOTH.z],['Salon samochodowy',CAR.x,CAR.z],['Lakiernik',PAINT.x,PAINT.z],['Mechanik',MECH.x,MECH.z]];
     const scaleUI=Math.max(.62,Math.min(1.35,w/660)), scale=scaleUI*(view?1.4/k:1);
     ctx.font=`bold ${12*scale}px system-ui`;ctx.textAlign='center';ctx.textBaseline='middle';
     for(const [name,x,z] of labels){const q=pt(x,z);ctx.fillStyle='#fff';ctx.shadowColor='#18232c';ctx.shadowBlur=4;ctx.fillText(name,q.x,q.y-10*scale);}
@@ -2265,6 +2982,17 @@
     ctx.fillStyle='#fff';ctx.font=`bold ${11*scale}px system-ui`;ctx.textAlign='center';
     let q=pt(-47,ROAD_Z+1);ctx.fillText('DŁUGA',q.x,q.y);
     q=pt(4,40);ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-Math.PI/2);ctx.fillText('KRÓTKA',0,0);ctx.restore();
+    q=pt(POP_X+1,30);ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-Math.PI/2);ctx.fillText('POPRZECZNA',0,0);ctx.restore();
+    q=pt(RB.x+1,45);ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-Math.PI/2);ctx.fillText('SPOŁECZNA',0,0);ctx.restore();
+    // Upper: punkt odbioru (A) lub celu (B) aktywnego kursu
+    for(const um of upperMapMarks()){
+      const uq=pt(um.x,um.z), ur=(9+Math.sin(performance.now()/250)*1.5)*scale;
+      ctx.save(); ctx.fillStyle=um.color; ctx.strokeStyle='#fff'; ctx.lineWidth=2/k;
+      ctx.beginPath(); ctx.arc(uq.x,uq.y,ur,0,Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.fillStyle='#fff'; ctx.font=`bold ${12*scale}px system-ui`; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(um.label,uq.x,uq.y+1*scale);
+      if(bigMapCanvas===canvas){ ctx.shadowColor='#18232c'; ctx.shadowBlur=4; ctx.fillText(um.name,uq.x,uq.y+ur+9*scale); }
+      ctx.restore();
+    }
     // Gracz i kierunek patrzenia
     const p=pt(player.position.x,player.position.z);const ang=-(player.rotation.y||0);
     ctx.save();ctx.translate(p.x,p.y);ctx.rotate(ang);ctx.fillStyle='#ffd54a';ctx.strokeStyle='#342600';ctx.lineWidth=2/k;
@@ -2617,7 +3345,7 @@
     const head = t => `<div class="phead"><button id="pback">‹</button>${t}</div>`;
     curScreen = name;
     if(name === 'home'){
-      screenEl.innerHTML = '<div class="apps"><div class="app" data-app="settings"><span>⚙️</span>Ustawienia</div><div class="app" data-app="bank"><span>🏦</span>Bank</div><div class="app" data-app="camera"><span>📷</span>Aparat</div><div class="app" data-app="gallery"><span>🖼️</span>Galeria</div><div class="app" data-app="dom"><span>🏠</span>DOM</div></div>';
+      screenEl.innerHTML = '<div class="apps"><div class="app" data-app="settings"><span>⚙️</span>Ustawienia</div><div class="app" data-app="bank"><span>🏦</span>Bank</div><div class="app" data-app="camera"><span>📷</span>Aparat</div><div class="app" data-app="gallery"><span>🖼️</span>Galeria</div><div class="app" data-app="dom"><span>🏠</span>DOM</div><div class="app" data-app="upper"><span>🚖</span>Upper</div></div>';
       screenEl.querySelectorAll('.app').forEach(a => a.onclick = () => showScreen(a.dataset.app));
     } else if(name === 'camera'){
       screenEl.innerHTML = head('📷 Aparat') + `<div class="cam-wrap"><video id="cameraPreview" autoplay playsinline muted></video><div class="cam-controls"><button id="flipCamera">🔄 Przednia</button><button class="capture" id="takePhoto">● Zdjęcie</button><button id="recordVideo">⏺ Nagraj</button></div><div id="cameraHint">Zrób zdjęcie lub nagraj film ze świata gry.</div></div>`;
@@ -2689,6 +3417,7 @@
         showScreen('dom');
       });
     }
+    else if(name === 'upper') renderUpperScreen(head);
     const b = $('pback'); if(b) b.onclick = () => showScreen('home');
   }
 
@@ -2800,11 +3529,12 @@
       else if($('fridge').style.display === 'block') closeFridge();
       else if($('wardrobe').style.display === 'block') closeWardrobe();
       else if(dlgEl.style.display === 'flex') closeDialog();
+      else if(carDriving) return;                                               // z auta wysiada się Shiftem
       else if(curAct && !bikeMounted) curAct.run();
     }
     if(e.code === 'KeyG' && homeInside && !sitting && !placing){ const pc = nearDesk('chair') || nearDesk('wardrobe') || nearLamp(); if(pc) pickupDesk(pc); }
     if(e.code === 'KeyP') phoneEl.style.display === 'flex' ? closePhone() : openPhone();
-    if(e.code === 'Escape'){ closeShop(); closePhone(); closeDialog(); closeFridge(); closeWardrobe(); cancelPlacement(); }
+    if(e.code === 'Escape'){ closeShop(); closePhone(); closeDialog(); closeFridge(); closeWardrobe(); cancelPlacement(); closePaintUI(true); }
   });
 
   // NPC kucharz i praca dostawcy
@@ -2899,6 +3629,168 @@
     job.carrying = false; job.order = null; job.delivered++;
     renderInv(); renderShop(); toast('Dostarczono! +4 🪙');
   }
+
+  // ===== Upper (aplikacja w telefonie): praca kierowcy – przewozisz pasażerów swoim autem, zarobek zależy od długości trasy =====
+  // Zatrudnienie wymaga własnego auta. Zlecenie: punkt odbioru (zielone A) → pasażer czeka na chodniku, wsiada, gdy podjedziesz i zwolnisz →
+  // punkt docelowy (czerwone B). Oba punkty są też na minimapie i na pełnej mapie.
+  const upperApp = {hired:false, done:0, earned:0, offer:null, ride:null};
+  const UPPER_SPOTS = [                                                    // miejsca odbioru / celu (chodniki przy ulicach)
+    ['Real Shop',18,-7.4], ['Restauracja',-4,-20.6], ['Real Bank',-23,-7.4], ['Mebelek',-44,-7.4],
+    ['ul. Długa (zachód)',-68,-7.4], ['ul. Długa (zachód)',-56,-20.6], ['ul. Długa (środek)',40,-20.6],
+    ['ul. Krótka',6.65,20], ['ul. Krótka',-6.65,52],
+    ['ul. Poprzeczna',71.35,8], ['Mechanik',71.35,42], ['Salon samochodowy',84.65,25], ['Lakiernik',84.65,46], ['ul. Poprzeczna',84.65,58],
+    ['Rondo',112,-7.4], ['ul. Społeczna',123.35,30], ['ul. Społeczna',136.65,18], ['Sklep z ubraniami',136.65,56],
+    ['Supermarket Pandy',124,-61]
+  ];
+  const upperRoute = (a, b) => Math.abs(a[1]-b[1]) + Math.abs(a[2]-b[2]);       // trasa ≈ odległość „po ulicach”
+  const upperFare = m => Math.max(4, Math.round(3 + m*0.08));                    // zarobek rośnie z długością trasy (ok. 1 moneta na 12 m)
+  const upperBeacon = color => {
+    const g = new THREE.Group(); g.visible = false;
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(0.6,1.1,4), new THREE.MeshBasicMaterial({color}));
+    cone.rotation.x = Math.PI; cone.position.y = 7.2; g.add(cone);
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.4,0.4,7,12,1,true), new THREE.MeshBasicMaterial({color, transparent:true, opacity:0.22, side:THREE.DoubleSide, depthWrite:false}));
+    beam.position.y = 3.5; g.add(beam); scene.add(g); g.userData.cone = cone; return g;
+  };
+  const upperPickBeacon = upperBeacon(0x43a047), upperDestBeacon = upperBeacon(0xe53935);
+  function makeRiderNpc(){
+    const g = new THREE.Group(), lamb = c => new THREE.MeshLambertMaterial({color:c});
+    const nb = (w,h,d,c,x,y,z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), lamb(c)); m.position.set(x,y,z); m.castShadow = true; g.add(m); };
+    const shirt = [0xe53935,0x1e88e5,0x43a047,0xfdd835,0x8e24aa,0xfb8c00,0x00acc1][Math.floor(Math.random()*7)];
+    const skin = [0xe0ac69,0xc68642,0xf1c27d,0x8d5524][Math.floor(Math.random()*4)];
+    const pants = [0x37474f,0x263238,0x4e342e,0x1a237e][Math.floor(Math.random()*4)];
+    nb(0.7,0.9,0.4,shirt,0,1.25,0); nb(0.5,0.5,0.5,skin,0,1.95,0); nb(0.54,0.14,0.54,0x3e2723,0,2.27,0);
+    nb(0.08,0.08,0.02,0x000000,-0.12,2.0,0.26); nb(0.08,0.08,0.02,0x000000,0.12,2.0,0.26);
+    nb(0.25,0.8,0.25,shirt,-0.48,1.25,0); nb(0.25,0.8,0.25,shirt,0.48,1.25,0);
+    nb(0.25,0.8,0.25,pants,-0.18,0.4,0); nb(0.25,0.8,0.25,pants,0.18,0.4,0);
+    g.visible = false; scene.add(g); return g;
+  }
+  const upperWalkers = [];                                                  // pasażerowie wysiadający z auta i odchodzący
+  const upperHud = document.createElement('div');
+  upperHud.style.cssText = 'position:fixed;right:12px;top:104px;color:#fff;background:rgba(0,0,0,.45);padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.5;display:none;pointer-events:none;max-width:230px;z-index:7';
+  document.body.appendChild(upperHud);
+  let upperHudTxt = '';
+  const upperRefreshPhone = () => { if(phoneEl.style.display === 'flex' && curScreen === 'upper') showScreen('upper'); };
+  function upperPay(n){
+    let rest = 0;
+    for(let i=0;i<n;i++) if(!addItem('coin')) rest++;
+    if(rest > 0){
+      if(bank.opened){ bank.balance += rest; logTx(`+${rest} 🪙 kurs Upper`); refreshPhoneBank(); }
+      else for(let i=0;i<Math.min(rest,40);i++) spawnItem('coin', player.position.x + (Math.random()-.5)*2, player.position.z + (Math.random()-.5)*2, 0.5);
+    }
+    renderInv(); renderShop();
+  }
+  function upperNewOffer(){
+    let a, b, tries = 0;
+    do {
+      a = UPPER_SPOTS[Math.floor(Math.random()*UPPER_SPOTS.length)]; b = UPPER_SPOTS[Math.floor(Math.random()*UPPER_SPOTS.length)];
+    } while((a === b || upperRoute(a,b) < 70 || a[0] === b[0]) && ++tries < 60);
+    const m = Math.round(upperRoute(a,b)/5)*5;
+    upperApp.offer = {pickup:a, dest:b, route:m, fare:upperFare(m)};
+  }
+  function upperAccept(){
+    const o = upperApp.offer; if(!o || !hasCar) return;
+    const npc = makeRiderNpc(); npc.position.set(o.pickup[1], 0, o.pickup[2]); npc.visible = true;
+    upperApp.ride = {stage:'pickup', pickup:o.pickup, dest:o.dest, route:o.route, fare:o.fare, npc, boarding:false};
+    upperApp.offer = null;
+    toast(`Zlecenie przyjęte 🚖 Odbierz pasażera: ${o.pickup[0]} (zielone A na mapie)`);
+  }
+  function upperClearRide(){
+    const r = upperApp.ride; if(!r) return;
+    if(r.npc){ scene.remove(r.npc); }
+    upperApp.ride = null; upperPickBeacon.visible = upperDestBeacon.visible = false;
+  }
+  function upperCancel(){
+    const r = upperApp.ride; if(!r) return;
+    upperClearRide(); toast('Kurs anulowany');
+  }
+  function upperFinish(){
+    const r = upperApp.ride; if(!r) return;
+    const cp = pcar.group.position, c = Math.cos(carHeading), sn = Math.sin(carHeading);
+    r.npc.position.set(cp.x - c*2.0, 0, cp.z + sn*2.0); r.npc.visible = true;       // pasażer wysiada z prawej strony auta i idzie do celu
+    upperWalkers.push({mesh:r.npc, tx:r.dest[1], tz:r.dest[2], life:5});
+    const fare = r.fare; upperApp.done++; upperApp.earned += fare;
+    r.npc = null; upperClearRide();
+    upperPay(fare);
+    toast(`Kurs zakończony! +${fare} 🪙 (Upper)`);
+    upperRefreshPhone();
+  }
+  function renderUpperScreen(head){
+    const bs = c => `background:${c};color:#fff;border:0;border-radius:8px;padding:9px 10px;font-size:13px;cursor:pointer;margin-top:8px;width:100%`;
+    const card = h => `<div style="background:rgba(255,255,255,.12);border-radius:12px;padding:12px;margin-bottom:10px;font-size:13px;line-height:1.45">${h}</div>`;
+    let body = '';
+    if(!upperApp.hired){
+      body = card(`<div style="font-size:16px;font-weight:700">🚖 Upper</div><div style="opacity:.9;margin-top:4px">Zarabiaj jako kierowca: przyjmuj zlecenia, zabieraj pasażerów swoim autem i wożą ich po mieście. Im dłuższa trasa, tym więcej monet.</div>`)
+        + (hasCar ? `<button data-act="hire" style="${bs('#2e7d32')}">Zatrudnij się jako kierowca</button>`
+                  : `<div style="background:rgba(0,0,0,.25);border-radius:10px;padding:10px;font-size:12px;line-height:1.4">🔒 <b>Potrzebujesz własnego auta</b><br>Kup je w salonie samochodowym przy ulicy Poprzecznej.</div><button disabled style="${bs('#666')}">Brak auta</button>`);
+    } else if(upperApp.ride){
+      const r = upperApp.ride, pickup = r.stage === 'pickup';
+      body = card(`<div style="font-weight:700;font-size:15px">🚖 Kurs w toku</div><div style="margin-top:6px">${pickup ? '🟢 Odbierz pasażera' : '🔴 Zawieź pasażera'}: <b>${pickup ? r.pickup[0] : r.dest[0]}</b></div><div style="opacity:.85;margin-top:2px">Trasa: ${r.route} m • Zarobek: <b>${r.fare}</b> 🪙</div><div style="opacity:.7;font-size:11px;margin-top:6px">${pickup ? 'Podjedź autem do pasażera (zielone A na mapie) i zwolnij.' : 'Zatrzymaj się przy punkcie B na mapie.'}</div>`)
+        + `<button data-act="cancel" style="${bs('#c0392b')}">Anuluj kurs</button>`;
+    } else if(upperApp.offer){
+      const o = upperApp.offer, dp = Math.round(Math.hypot(player.position.x - o.pickup[1], player.position.z - o.pickup[2])/5)*5;
+      body = card(`<div style="font-weight:700;font-size:15px">Nowe zlecenie</div><div style="margin-top:6px">🟢 Odbiór: <b>${o.pickup[0]}</b> <span style="opacity:.7">(${dp} m od ciebie)</span></div><div>🔴 Cel: <b>${o.dest[0]}</b></div><div style="opacity:.85;margin-top:4px">Trasa: ${o.route} m</div><div style="font-size:16px;margin-top:4px">Zarobek: <b>${o.fare}</b> 🪙</div>`)
+        + (hasCar ? `<button data-act="accept" style="${bs('#2e7d32')}">Przyjmij zlecenie</button>` : `<button disabled style="${bs('#666')}">Potrzebujesz auta</button>`)
+        + `<button data-act="decline" style="${bs('rgba(255,255,255,.2)')}">Odrzuć i szukaj innego</button>`;
+    } else {
+      body = card(`<div style="font-weight:700;font-size:15px">🚖 Kierowca Upper</div><div style="opacity:.85;margin-top:4px">Zrealizowane kursy: <b>${upperApp.done}</b><br>Zarobione łącznie: <b>${upperApp.earned}</b> 🪙</div>`)
+        + (hasCar ? `<button data-act="search" style="${bs('#3a7bd5')}">🔍 Szukaj zlecenia</button>` : `<div style="background:rgba(0,0,0,.25);border-radius:10px;padding:10px;font-size:12px">🔒 Bez auta nie przyjmiesz zleceń.</div>`);
+    }
+    screenEl.innerHTML = head('🚖 Upper') + `<div class="pbody">${body}</div>`.replace(/🪙/g, '<i class="coin"></i>');
+    screenEl.querySelectorAll('[data-act]').forEach(btn => btn.onclick = () => {
+      const a = btn.dataset.act;
+      if(a === 'hire'){ if(!hasCar) return; upperApp.hired = true; toast('Zatrudniono w Upper 🚖 Możesz przyjmować zlecenia'); }
+      else if(a === 'search') upperNewOffer();
+      else if(a === 'decline') upperNewOffer();
+      else if(a === 'accept') upperAccept();
+      else if(a === 'cancel') upperCancel();
+      showScreen('upper');
+    });
+  }
+  function upperMapMarks(){
+    const r = upperApp.ride; if(!r) return [];
+    return r.stage === 'pickup' ? [{x:r.pickup[1], z:r.pickup[2], label:'A', color:'#2e9e4f', name:r.pickup[0]}]
+                                : [{x:r.dest[1], z:r.dest[2], label:'B', color:'#e53935', name:r.dest[0]}];
+  }
+  function updateUpper(dt, time){
+    for(let i = upperWalkers.length-1; i >= 0; i--){                       // pasażerowie odchodzący po kursie
+      const w = upperWalkers[i]; w.life -= dt;
+      const dx = w.tx - w.mesh.position.x, dz = w.tz - w.mesh.position.z, d = Math.hypot(dx,dz);
+      if(d > 0.3){ w.mesh.position.x += dx/d*Math.min(d, 2.6*dt); w.mesh.position.z += dz/d*Math.min(d, 2.6*dt); w.mesh.rotation.y = Math.atan2(dx,dz); }
+      if(w.life <= 0){ scene.remove(w.mesh); upperWalkers.splice(i,1); }
+    }
+    const r = upperApp.ride;
+    upperPickBeacon.visible = !!r && r.stage === 'pickup';
+    upperDestBeacon.visible = !!r && r.stage === 'dest';
+    let txt = '';
+    if(r){
+      const cp = pcar.group.position, slow = Math.abs(carV) < 2.5;
+      if(r.stage === 'pickup'){
+        upperPickBeacon.position.set(r.pickup[1], 0, r.pickup[2]); upperPickBeacon.userData.cone.position.y = 7.2 + Math.sin(time*3)*0.35;
+        const dcar = Math.hypot(cp.x - r.npc.position.x, cp.z - r.npc.position.z);
+        if(!r.boarding && carDriving && dcar < 9 && slow){ r.boarding = true; toast('Pasażer idzie do auta 🚶'); }
+        if(r.boarding && (dcar > 20 || !hasCar)) r.boarding = false;
+        const tx = r.boarding ? cp.x : r.pickup[1], tz = r.boarding ? cp.z : r.pickup[2];
+        const dx = tx - r.npc.position.x, dz = tz - r.npc.position.z, d = Math.hypot(dx,dz);
+        if(d > 0.3){ const st = Math.min(d, 3.2*dt); r.npc.position.x += dx/d*st; r.npc.position.z += dz/d*st; r.npc.rotation.y = Math.atan2(dx,dz); }
+        if(r.boarding && d < 1.6){                                          // pasażer wsiadł
+          r.stage = 'dest'; r.npc.visible = false; r.boarding = false;
+          toast(`Pasażer wsiadł 🚖 Zawieź go: ${r.dest[0]} (czerwone B na mapie)`); upperRefreshPhone();
+        }
+        const dd = Math.round(Math.hypot(cp.x - r.pickup[1], cp.z - r.pickup[2])/5)*5;
+        txt = `🚖 Upper<br>🟢 Odbierz pasażera: ${r.pickup[0]}<br>Odległość: ${dd} m<br>Zarobek: ${r.fare} 🪙`;
+      } else {
+        upperDestBeacon.position.set(r.dest[1], 0, r.dest[2]); upperDestBeacon.userData.cone.position.y = 7.2 + Math.sin(time*3)*0.35;
+        const d = Math.hypot(cp.x - r.dest[1], cp.z - r.dest[2]);
+        if(carDriving && d < 8 && slow){ upperFinish(); return; }
+        txt = `🚖 Upper – pasażer na pokładzie<br>🔴 Cel: ${r.dest[0]}<br>Odległość: ${Math.round(d/5)*5} m<br>Zarobek: ${r.fare} 🪙`;
+      }
+    }
+    if(txt !== upperHudTxt){ upperHudTxt = txt; upperHud.style.display = txt ? 'block' : 'none'; upperHud.innerHTML = coinHTML(txt); }
+  }
+  function svApplyUpper(u){
+    upperClearRide(); upperApp.offer = null;
+    upperApp.hired = !!(u && u.h); upperApp.done = u ? Math.max(0, u.n|0) : 0; upperApp.earned = u ? Math.max(0, u.e|0) : 0;
+  }
   // ===== Zakupy w Supermarkecie Pandy: koszyk, towary z regałów, płatność przy kasie =====
   const SUP_PRODUCTS = {apple:{n:'Jabłko',i:'🍎',p:2}, cola:{n:'Cola',i:'🥤',p:3}, bread:{n:'Chleb',i:'🍞',p:4}, computer:{n:'Komputer',i:'🖥️',p:100}, phone:{n:'Telefon',i:'📱',p:5}, charger:{n:'Ładowarka',i:'🔌',p:8}};
   let basket = null;                        // null = brak koszyka; w koszyku: {id: liczba}
@@ -2961,6 +3853,7 @@
     return null;
   }
   function findAction(){
+    if(paintUiOpen) return null;
     if(shopEl.style.display === 'block' || dlgEl.style.display === 'flex' || $('fridge').style.display === 'block' || $('wardrobe').style.display === 'block') return null;
     if(placing) return null;
     if(sitting){
@@ -2973,6 +3866,8 @@
       if(pcDesk) return {text:computerUiOpen ? 'F – zamknij komputer' : 'F – włącz komputer 🖥️', run:turnOnComputer};
       return {text:'F – wstań z krzesła', run:standUp};
     }
+    if(carDriving) return {text:'Shift – wysiądź z auta 🚗', run:()=>{}};
+    if(hasCar && Math.hypot(player.position.x-pcar.group.position.x, player.position.z-pcar.group.position.z) < 3.6 && !bikeMounted) return {text:'F – wsiądź do auta 🚗', run:enterCar};
     if(bikeMounted) return {text:'Shift – zsiądź z roweru',run:dismountBike};
     if(bikePurchased && Math.hypot(player.position.x-bike.position.x,player.position.z-bike.position.z)<2.6)
       return {text:'F – wsiądź na rower',run:mountBike};
@@ -3023,6 +3918,10 @@
     if(shopInside && shopNpcDist() < 3.4) return {text:'F – porozmawiaj ze sprzedawczynią', run:openShopTalk};
     if(bankInside && bankNpcDist() < 3.4) return {text:'F – porozmawiaj z bankierem', run:openBankTalk};
     if(furnInside && furnNpcDist() < 3.4) return {text:'F – porozmawiaj ze sprzedawcą mebli', run:openFurnTalk};
+    if(mechInside && mechNpcDist() < 4.2) return {text:'F – porozmawiaj z mechanikiem 🔧', run:openMechTalk};
+    if(paintInside && paintNpcDist() < 3.4) return {text:'F – porozmawiaj z lakiernikiem 🎨', run:openPaintTalk};
+    if(carInside && carNpcDist() < 3.4) return {text:'F – porozmawiaj z doradcą salonu', run:openCarTalk};
+    if(clothInside && clothNpcDist() < 3.4) return {text:'F – porozmawiaj ze sprzedawczynią ubrań', run:openClothTalk};
     return null;
   }
   function updateJob(dt, time){
@@ -3063,13 +3962,7 @@
     scene.add(holder);
     worldItems.push({id, holder, mesh, cool: cool||0, ph: Math.random()*6});
   }
-  const kinds = ['hat'];
-  spawnItem('hat', -4, -6, 0);
-  for(let i=0;i<40;i++){
-    const x = (Math.random()-.5)*300, z = (Math.random()-.5)*300;
-    if(Math.abs(z - ROAD_Z) < streetEdge + 2 || inShop(x, z, 2)) continue;
-    spawnItem(kinds[Math.floor(Math.random()*kinds.length)], x, z, 0);
-  }
+  // Kapelusze nie leżą już na mapie – kupisz je w sklepie z ubraniami przy ulicy Społecznej.
   function updateItems(dt, time){
     for(let i = worldItems.length-1; i >= 0; i--){
       const w = worldItems[i];
@@ -3158,7 +4051,7 @@
     // chmury
     cloudMat.color.copy(PAL.cloudNight).lerp(PAL.cloudDay, day).lerp(PAL.cloudDusk, dusk*0.4);
     // wnętrza i okna
-    restLight.intensity = shopLight.intensity = bankLight.intensity = furnLight.intensity = 1.0*night;
+    restLight.intensity = shopLight.intensity = bankLight.intensity = furnLight.intensity = clothLight.intensity = carLight.intensity = paintLight.intensity = mechLight.intensity = 1.0*night;
     lampPool.forEach(l => l.intensity = l.userData.used ? 0.55 + 0.65*night : 0);   // lampy w domu
     glowMats.forEach(m => m.emissive.setRGB(1, 0.78, 0.4).multiplyScalar(night*0.85));
 
@@ -3207,6 +4100,10 @@
       [shopWallMat, shopInside],
       [bankWallMat, bankInside],
       [furnWallMat, furnInside],
+      [clothWallMat, clothInside],
+      [carWallMat, carInside],
+      [paintWallMat, paintInside],
+      [mechWallMat, mechInside],
       [homeWallMat, homeInside]
     ];
     for(const [material, inside] of insideStates){
@@ -3253,7 +4150,7 @@
   // Kursor znika i kamera podąża za myszką; gdy otwarte jest jakieś okno (sklep, ekwipunek, telefon...), kursor wraca
   function uiBlocking(){
     if(isDead || isPaused || computerUiOpen || fullMapOpen || placing) return true;
-    return ['shop','dlg','phone','fridge','wardrobe','inv','placeUI'].some(id => {
+    return ['shop','dlg','phone','fridge','wardrobe','inv','placeUI','paintUI'].some(id => {
       const e = document.getElementById(id);
       return e && getComputedStyle(e).display !== 'none';
     });
@@ -3506,6 +4403,8 @@
       fridge: JSON.stringify(fridgeStock),
       homes: JSON.stringify(HOMES.map(H => ({id:H.id, rented:!!H.rented, owned:!!H.owned, paid:H.owned ? 0 : Math.round(H.paidUntil||0), open:!!(H.door && H.door.open)}))),
       furn: JSON.stringify(placedDesks.slice(0,40).map(pd => ({k:pd.kind||'desk', x:+pd.wall.x.toFixed(2), z:+pd.wall.z.toFixed(2), r:svRot4(pd.mesh.rotation.y), c:pd.computer ? (Math.round(pd.computer.rotation.y/Math.PI) & 1) : -1}))),
+      car: JSON.stringify(hasCar ? {has:true, x:+pcar.group.position.x.toFixed(2), z:+pcar.group.position.z.toFixed(2), r:+carHeading.toFixed(3), c:pcar.bodyMat.color.getHex(), s:steerLvl} : {has:false}),
+      upper: JSON.stringify({h:upperApp.hired?1:0, n:upperApp.done|0, e:upperApp.earned|0}),
       phone: JSON.stringify({plug:!!chargerPlugged, home:chargerHome ? chargerHome.id : '', dock:!!phoneDocked, bat:+(+phoneBattery).toFixed(1)}),
       pos: JSON.stringify(svPos())
     };
@@ -3536,6 +4435,7 @@
   function svFresh(){
     if(bikeMounted){ bikeMounted = false; player.visible = true; riderBlend = 0; }   // zsiadamy bez przenoszenia postaci przy rowerze
     bikePurchased = false; bike.visible = false;
+    svApplyCar({has:false}); svApplyUpper(null);
     job.accepted = false; job.order = null; job.carrying = false; job.delivered = 0;
     try{ closeDialog(); }catch(e){}
     svResetHomes();
@@ -3597,6 +4497,8 @@
       try{ const f = JSON.parse(d.fridge || '{}'); for(const k in fridgeStock) if(isFinite(+f[k])) fridgeStock[k] = Math.max(0, f[k]|0); }catch(e){}
       if(d.homes) try{ svApplyHomes(JSON.parse(d.homes)); }catch(e){}
       if(d.furn) try{ svApplyFurn(JSON.parse(d.furn)); }catch(e){}
+      if(d.car) try{ svApplyCar(JSON.parse(d.car)); }catch(e){}
+      if(d.upper) try{ svApplyUpper(JSON.parse(d.upper)); }catch(e){}
       if(d.phone) try{ svApplyPhone(JSON.parse(d.phone)); }catch(e){}
       if(d.pos) try{ svApplyPos(JSON.parse(d.pos)); }catch(e){}
       renderInv(); renderShop(); renderStats(); updateDayNight(gameElapsed); refreshPhoneBank(); refreshPhoneDom();
@@ -3729,11 +4631,14 @@
     if(sitting && (keys.ShiftLeft || keys.ShiftRight)){ standUp(); keys.ShiftLeft = false; keys.ShiftRight = false; }
     let ix = (keys.KeyD||keys.ArrowRight?1:0) - (keys.KeyA||keys.ArrowLeft?1:0) + joy.x;
     let iz = (keys.KeyW||keys.ArrowUp?1:0) - (keys.KeyS||keys.ArrowDown?1:0) - joy.y;
-    if(sitting){ ix = 0; iz = 0; }
+    if(sitting || paintUiOpen){ ix = 0; iz = 0; }
+    let drvX = 0, drvZ = 0;
+    if(carDriving){ drvX = ix; drvZ = iz; ix = 0; iz = 0; }                      // w aucie WASD steruje autem, nie postacią
     const len = Math.hypot(ix,iz);
     if(len > 1){ ix/=len; iz/=len; }
     const shiftNow = !!(keys.ShiftLeft||keys.ShiftRight);
     if(bikeMounted && shiftNow && !shiftPrev && !isSleeping) dismountBike();   // Shift zsiada z roweru
+    if(carDriving && shiftNow && !shiftPrev && !isSleeping) exitCar();         // Shift wysiada z auta
     shiftPrev = shiftNow;
     const wantRun = shiftNow;
     const exhausted = stats.energy <= 0, tired = stats.energy < 15;
@@ -3746,12 +4651,15 @@
     const mz = -ix*Math.sin(yaw) - iz*Math.cos(yaw);
     player.position.x += mx*speed*dt;
     player.position.z += mz*speed*dt;
+    if(carDriving) driveCar(drvX, drvZ, dt);
+    const CR = carDriving ? 1.15 : 0;                                            // auto jest większe od postaci – większy promień kolizji
+    const preX = player.position.x, preZ = player.position.z;
 
     // kolizje z pniami drzew
     for(const t of treeColl){
       const dx = player.position.x - t.x, dz = player.position.z - t.z;
-      if(Math.abs(dx) > 3 || Math.abs(dz) > 3) continue;
-      const d = Math.hypot(dx, dz), min = t.r + 0.35;
+      if(Math.abs(dx) > 3.6 || Math.abs(dz) > 3.6) continue;
+      const d = Math.hypot(dx, dz), min = t.r + 0.35 + CR;
       if(d < min && d > 0.0001){
         player.position.x = t.x + dx/d*min;
         player.position.z = t.z + dz/d*min;
@@ -3759,7 +4667,7 @@
     }
     for(const b of BUILDINGS){ // kolizje ze ścianami budynków
       if(b.open) continue;
-      const hx = b.w/2 + 0.4, hz = b.d/2 + 0.4;
+      const hx = b.w/2 + 0.4 + CR, hz = b.d/2 + 0.4 + CR;
       const dx = player.position.x - b.x, dz = player.position.z - b.z;
       if(Math.abs(dx) < hx && Math.abs(dz) < hz){
         if(hx - Math.abs(dx) < hz - Math.abs(dz)) player.position.x = b.x + Math.sign(dx || 1)*hx;
@@ -3770,10 +4678,10 @@
       if(sitting && w === sitting.wall) continue;
       if(w.enter !== undefined && player.position.y >= w.enter) continue;   // wskoczono nad krawędź platformy
       const px = player.position.x, pz = player.position.z;
-      if(Math.abs(px - w.x) > w.w/2 + 1 || Math.abs(pz - w.z) > w.d/2 + 1) continue;
+      if(Math.abs(px - w.x) > w.w/2 + 1 + CR || Math.abs(pz - w.z) > w.d/2 + 1 + CR) continue;
       const cx = Math.max(w.x - w.w/2, Math.min(w.x + w.w/2, px));
       const cz = Math.max(w.z - w.d/2, Math.min(w.z + w.d/2, pz));
-      const dx = px - cx, dz = pz - cz, dd = Math.hypot(dx, dz), R = 0.35;
+      const dx = px - cx, dz = pz - cz, dd = Math.hypot(dx, dz), R = 0.35 + CR;
       if(dd < R){
         if(dd > 1e-5){ player.position.x += dx/dd*(R-dd); player.position.z += dz/dd*(R-dd); }
         else {
@@ -3788,24 +4696,32 @@
       if(!car.active || !car.group.visible) continue;
       const cp = car.group.position;
       const dx = player.position.x - cp.x, dz = player.position.z - cp.z;
-      const d = Math.hypot(dx, dz), min = 2.45;
+      const d = Math.hypot(dx, dz), min = carDriving ? 4.0 : 2.45;
       if(d < min && d > 0.0001){
+        if(carDriving) carV *= 0.5;
         player.position.x = cp.x + dx/d*min;
         player.position.z = cp.z + dz/d*min;
       } else if(d <= 0.0001){
         player.position.x += 2.45;
       }
     }
+    if(carDriving && Math.hypot(player.position.x - preX, player.position.z - preZ) > 0.02) carV *= Math.max(0, 1 - dt*9);   // uderzenie w przeszkodę hamuje auto
     updateShop();
     updateRestaurant();
     updateSupermarket();
     updateHomeInterior();
     updateHomeDoor(dt);
     updateTraffic(dt);
+    updateUpper(dt, gameElapsed);
+    updatePlayerSignals(typeof drvX === 'number' ? drvX : 0);
     updateJob(dt, gameElapsed);
     updateShopInterior(dt, gameElapsed);
     updateBankInterior(dt, gameElapsed);
     updateFurnInterior(dt, gameElapsed);
+    updateClothInterior(dt, gameElapsed);
+    updateCarInterior(dt, gameElapsed);
+    updatePaintInterior(dt, gameElapsed);
+    updateMechInterior(dt, gameElapsed);
 
     const moving = len > 0.1;
     if(moving){
@@ -3816,6 +4732,13 @@
       player.rotation.y = facing;
       walkT += dt*speed*1.6;
     }
+    if(carDriving){
+      pcar.group.position.set(player.position.x, 0.02, player.position.z); pcar.group.rotation.y = carHeading;
+      pcar.wheels.forEach(w => { w.rotation.z -= carV*dt/0.36; });
+      if(carV > 2 && camPtr === null){                                          // kamera sama ustawia się za autem
+        let dd = carHeading + Math.PI - yaw; dd = Math.atan2(Math.sin(dd), Math.cos(dd)); yaw += dd*Math.min(1, dt*1.8);
+      }
+    }
     if(bikeMounted){
       bike.position.set(player.position.x,0,player.position.z);
       bike.rotation.y=facing;
@@ -3824,7 +4747,7 @@
 
     // skok
     const gy = groundAt(player.position.x, player.position.z, player.position.y);
-    if(!bikeMounted && !sitting && keys.Space && player.position.y <= gy + 0.001 && stats.energy >= 3){ vy = 7.5; addStats(0, -2); }
+    if(!bikeMounted && !carDriving && !sitting && keys.Space && player.position.y <= gy + 0.001 && stats.energy >= 3){ vy = 7.5; addStats(0, -2); }
     vy -= 20*dt;
     player.position.y = Math.max(gy, player.position.y + vy*dt);
     if(player.position.y === gy && vy < 0) vy = 0;
@@ -3859,7 +4782,8 @@
     // głód i energia
     stats.hunger = Math.max(0, stats.hunger - dt*(0.12 + (running && moving ? 0.05 : 0)));
     let dE;
-    if(!moving) dE = stats.hunger > 15 ? 1.2 : 0;                                    // odpoczynek regeneruje energię
+    if(carDriving) dE = 0;                                                           // jazda autem nie męczy
+    else if(!moving) dE = stats.hunger > 15 ? 1.2 : 0;                                    // odpoczynek regeneruje energię
     else if(bikeMounted) dE = -(running ? 0.8 : 0.3);
     else dE = -(running ? 0.6 : 0.12);
     if(stats.hunger <= 0) dE = Math.min(dE, 0) - 0.15;                               // głód wyczerpuje
