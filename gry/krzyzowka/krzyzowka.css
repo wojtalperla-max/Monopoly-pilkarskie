@@ -122,3 +122,29 @@ button:disabled{opacity:.5;cursor:default}
 /* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
 html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
 html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
+
+/* ===== lupka / dopasowanie planszy ===== */
+.zoombar{display:flex;gap:10px;align-items:stretch;margin-bottom:12px}
+.zoombar #cur{flex:1;min-width:0;margin-bottom:0}
+.zoom{display:flex;gap:6px;align-items:center;flex:none}
+.zoom button{min-width:48px;white-space:nowrap}
+#scroll{display:block}
+#board{margin:0 auto;align-content:start;flex:none}
+@media(max-width:600px){.zoombar{flex-direction:column}.zoom{justify-content:center}}
+#scroll.zoomed{cursor:grab}
+#scroll.zoomed .c{cursor:grab}
+#scroll.panning,#scroll.panning .c{cursor:grabbing;user-select:none}
+
+/* ===== opcja Hasła Minecraft ===== */
+.mcopt{display:flex!important;align-items:center;gap:10px;margin:12px 0 0!important;padding:10px 12px;border-radius:12px;background:#ffffff1f;border:2px solid #ffffff55;cursor:pointer;font-size:17px!important;font-weight:700!important;color:#fff!important;user-select:none}
+.mcopt input{width:22px;height:22px;accent-color:#ffd84a;flex:none;margin:0;cursor:pointer}
+.mcopt:has(input:checked){background:#2a9d4f66;border-color:#7dff9b}
+.mchint{margin:6px 2px 0;font-size:13px;color:#ffffffbf}
+#bMc:not(.alt){background:#2a9d4f}
+
+/* ===== poprawnie wpisane hasła na zielono (kolor gracza jako dolny pasek) ===== */
+.c.done{background:#8fdc97;color:#143d1c}
+.c.done::after{content:"";position:absolute;top:3px;right:3px;width:max(6px,calc(var(--cs)*.2));height:max(6px,calc(var(--cs)*.2));background:var(--pc,transparent);border:1.5px solid #fff;border-radius:2px;box-shadow:0 0 0 1px #0004}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .c.done{background:#2f7d43;color:#f2fff3}}
+:root[data-theme="dark"] .c.done{background:#2f7d43;color:#f2fff3}
+.c.sel.done{background:#ffc94d;color:#2a2118}

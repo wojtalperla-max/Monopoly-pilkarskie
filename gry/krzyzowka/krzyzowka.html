@@ -30,6 +30,8 @@
   <div class="kz-card">
    <label for="nick">Twój nick i kolor</label>
    <div class="pick"><input class="t" id="nick" maxlength="14" placeholder="Twój nick…" autocomplete="off"><input type="color" id="col" aria-label="Twój kolor"></div>
+   <label class="mcopt" for="mcOpt"><input type="checkbox" id="mcOpt"><span>⛏ Hasła Minecraft</span></label>
+   <p class="mchint">Do losowanych haseł dołączą też pytania o grę Minecraft.</p>
   </div>
   <div class="kz-main">
    <button class="kz-btn kz-gold" id="bSolo"><span class="kz-ic">▶</span>GRAJ SOLO</button>
@@ -44,10 +46,10 @@
  </div>
 </section>
 <section id="game" class="hide">
- <div class="top"><h2>Krzyżówka</h2><span id="roomLbl" style="color:var(--muted)">Kod pokoju:</span><span class="pill" id="room" title="Kliknij, aby skopiować"></span><button class="alt sm" id="bNew">Nowa krzyżówka</button><button class="alt sm" id="bLeave">Wyjdź</button></div>
+ <div class="top"><h2>Krzyżówka</h2><span id="roomLbl" style="color:var(--muted)">Kod pokoju:</span><span class="pill" id="room" title="Kliknij, aby skopiować"></span><button class="alt sm" id="bMc" title="Hasła Minecraft w losowaniu"></button><button class="alt sm" id="bNew">Nowa krzyżówka</button><button class="alt sm" id="bLeave">Wyjdź</button></div>
  <div id="win" class="hide"></div>
  <div class="layout">
-  <div class="boardwrap"><div id="cur"></div><div id="scroll"><div id="board"></div></div></div>
+  <div class="boardwrap"><div class="zoombar"><div id="cur"></div><div class="zoom" role="group" aria-label="Powiększenie planszy"><button class="alt sm" id="zOut" title="Oddal" aria-label="Oddal">🔍−</button><button class="alt sm" id="zFit" title="Pokaż całą planszę">100%</button><button class="alt sm" id="zIn" title="Przybliż" aria-label="Przybliż">🔍+</button></div></div><div id="scroll"><div id="board"></div></div></div>
   <div class="side">
    <div class="panel"><h3>Gracze</h3><div id="pls"></div></div>
    <div class="panel"><h3>Poziomo →</h3><div class="clues" id="ch"></div></div>
@@ -114,7 +116,8 @@ window.__krJoin=async function(name){
 })();
 </script>
 <script>
-const WL=`KRAKOW|Dawna stolica Polski;WISLA|Najdłuższa polska rzeka;TATRY|Najwyższe polskie góry;BALTYK|Morze na północy Polski;KOT|Mruczy na kolanach babci;PIES|Najlepszy przyjaciel człowieka;SERNIK|Ciasto z twarogu;PIEROGI|Ruskie lub z mięsem;BARSZCZ|Czerwona zupa wigilijna;CHOINKA|Stoi w salonie w grudniu;KONWALIA|Biały kwiat o dzwonkach;SLONCE|Świeci w dzień;KSIEZYC|Towarzyszy Ziemi;JABLKO|Owoc z Newtona;GRUSZKA|Owoc jak żarówka;MALINA|Sok na przeziębienie;ROWER|Dwa kółka i pedały;POCIAG|Jedzie po torach;SAMOLOT|Lata z lotniska;OKRET|Pływa po morzu;KSIAZKA|Czyta się ją wieczorem;LAMPA|Daje światło;FOTEL|Wygodne siedzisko babci;KOCYK|Otula nogi zimą;SZALIK|Na szyję w mrozie;CZAPKA|Chroni głowę przed zimnem;ZEGAR|Wskazuje godzinę;OKNO|Widać przez nie podwórko;DRZWI|Wchodzi się przez nie;MASLO|Smaruje się nim chleb;CHLEB|Powszedni na stole;MLEKO|Białe, od krowy;HERBATA|Napar z cytryną;KAWA|Poranna czarna;ROSOL|Niedzielna zupa z kury;KOTLET|Schabowy na obiad;PACZEK|Tłusty czwartek;MAKOWIEC|Rolada z makiem;WIOSNA|Pora po zimie;LATO|Pora wakacji;JESIEN|Liście spadają;ZIMA|Śnieg i mróz;DESZCZ|Pada z chmur;TECZA|Kolorowy łuk na niebie;BOCIAN|Ptak z gniazdem na dachu;SOWA|Nocny ptak;ORZEL|Godło Polski;LAS|Pełen grzybów;GRZYB|Prawdziwek lub kurka;JEZIORO|Woda otoczona lądem;MOST|Łączy brzegi rzeki;WARSZAWA|Stolica Polski;GDANSK|Miasto Solidarności;POZNAN|Koziołki na ratuszu;WROCLAW|Miasto krasnali;KARPACZ|Miasto pod Śnieżką;SNIEZKA|Szczyt Karkonoszy;KARKONOSZE|Góry ze Śnieżką;ZAMEK|Mieszkał w nim król;KROL|Nosi koronę;SZACHY|Gra z hetmanem;KARTY|Talia do gry;TANGO|Taniec argentyński;RADIO|Gra w kuchni;TELEFON|Dzwoni;OGROD|Rosną w nim warzywa;POMIDOR|Czerwone warzywo;OGOREK|Kiszony do obiadu;WIDELEC|Sztuciec do makaronu;LYZKA|Do zupy;NOZ|Kroi chleb;TALERZ|Na nim leży obiad;KUBEK|Pije się z niego herbatę;GARNEK|Gotuje się w nim zupę;PATELNIA|Smaży się na niej jajecznicę;LODOWKA|Chłodzi jedzenie;PIEKARNIK|Wypiekasz w nim szarlotkę;SZARLOTKA|Ciasto z jabłkami;PLACEK|Ziemniaczany ze śmietaną;BIGOS|Kapusta z mięsem;ZUREK|Zupa w chlebie na Wielkanoc;MAZUREK|Wielkanocne ciasto;BABA|Wielkanocna z lukrem;BOMBKA|Wisi na choince;PRASA|Gazety i czasopisma;GAZETA|Codzienny dziennik;LISTONOSZ|Roznosi listy;PAROWOZ|Dawny pociąg z dymem;TRAMWAJ|Jedzie po szynach w mieście;AUTOBUS|Miejski środek transportu;TAKSOWKA|Wezwiesz ją przez telefon;SKRZYPCE|Instrument ze smyczkiem;FORTEPIAN|Duży instrument z klawiszami;GITARA|Ma sześć strun;BEBEN|Uderza się w niego pałeczkami;TRABKA|Dęty instrument;CHOPIN|Kompozytor z Żelazowej Woli;MICKIEWICZ|Autor Pana Tadeusza;SIENKIEWICZ|Autor Quo vadis;KOPERNIK|Wstrzymał Słońce;CURIE|Dwukrotna noblistka;MORZE|Słona woda;OCEAN|Większy od morza;WYSPA|Otoczona wodą;PLAZA|Piasek nad morzem;PUSTYNIA|Sahara to jedna z nich;WULKAN|Wybucha lawą;GORA|Wysokie wzniesienie terenu;DOLINA|Między górami;POLANA|Bez drzew w lesie;STRUMYK|Mała rzeczka;MOTYL|Kolorowy owad ze skrzydłami;PSZCZOLA|Daje miód;BIEDRONKA|Czerwona w kropki;ZABA|Kumka w stawie;WIEWIORKA|Zbiera orzechy;JEZ|Kolczasty mieszkaniec lasu;LIS|Rudy spryciarz;WILK|Wyje do księżyca;NIEDZWIEDZ|Śpi zimą w gawrze;KROWA|Daje mleko;KON|Zaprzęgany do wozu;OWCA|Ma wełnę;KURA|Znosi jajka;KACZKA|Pływa po stawie;GESI|Ptaki z bajki o Nilsie;SZKOLA|Uczą się w niej dzieci;LEKCJA|Trwa 45 minut;ZESZYT|Piszesz w nim ołówkiem;TORNISTER|Plecak ucznia;LINIJKA|Mierzy centymetry;PIORNIK|Mieszkanie długopisu;TABLICA|Pisze się na niej kredą;KREDA|Biała do tablicy;DYPLOM|Dostaje się po studiach;MATURA|Egzamin dojrzałości;FUTBOL|Gra z piłką;PILKA|Okrągła do gry;BRAMKA|Tam strzela napastnik;TENIS|Z rakietą i siatką;PLYWANIE|Sport w basenie;NARTY|Zjeżdżasz na nich ze stoku;LYZWY|Na lodowisko;BIEGI|Konkurencja lekkoatletyczna;SZACHOWNICA|Sześćdziesiąt cztery pola;PUZZLE|Układanka z kawałków;DOMINO|Gra w kostki;LOTERIA|Los szczęścia;PREZENT|Pod choinką;URODZINY|Tort ze świeczkami;TORT|Dmuchasz świeczki;BALON|Lata z helem;WESELE|Panna młoda w bieli;MROWKA|Pracowita w mrowisku`.split(";").map(s=>s.split("|"));
+const WL=`KRAKÓW|Dawna stolica Polski;WISŁA|Najdłuższa polska rzeka;TATRY|Najwyższe polskie góry;BAŁTYK|Morze na północy Polski;KOT|Mruczy na kolanach babci;PIES|Najlepszy przyjaciel człowieka;SERNIK|Ciasto z twarogu;PIEROGI|Ruskie lub z mięsem;BARSZCZ|Czerwona zupa wigilijna;CHOINKA|Stoi w salonie w grudniu;KONWALIA|Biały kwiat o dzwonkach;SŁOŃCE|Świeci w dzień;KSIĘŻYC|Towarzyszy Ziemi;JABŁKO|Owoc z Newtona;GRUSZKA|Owoc jak żarówka;MALINA|Sok na przeziębienie;ROWER|Dwa kółka i pedały;POCIĄG|Jedzie po torach;SAMOLOT|Lata z lotniska;OKRĘT|Pływa po morzu;KSIĄŻKA|Czyta się ją wieczorem;LAMPA|Daje światło;FOTEL|Wygodne siedzisko babci;KOCYK|Otula nogi zimą;SZALIK|Na szyję w mrozie;CZAPKA|Chroni głowę przed zimnem;ZEGAR|Wskazuje godzinę;OKNO|Widać przez nie podwórko;DRZWI|Wchodzi się przez nie;MASŁO|Smaruje się nim chleb;CHLEB|Powszedni na stole;MLEKO|Białe, od krowy;HERBATA|Napar z cytryną;KAWA|Poranna czarna;ROSÓŁ|Niedzielna zupa z kury;KOTLET|Schabowy na obiad;PĄCZEK|Tłusty czwartek;MAKOWIEC|Rolada z makiem;WIOSNA|Pora po zimie;LATO|Pora wakacji;JESIEŃ|Liście spadają;ZIMA|Śnieg i mróz;DESZCZ|Pada z chmur;TĘCZA|Kolorowy łuk na niebie;BOCIAN|Ptak z gniazdem na dachu;SOWA|Nocny ptak;ORZEŁ|Godło Polski;LAS|Pełen grzybów;GRZYB|Prawdziwek lub kurka;JEZIORO|Woda otoczona lądem;MOST|Łączy brzegi rzeki;WARSZAWA|Stolica Polski;GDAŃSK|Miasto Solidarności;POZNAŃ|Koziołki na ratuszu;WROCŁAW|Miasto krasnali;KARPACZ|Miasto pod Śnieżką;ŚNIEŻKA|Szczyt Karkonoszy;KARKONOSZE|Góry ze Śnieżką;ZAMEK|Mieszkał w nim król;KRÓL|Nosi koronę;SZACHY|Gra z hetmanem;KARTY|Talia do gry;TANGO|Taniec argentyński;RADIO|Gra w kuchni;TELEFON|Dzwoni;OGRÓD|Rosną w nim warzywa;POMIDOR|Czerwone warzywo;OGÓREK|Kiszony do obiadu;WIDELEC|Sztuciec do makaronu;ŁYŻKA|Do zupy;NÓŻ|Kroi chleb;TALERZ|Na nim leży obiad;KUBEK|Pije się z niego herbatę;GARNEK|Gotuje się w nim zupę;PATELNIA|Smaży się na niej jajecznicę;LODÓWKA|Chłodzi jedzenie;PIEKARNIK|Wypiekasz w nim szarlotkę;SZARLOTKA|Ciasto z jabłkami;PLACEK|Ziemniaczany ze śmietaną;BIGOS|Kapusta z mięsem;ŻUREK|Zupa w chlebie na Wielkanoc;MAZUREK|Wielkanocne ciasto;BABA|Wielkanocna z lukrem;BOMBKA|Wisi na choince;PRASA|Gazety i czasopisma;GAZETA|Codzienny dziennik;LISTONOSZ|Roznosi listy;PAROWÓZ|Dawny pociąg z dymem;TRAMWAJ|Jedzie po szynach w mieście;AUTOBUS|Miejski środek transportu;TAKSÓWKA|Wezwiesz ją przez telefon;SKRZYPCE|Instrument ze smyczkiem;FORTEPIAN|Duży instrument z klawiszami;GITARA|Ma sześć strun;BĘBEN|Uderza się w niego pałeczkami;TRĄBKA|Dęty instrument;CHOPIN|Kompozytor z Żelazowej Woli;MICKIEWICZ|Autor Pana Tadeusza;SIENKIEWICZ|Autor Quo vadis;KOPERNIK|Wstrzymał Słońce;CURIE|Dwukrotna noblistka;MORZE|Słona woda;OCEAN|Większy od morza;WYSPA|Otoczona wodą;PLAŻA|Piasek nad morzem;PUSTYNIA|Sahara to jedna z nich;WULKAN|Wybucha lawą;GÓRA|Wysokie wzniesienie terenu;DOLINA|Między górami;POLANA|Bez drzew w lesie;STRUMYK|Mała rzeczka;MOTYL|Kolorowy owad ze skrzydłami;PSZCZOŁA|Daje miód;BIEDRONKA|Czerwona w kropki;ŻABA|Kumka w stawie;WIEWIORKA|Zbiera orzechy;JEŻ|Kolczasty mieszkaniec lasu;LIS|Rudy spryciarz;WILK|Wyje do księżyca;NIEDŹWIEDŹ|Śpi zimą w gawrze;KROWA|Daje mleko;KOŃ|Zaprzęgany do wozu;OWCA|Ma wełnę;KURA|Znosi jajka;KACZKA|Pływa po stawie;GĘSI|Ptaki z bajki o Nilsie;SZKOŁA|Uczą się w niej dzieci;LEKCJA|Trwa 45 minut;ZESZYT|Piszesz w nim ołówkiem;TORNISTER|Plecak ucznia;LINIJKA|Mierzy centymetry;PIÓRNIK|Mieszkanie długopisu;TABLICA|Pisze się na niej kredą;KREDA|Biała do tablicy;DYPLOM|Dostaje się po studiach;MATURA|Egzamin dojrzałości;FUTBOL|Gra z piłką;PIŁKA|Okrągła do gry;BRAMKA|Tam strzela napastnik;TENIS|Z rakietą i siatką;PŁYWANIE|Sport w basenie;NARTY|Zjeżdżasz na nich ze stoku;ŁYŻWY|Na lodowisko;BIEGI|Konkurencja lekkoatletyczna;SZACHOWNICA|Sześćdziesiąt cztery pola;PUZZLE|Układanka z kawałków;DOMINO|Gra w kostki;LOTERIA|Los szczęścia;PREZENT|Pod choinką;URODZINY|Tort ze świeczkami;TORT|Dmuchasz świeczki;BALON|Lata z helem;WESELE|Panna młoda w bieli;MRÓWKA|Pracowita w mrowisku`.split(";").map(s=>s.split("|"));
+const MC=`MINECRAFT|Gra z kwadratowych bloków, w której kopiesz i budujesz;MOJANG|Studio, które stworzyło Minecrafta;STEVE|Domyślny bohater gry Minecraft;ALEX|Druga domyślna postać z gry Minecraft;CREEPER|Zielony potwór, który wybucha przy graczu;ENDERMAN|Wysoki, czarny stwór, który teleportuje się i nie lubi kontaktu wzrokowego;ZOMBIE|Nocą jęczy i chodzi, a w dzień płonie na słońcu;SZKIELET|Łucznik z kości, który strzela w jaskiniach i nocą;PAJĄK|Wspinający się po ścianach wróg z Minecrafta;WIEŚNIAK|Handluje szmaragdami w wiosce w Minecrafcie;SZMARAGD|Zielony kamień, waluta wieśniaków;DIAMENT|Najcenniejsza ruda do mocnych narzędzi w Minecrafcie;OBSYDIAN|Czarny blok z wody i lawy, potrzebny do portalu;LAWA|Pomarańczowa, groźna ciecz w jaskiniach i Netherze;KILOF|Narzędzie do kopania kamienia i rud w Minecrafcie;MIECZ|Broń do walki z potworami w Minecrafcie;ŁUK|Strzelasz z niego strzałami w Minecrafcie;TARCZA|Blokuje ataki i można ją ozdobić sztandarem;ZBROJA|Chroni gracza w Minecrafcie przed obrażeniami;SKRZYNIA|Drewniany blok do przechowywania przedmiotów;PIEC|Przetapia rudę i smaży mięso w Minecrafcie;WARSZTAT|Blok z siatką 3x3 do wytwarzania przedmiotów;ZACZAROWANIE|Magiczne ulepszenie miecza lub kilofa;PORTAL|Prowadzi do Netheru lub do Endu;NETHER|Ognisty wymiar pełen lawy i zombie świniolud;SMOK|Końcowy boss z wymiaru Endu;WITHER|Trzygłowy boss przyzywany z piasku dusz;WARDEN|Ślepy potwór z głębokiego mroku reagujący na dźwięk;WIOSKA|Osada, w której mieszkają wieśniacy;GOLEM|Żelazny obrońca wioski w Minecrafcie;ŚWINIA|Różowe zwierzę, na którym jeździsz z siodłem;OCELOT|Dziki kot z dżungli, który odstrasza creepery;PAPUGA|Kolorowy ptak, który naśladuje dźwięki potworów;PANDA|Biało-czarny miś, który uwielbia bambus;LAMA|Zwierzę z gór, które pluje na graczy;AKSOLOTL|Różowy płaz z jaskiń o zewnętrznych skrzelach;SLIME|Zielona skacząca kula, która dzieli się na mniejsze;GHAST|Latający duch z Netheru, który płacze i strzela kulami ognia;BLAZE|Płonący stwór z twierdzy Netheru, daje płonące pręty;SHULKER|Stwór z Endu ukryty w skorupie, strzela pociskami;ELYTRA|Skrzydła do szybowania zdobywane w Endzie;TNT|Czerwony blok, który wybucha po podpaleniu;REDSTONE|Czerwony proszek do budowania mechanizmów;BEDROCK|Nieniszczalna warstwa na dnie świata;TRAWA|Zielony blok z ziemią pod spodem;PIASEK|Spada pod wpływem grawitacji, spotkasz go na pustyni;DĄB|Drzewo, z którego dostajesz pnie i deski;DESKA|Z jednego pnia drzewa robisz cztery;PATYK|Rączka kilofa, miecza i łopaty;POCHODNIA|Oświetla jaskinię i odstrasza potwory;ŁÓŻKO|Pozwala przespać noc i ustawia punkt odrodzenia;MARCHEW|Pomarańczowe warzywo, które lubią świnie;ZIEMNIAK|Warzywo, które upieczesz w piecu;ARBUZ|Zielony owoc z czerwonym wnętrzem w Minecrafcie;ZŁOTO|Żółty kruszec, z którego robi się złote jabłka;ŻELAZO|Ruda do pancerza i golema w Minecrafcie;WĘGIEL|Czarna ruda, paliwo do pieca i pochodni;LAZURYT|Niebieska ruda potrzebna do zaklęć;SPAWNER|Klatka w lochu, z której wyskakują potwory;KOPALNIA|Podziemne tunele, w których szuka się rud;JASKINIA|Ciemne miejsce pełne rud i pająków;DŻUNGLA|Biom z ocelotami i wysokimi drzewami;MIKSTURA|Napój z alchemii dający efekty w Minecrafcie;PERŁA|Rzucana kulka z Endermana, która teleportuje gracza;PRZETRWANIE|Tryb gry, w którym walczysz z głodem i potworami`.split(";").map(s=>s.split("|"));
 const $=id=>document.getElementById(id),esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const HEX=/^#[0-9a-f]{6}$/i;
 const cleanN=v=>String(v||'').replace(/[\u0000-\u001f\u200b-\u200f\u2028-\u202f<>&]/g,'').trim().slice(0,14);
@@ -138,7 +141,7 @@ function gen(){
     if(e){if(e.ch!==w[i]||e.d[d])return -1;x++}else if(at(rr+dc,cc+dr)||at(rr-dc,cc-dr))return -1}
    return x};
   const put=(w,r,c,d)=>{for(let i=0;i<w.length;i++){const k=(r+d*i)*N+c+(1-d)*i;let e=G.get(k);if(!e){e={ch:w[i],d:{},r:r+d*i,c:c+(1-d)*i};G.set(k,e)}e.d[d]=1}};
-  const pool=sh(WL.slice()).slice(0,52).sort((a,b)=>b[0].length-a[0].length+(Math.random()-.5)*3);
+  const pool=sh((S.mc?WL.concat(MC):WL).slice()).slice(0,52).sort((a,b)=>b[0].length-a[0].length+(Math.random()-.5)*3);
   const words=[];const f=pool[0];put(f[0],12,(N-f[0].length)>>1,0);words.push({a:f[0],q:f[1],r:12,c:(N-f[0].length)>>1,d:0});
   for(const [w,q] of pool.slice(1)){const cand=[];
    for(const e of G.values())for(let i=0;i<w.length;i++)if(w[i]===e.ch)for(const d of [0,1]){
@@ -150,13 +153,13 @@ function gen(){
  return{id:Date.now().toString(36)+(Math.random()*1679616|0).toString(36),words:best,h:Math.max(...best.map(w=>w.r+(w.d?w.a.length:1))),w:Math.max(...best.map(w=>w.c+(w.d?1:w.a.length)))};
 }
 /* ---------- stan ---------- */
-const S={room:null,code:'',id:'',words:[],H:0,W:0,solved:{},ent:{},sel:null,dir:0,bad:-1,cells:{},nums:{},known:{},nick:'',col:'',myId:'me',recorded:false,wait:0,wait2:0};
-const k=(r,c)=>r+","+c,norm=s=>s.toUpperCase().replace(/Ł/g,"L").normalize("NFD").replace(/[^A-Z]/g,"");
+const S={mc:false,room:null,code:'',id:'',words:[],H:0,W:0,solved:{},ent:{},sel:null,dir:0,bad:-1,cells:{},nums:{},known:{},nick:'',col:'',myId:'me',recorded:false,wait:0,wait2:0};
+const k=(r,c)=>r+","+c,PLC="ĄĆĘŁŃÓŚŹŻ",norm=s=>[...String(s).toUpperCase().normalize("NFC")].map(ch=>PLC.includes(ch)?ch:ch.normalize("NFD").replace(/[^A-Z]/g,"")).join(""),fold=s=>String(s).replace(/Ł/g,"L").normalize("NFD").replace(/[\u0300-\u036f]/g,"");
 const who=p=>S.known[p]||{nick:'Gracz',col:'#888888'};
 /* Firebase może zwrócić tablicę jako obiekt o kluczach liczbowych – normalizujemy i walidujemy, zanim ruszymy stan */
 function loadPuzzle(p,solvedMap){
  const arr=Array.isArray(p.words)?p.words:Object.keys(p.words||{}).sort((x,y)=>x-y).map(i=>p.words[i]);
- const ws=arr.filter(w=>w&&/^[A-Z]{2,25}$/.test(String(w.a))).map(w=>({a:String(w.a),q:String(w.q||'').slice(0,120),r:+w.r,c:+w.c,d:+w.d?1:0}));
+ const ws=arr.filter(w=>w&&/^[A-ZĄĆĘŁŃÓŚŹŻ]{2,25}$/.test(String(w.a))).map(w=>({a:String(w.a),q:String(w.q||'').slice(0,120),r:+w.r,c:+w.c,d:+w.d?1:0}));
  if(!ws.length||ws.length!==arr.length||!(+p.h>0)||!(+p.w>0))throw new Error('Niepoprawna krzyżówka');
  S.id=String(p.id).replace(/[^a-z0-9]/gi,'').slice(0,20)||'x';S.words=ws;S.H=+p.h;S.W=+p.w;
  S.solved={};S.ent={};S.bad=-1;S.recorded=false;
@@ -168,7 +171,7 @@ function setup(){
  S.words.forEach((w,i)=>{for(let j=0;j<w.a.length;j++){const kk=w.d?k(w.r+j,w.c):k(w.r,w.c+j);(S.cells[kk]=S.cells[kk]||{ch:w.a[j],ws:[-1,-1]}).ws[w.d]=i}});
  const st=[...new Set(S.words.map(w=>k(w.r,w.c)))].map(s=>s.split(",").map(Number)).sort((a,b)=>a[0]-b[0]||a[1]-b[1]);
  st.forEach((s,i)=>S.nums[k(...s)]=i+1);S.words.forEach(w=>w.n=S.nums[k(w.r,w.c)]);
- $("board").style.gridTemplateColumns=`repeat(${S.W},var(--cs))`;
+ $("board").style.gridTemplateColumns=`repeat(${S.W},var(--cs))`;Z=1;setTimeout(fitBoard,0);
  S.sel=[S.words[0].r,S.words[0].c];S.dir=S.words[0].d}
 const aw=()=>{if(!S.sel)return -1;const c=S.cells[k(...S.sel)];return c?(c.ws[S.dir]>=0?c.ws[S.dir]:c.ws[1-S.dir]):-1};
 const letter=kk=>{const c=S.cells[kk];if(!c)return"";for(const i of c.ws)if(i>=0&&S.solved[i])return c.ch;return S.ent[kk]||""};
@@ -191,7 +194,7 @@ function paint(){
  for(let r=0;r<S.H;r++)for(let c=0;c<S.W;c++){const kk=k(r,c),cl=S.cells[kk];
   if(!cl){h+='<div class="b"></div>';continue}
   const sv=cl.ws.find(i=>i>=0&&S.solved[i]);let cls="c",st="";
-  if(sv!==undefined){cls+=" done";st=`style="background:color-mix(in srgb,${colOf(who(S.solved[sv].p).col)} 38%,var(--paper));color:var(--ink)"`}
+  if(sv!==undefined){cls+=" done";st=`style="--pc:${colOf(who(S.solved[sv].p).col)}"`}
   if(a>=0&&cl.ws.includes(a)&&sv===undefined)cls+=" act";
   if(S.bad>=0&&cl.ws.includes(S.bad))cls+=" bad";
   if(S.sel[0]===r&&S.sel[1]===c)cls+=" sel";
@@ -230,7 +233,7 @@ function move(step){const a=aw();if(a<0)return;const w=S.words[a],i=(w.d?S.sel[0
  if(i>=0&&i<w.a.length)S.sel=w.d?[w.r+i,w.c]:[w.r,w.c+i]}
 function check(a){const w=S.words[a];if(S.solved[a])return;let s="";
  for(let j=0;j<w.a.length;j++){const l=letter(w.d?k(w.r+j,w.c):k(w.r,w.c+j));if(!l)return;s+=l}
- if(s===w.a){
+ if(fold(s)===fold(w.a)){
   S.solved[a]={p:S.myId,ts:S.room?null:Date.now()};
   for(let j=0;j<w.a.length;j++)delete S.ent[w.d?k(w.r+j,w.c):k(w.r,w.c+j)];
   if(S.room)S.room.emit('solved',{id:S.id,i:a,nick:S.nick,col:S.col}).catch(()=>{})}
@@ -326,6 +329,41 @@ $("bLeave").onclick=toLobby;
 /* ---------- hooki huba ---------- */
 window.__krzyzLeave=()=>{try{if(S.room||!$('game').classList.contains('hide'))toLobby()}catch(e){}};
 window.__krzyzRefresh=()=>{try{if(!S.room&&$('game').classList.contains('hide'))initPrefs()}catch(e){}};
+
+/* ===== dopasowanie całej planszy + lupka (przybliż/oddal) ===== */
+let Z=1;
+function fitBoard(){
+ const sc=$("scroll"),b=$("board");if(!S.W||!S.H||!sc.clientWidth)return;
+ const aw=sc.clientWidth-8-4-(S.W-1),ah=Math.max(180,innerHeight*.78)-8-4-(S.H-1);
+ const base=Math.max(6,Math.floor(Math.min(aw/S.W,ah/S.H,64)));
+ b.style.setProperty("--cs",Math.round(Math.min(base*Z,120))+"px");
+ $("zFit").textContent=Math.round(Z*100)+"%";
+ sc.style.maxHeight=Z>1?"78vh":"none";sc.classList.toggle("zoomed",Z>1)}
+function setZoom(z){Z=Math.min(4,Math.max(.4,Math.round(z*100)/100));fitBoard()}
+$("zIn").onclick=()=>setZoom(Z*1.25);
+$("zOut").onclick=()=>setZoom(Z/1.25);
+$("zFit").onclick=()=>setZoom(1);
+$("scroll").addEventListener("wheel",e=>{if(!e.ctrlKey)return;e.preventDefault();setZoom(Z*(e.deltaY<0?1.1:1/1.1))},{passive:false});
+let lastW=0;new ResizeObserver(()=>{const w=$("scroll").clientWidth;if(w!==lastW){lastW=w;fitBoard()}}).observe($("scroll"));
+addEventListener("resize",fitBoard);
+
+/* przesuwanie przybliżonej planszy przeciąganiem myszą (dotyk przewija natywnie) */
+(function(){const sc=$("scroll");let d=null,moved=false;
+ sc.addEventListener("pointerdown",e=>{if(e.pointerType!=="mouse"||e.button!==0||Z<=1)return;d={x:e.clientX,y:e.clientY,l:sc.scrollLeft,t:sc.scrollTop};moved=false});
+ addEventListener("pointermove",e=>{if(!d)return;const dx=e.clientX-d.x,dy=e.clientY-d.y;
+  if(!moved&&Math.hypot(dx,dy)>5){moved=true;sc.classList.add("panning")}
+  if(moved){sc.scrollLeft=d.l-dx;sc.scrollTop=d.t-dy}});
+ const end=()=>{d=null;sc.classList.remove("panning")};
+ addEventListener("pointerup",end);addEventListener("pointercancel",end);
+ sc.addEventListener("click",e=>{if(moved){e.stopPropagation();e.preventDefault();moved=false}},true)})();
+
+/* ---------- opcja „Hasła Minecraft” ---------- */
+function syncMc(){$("mcOpt").checked=S.mc;$("bMc").textContent="⛏ Minecraft: "+(S.mc?"wł.":"wył.");$("bMc").classList.toggle("alt",!S.mc)}
+function setMc(v){S.mc=!!v;try{localStorage.setItem("krzyz_mc",S.mc?"1":"0")}catch(e){}syncMc()}
+try{S.mc=localStorage.getItem("krzyz_mc")==="1"}catch(e){}
+$("mcOpt").onchange=()=>setMc($("mcOpt").checked);
+$("bMc").onclick=()=>{setMc(!S.mc);toast(S.mc?"Hasła Minecraft dodane do puli – od następnej krzyżówki":"Hasła Minecraft wyłączone – od następnej krzyżówki")};
+syncMc();
 initPrefs();
 
 </script></body></html>

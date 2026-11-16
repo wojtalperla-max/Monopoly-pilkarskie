@@ -37,13 +37,13 @@ label{display:block;color:var(--mut);font-size:14px;margin:0 0 6px 4px}
 .grid{display:grid;grid-template-columns:minmax(260px,380px) 1fr;gap:18px}
 @media (max-width:780px){.grid{grid-template-columns:1fr}}
 .scene{display:flex;flex-direction:column;align-items:center;gap:10px}
-svg.gal{width:100%;max-width:340px;height:auto;overflow:visible}
+svg.gal{width:100%;max-width:340px;height:auto;overflow:visible;background:#eef1ff;border-radius:18px;padding:10px;box-shadow:0 10px 30px -12px rgba(0,0,0,.5)}
 .gal path,.gal circle{fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-width:9}
 .gal .st{stroke:#9aa3d6}
-.gal .p{stroke:#f8fafc;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .6s ease;filter:drop-shadow(0 0 6px var(--glow))}
+.gal .p{stroke:#0a0a12;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset .6s ease}
 .gal .p.on{stroke-dashoffset:0}
-.gal.lost .p{stroke:var(--bad);filter:drop-shadow(0 0 8px var(--bad))}
-.gal.won .p{stroke:var(--ok);filter:drop-shadow(0 0 8px var(--ok))}
+.gal.lost .p{stroke:#e11d48}
+.gal.won .p{stroke:#059669}
 .gal.lost #fig{animation:sway 2s ease-in-out infinite;transform-origin:200px 80px}
 @keyframes sway{50%{transform:rotate(4deg)}}
 .bar{width:100%;max-width:340px;height:10px;border-radius:9px;background:var(--key);overflow:hidden}
@@ -68,6 +68,7 @@ svg.gal{width:100%;max-width:340px;height:auto;overflow:visible}
 .pl{display:flex;align-items:center;gap:7px;background:var(--key);border:1px solid var(--line);border-radius:999px;padding:5px 12px 5px 8px;font-size:14px}
 .pl i{width:12px;height:12px;border-radius:50%}
 .msg{text-align:center;font-size:20px;font-weight:600;margin:0 0 4px;min-height:30px}
+.nextw{display:block;margin:10px auto 18px;font-size:19px;padding:13px 28px}
 .msg.w{color:var(--ok)}.msg.l{color:var(--bad)}
 .hostp{margin-top:18px;padding-top:18px;border-top:1px solid var(--line);display:grid;gap:12px}
 #toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,30px);background:var(--card);border:1px solid var(--line);backdrop-filter:blur(14px);padding:12px 20px;border-radius:14px;opacity:0;pointer-events:none;transition:.3s;z-index:9;max-width:90vw;text-align:center}
