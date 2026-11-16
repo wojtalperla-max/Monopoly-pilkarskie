@@ -411,6 +411,55 @@
   // ===== Przedłużenie ulicy Długiej, rondo i zjazd do przyszłego supermarketu =====
   // Jadąc Długą na wschód (+x) za domami nr 10 i 6: rondo, a jego lewy zjazd (w stronę -z) prowadzi do wielkiego, pustego budynku.
   const RB = {x:130, z:ROAD_Z, rOut:14, rIn:5.5};
+
+  // ===== Wzgórze za ulicą Społeczną: ulica biegnie dalej na południe (+z) i wspina się na podwyższony teren =====
+  const SPOL_END = 84;                                                // dotychczasowy koniec jezdni Społecznej
+  // Ścieżka przedłużonej Społecznej: od z=84 prosto na południe do z=134, łuk (R=16) i dalej prosto na zachód wzdłuż z=150 aż do x=0
+  const SPOL_TURN_R = 16, SPOL_TURN_Z = 150, SPOL_WEST_END = 0;
+  const SPOL_PATH = (function(){
+    const pts = [[RB.x, SPOL_END], [RB.x, SPOL_TURN_Z - SPOL_TURN_R]];
+    const cx = RB.x - SPOL_TURN_R, cz = SPOL_TURN_Z - SPOL_TURN_R;
+    for(let i=1;i<=12;i++){ const a = i/12*Math.PI/2; pts.push([cx + Math.cos(a)*SPOL_TURN_R, cz + Math.sin(a)*SPOL_TURN_R]); }
+    pts.push([SPOL_WEST_END, SPOL_TURN_Z]);
+    return pts;
+  })();
+  const HILL = {zMin:92, zStart:96, zTop:SPOL_TURN_Z - SPOL_TURN_R, h:7, flatHalf:15, fadeHalf:24};
+  const sstep = t => { t = Math.max(0, Math.min(1, t)); return t*t*(3 - 2*t); };
+  function pathNearest(x, z){                                         // najbliższy punkt ścieżki: {d, qz}
+    let bd = Infinity, bqz = 0;
+    for(let i=0;i<SPOL_PATH.length-1;i++){
+      const ax = SPOL_PATH[i][0], az = SPOL_PATH[i][1], bx = SPOL_PATH[i+1][0], bz = SPOL_PATH[i+1][1];
+      const vx = bx - ax, vz = bz - az, L2 = vx*vx + vz*vz;
+      const t = L2 > 0 ? Math.max(0, Math.min(1, ((x-ax)*vx + (z-az)*vz)/L2)) : 0;
+      const qx = ax + vx*t, qz = az + vz*t, d = Math.hypot(x - qx, z - qz);
+      if(d < bd){ bd = d; bqz = qz; }
+    }
+    return {d:bd, qz:bqz};
+  }
+  const HILL_REACH = HILL.flatHalf + HILL.fadeHalf;
+  const STATION = {x:67, z:170, w:34, d:22, blend:12, y:HILL.h + 0.2};   // stacja paliw: płaska platforma (w – wzdłuż X, d – wzdłuż Z) na poziomie chodnika Społecznej
+  function terrainH(x, z){                                            // wysokość terenu (0 na całej reszcie mapy) z platformą stacji
+    const h = hillH(x, z);
+    const ex = Math.abs(x - STATION.x) - STATION.w/2, ez = Math.abs(z - STATION.z) - STATION.d/2;
+    if(ex >= STATION.blend || ez >= STATION.blend) return h;
+    const t = 1 - sstep(Math.hypot(Math.max(0, ex), Math.max(0, ez))/STATION.blend);
+    return h + (STATION.y - h)*t;
+  }
+  function hillH(x, z){                                               // wysokość samego wzgórza
+    if(z <= HILL.zMin || z > SPOL_TURN_Z + HILL_REACH || x < SPOL_WEST_END - HILL_REACH || x > RB.x + HILL_REACH) return 0;
+    const n = pathNearest(x, z);
+    const side = 1 - sstep((n.d - HILL.flatHalf)/HILL.fadeHalf);
+    if(side <= 0) return 0;
+    return HILL.h * sstep((n.qz - HILL.zStart)/(HILL.zTop - HILL.zStart)) * side;
+  }
+  const HILL_BOX = {minX: SPOL_WEST_END - HILL_REACH, maxX: RB.x + HILL_REACH, minZ: HILL.zMin, maxZ: Math.max(SPOL_TURN_Z + HILL_REACH, STATION.z + STATION.d/2 + STATION.blend)};
+  // Zasięg świata widoczny na mapie. Mapa sama dobiera skalę tak, by zmieścić WSZYSTKIE zarejestrowane prostokąty –
+  // gdy dodasz nowy teren, wywołaj registerMapExtent(minX, minZ, maxX, maxZ), a mapa się oddali.
+  const MAP_EXTENTS = [{minX:-92, maxX:152, minZ:-94, maxZ:92}];
+  const registerMapExtent = (minX, minZ, maxX, maxZ) => MAP_EXTENTS.push({minX, maxX, minZ, maxZ});
+  registerMapExtent(HILL_BOX.minX, HILL_BOX.minZ, HILL_BOX.maxX, HILL_BOX.maxZ);
+  const onHill = (x, z, m) => z > HILL.zMin - m && pathNearest(x, z).d < HILL_REACH + m;
+  const AGD = {x:90, z:-74, w:26, d:20, h:5.4};                      // sklep AGD obok Pandy (po zachodniej stronie), front (+z) na z = -64
   const SUPER = {x:130, z:-76, w:44, d:24, h:7.5};                 // front budynku (+z) na z = -64
   const PAINT = {x:93, z:46, w:12, d:9, h:3.8};                    // lakiernik za salonem (dalej wzdłuż Poprzecznej)
   const MECH = {x:62, z:42, w:14, d:11, h:4.4};                    // mechanik po zachodniej stronie Poprzecznej (naprzeciw salonu i lakiernika); drzwi na wschód, wjazd autem
@@ -422,8 +471,10 @@
     (x > 78 - m && x < RB.x && Math.abs(z - ROAD_Z) < NEW_STREET_EDGE + m) ||                   // przedłużenie Długiej
     (Math.abs(x - RB.x) < NEW_STREET_EDGE + m && z < RB.z && z > SUPER.z + SUPER.d/2 - m) ||    // zjazd do supermarketu
     (Math.abs(x - SUPER.x) < SUPER.w/2 + m && z < -52 + m && z > SUPER.z - SUPER.d/2 - m) ||    // parking i budynek
+    (Math.abs(x - (AGD.x + 2)) < 16 + m && z < -52 + m && z > AGD.z - AGD.d/2 - m) ||           // sklep AGD z parkingiem
     (Math.abs(x - RB.x) < 22 + m && z > RB.z + 8 - m && z < 90 + m) ||                          // ulica Społeczna z domami i sklepem odzieżowym
     (Math.abs(x - POP_X) < POP_EDGE + m && z > SIDE_ROAD_START - m && z < POP_END + m) ||       // ulica Poprzeczna
+    onHill(x, z, m) ||                                                                          // wzgórze za Społeczną
     (Math.abs(x - CAR.x) < CAR.d/2 + 2 + m && Math.abs(z - CAR.z) < CAR.w/2 + 2 + m) ||        // salon samochodowy
     (Math.abs(x - MECH.x) < MECH.d/2 + 4 + m && Math.abs(z - MECH.z) < MECH.w/2 + 2 + m) ||    // mechanik
     (Math.abs(x - PAINT.x) < PAINT.d/2 + 2 + m && Math.abs(z - PAINT.z) < PAINT.w/2 + 2 + m);  // lakiernik                            // ulica Społeczna z domami i sklepem odzieżowym
@@ -477,7 +528,7 @@
       sw.position.set(RB.x + sd*SIDEWALK_OFFSET, 0.1, (RB.z - 13 + exitEnd)/2); sw.receiveShadow = true; street.add(sw);
     });
     // 3b) prawy zjazd (w stronę +z): ulica Społeczna – 5 domów gracza i sklep z ubraniami
-    const SPOL_END = 84, spStart = RB.z + 12.5, spLen = SPOL_END - spStart;
+    const spStart = RB.z + 12.5, spLen = SPOL_END - spStart;
     const spG = new THREE.Group(); spG.position.set(RB.x, 0, (spStart + SPOL_END)/2); spG.rotation.y = Math.PI/2; street.add(spG);
     const spRoad = new THREE.Mesh(new THREE.PlaneGeometry(spLen, ROAD_W), new THREE.MeshLambertMaterial({map:asphaltTex(spLen)}));
     spRoad.rotation.x = -Math.PI/2; spRoad.position.y = 0.02; spRoad.receiveShadow = true; spG.add(spRoad);
@@ -512,12 +563,78 @@
     // 5) budynek supermarketu: patrz buildSupermarket() niżej (po deklaracji WALLS)
   })();
 
+  // ===== Wzgórze i przedłużenie ulicy Społecznej (prosto, zakręt i odcinek na zachód do x=0) =====
+  (function buildHill(){
+    const X0 = HILL_BOX.minX, X1 = HILL_BOX.maxX, Z0 = HILL_BOX.minZ, Z1 = HILL_BOX.maxZ, STEP = 2;
+    const nx = Math.round((X1 - X0)/STEP), nz = Math.round((Z1 - Z0)/STEP);
+    // trawa wzgórza: siatka leży 2 cm pod płaską łąką, więc wynurza się dopiero tam, gdzie teren faktycznie się wznosi (bez migotania)
+    const geo = new THREE.PlaneGeometry(X1 - X0, Z1 - Z0, nx, nz); geo.rotateX(-Math.PI/2);
+    const pos = geo.attributes.position;
+    for(let i=0;i<pos.count;i++){
+      const wx = pos.getX(i) + (X0 + X1)/2, wz = pos.getZ(i) + (Z0 + Z1)/2;
+      pos.setXYZ(i, wx, terrainH(wx, wz) - 0.02, wz);
+    }
+    const uv = geo.attributes.uv;
+    for(let i=0;i<uv.count;i++) uv.setXY(i, (pos.getX(i) + 500)*0.12, (500 - pos.getZ(i))*0.12);
+    geo.computeVertexNormals();
+    const gt = grassTex.clone(); gt.needsUpdate = true; gt.repeat.set(1, 1);
+    const hm = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({map:gt})); hm.receiveShadow = true; scene.add(hm);
+
+    // próbki osi ulicy co ≤2 m: pozycja, styczna, długość narastająco
+    const S = []; let acc = 0;
+    for(let i=0;i<SPOL_PATH.length-1;i++){
+      const ax = SPOL_PATH[i][0], az = SPOL_PATH[i][1], bx = SPOL_PATH[i+1][0], bz = SPOL_PATH[i+1][1];
+      const L = Math.hypot(bx-ax, bz-az), n = Math.max(1, Math.ceil(L/2));
+      for(let k=0;k<n;k++){ const t = k/n; S.push({x:ax+(bx-ax)*t, z:az+(bz-az)*t, len:acc + L*t}); }
+      acc += L;
+    }
+    const last = SPOL_PATH[SPOL_PATH.length-1]; S.push({x:last[0], z:last[1], len:acc});
+    for(let i=0;i<S.length;i++){                                       // styczna = uśredniony kierunek sąsiednich próbek
+      const a = S[Math.max(0,i-1)], b = S[Math.min(S.length-1,i+1)];
+      const tx = b.x - a.x, tz = b.z - a.z, tl = Math.hypot(tx, tz) || 1;
+      S[i].nx = tz/tl; S[i].nz = -tx/tl;                               // normalna boczna
+    }
+    const off = (q, o) => [q.x + q.nx*o, q.z + q.nz*o];
+
+    // jezdnia: wstęga wzdłuż osi, tekstura biegnie wzdłuż ulicy jak na reszcie dróg
+    const tex = roadTex.clone(); tex.needsUpdate = true; tex.repeat.set(1, 1);
+    const P = [], U = [], I = [];
+    S.forEach((q, i) => {
+      const y = terrainH(q.x, q.z) + 0.04, u = q.len/TILE, a = off(q, -ROAD_W/2), b = off(q, ROAD_W/2);
+      P.push(a[0], y, a[1],  b[0], y, b[1]); U.push(u, 0,  u, 1);
+      if(i < S.length-1){ const k = i*2; I.push(k, k+1, k+2,  k+1, k+3, k+2); }
+    });
+    const rg = new THREE.BufferGeometry();
+    rg.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+    rg.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+    rg.setIndex(I); rg.computeVertexNormals();
+    const rm = new THREE.Mesh(rg, new THREE.MeshLambertMaterial({map:tex, side:THREE.DoubleSide})); rm.receiveShadow = true; street.add(rm);
+
+    // chodniki po obu stronach: ciągłe wstęgi z krawężnikiem
+    for(const sd of [-1, 1]){
+      const Q = [], J = [];
+      S.forEach((q, i) => {
+        const a = off(q, sd*SIDEWALK_OFFSET - SIDEWALK_W/2), b = off(q, sd*SIDEWALK_OFFSET + SIDEWALK_W/2);
+        const h = terrainH((a[0]+b[0])/2, (a[1]+b[1])/2), t = h + 0.2, bt = h - 0.3;
+        Q.push(a[0],t,a[1], b[0],t,b[1], a[0],bt,a[1], b[0],bt,b[1]);
+        if(i < S.length-1){ const k = i*4, n = k + 4;
+          J.push(k,k+1,n,  k+1,n+1,n);
+          J.push(k,n,k+2,  n,n+2,k+2);
+          J.push(k+1,k+3,n+1,  n+1,k+3,n+3);
+        }
+      });
+      const sg = new THREE.BufferGeometry();
+      sg.setAttribute('position', new THREE.Float32BufferAttribute(Q, 3)); sg.setIndex(J); sg.computeVertexNormals();
+      const sm = new THREE.Mesh(sg, new THREE.MeshLambertMaterial({color:0xb8b8b0, side:THREE.DoubleSide})); sm.receiveShadow = true; street.add(sm);
+    }
+  })();
+
   // Restauracja (z wnętrzem, do którego można wejść)
   const REST = {x:-4, z:-26.5, w:14, d:8, h:3.6};
   const WALLS = [];                       // prostokątne kolizje ścian i mebli
   const PLATFORMS = [];                   // powierzchnie, na które można wskoczyć (łóżko): {x,z,w,d,top,enter}
   function groundAt(x, z, y){                // wysokość podłoża pod graczem (0 albo blat platformy, jeśli już jest nad jej krawędzią)
-    let g = 0;
+    let g = terrainH(x, z);
     for(const p of PLATFORMS) if(y >= p.enter && Math.abs(x-p.x) < p.w/2-0.05 && Math.abs(z-p.z) < p.d/2-0.05 && p.top > g) g = p.top;
     return g;
   }
@@ -641,6 +758,7 @@
   // Supermarket Pandy (z wnętrzem, do którego można wejść)
   const supWallMat = new THREE.MeshLambertMaterial({color:0xdcd6c8});
   const supExterior = [];
+  let supDoor = null, supOpen = true, supToastAt = 0;                          // drzwi zamykane poza godzinami otwarcia (8:00–22:00)
   let supRoof = null;                                                           // dach: w środku niewidoczny, ale nadal rzuca cień (stałe oświetlenie wnętrza)
   (function buildSupermarket(){
     const SX = SUPER.x, SZ = SUPER.z, w = SUPER.w, d = SUPER.d, H = 6, t = 0.4, gap = 5, fz = d/2;
@@ -674,6 +792,19 @@
     const glass = new THREE.MeshLambertMaterial({color:0x2a4562});
     [-18,-14,-10,-6,6,10,14,18].forEach(x => box(3.6,2.4,0.1,glass,x,2.2,fz+0.04,false));
     [-1,1].forEach(sd => box(0.3,3.4,0.5,dark,sd*gap/2,1.7,fz,false));
+    // drzwi zamknięte poza godzinami otwarcia + tablica z godzinami
+    (function(){
+      const doorMat = new THREE.MeshLambertMaterial({color:0x7fb2d6, transparent:true, opacity:0.45});
+      const dm = new THREE.Mesh(new THREE.BoxGeometry(gap-0.3, 3.4, 0.08), doorMat);
+      dm.position.set(0, 1.7, fz-0.25); dm.visible = false; grp.add(dm);
+      const cs = tex(512,160,(g,cw,ch)=>{ g.fillStyle='#b71c1c'; g.fillRect(0,0,cw,ch); g.strokeStyle='#fff'; g.lineWidth=6; g.strokeRect(5,5,cw-10,ch-10);
+        g.fillStyle='#fff'; g.font='bold 78px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('ZAMKNIĘTE', cw/2, ch/2+3); });
+      const sg = plane(2.8, 0.88, new THREE.MeshBasicMaterial({map:cs}), 0, 1.7, fz-0.19); sg.visible = false;
+      const hs = tex(256,160,(g,cw,ch)=>{ g.fillStyle='#111'; g.fillRect(0,0,cw,ch); g.strokeStyle='#fff'; g.lineWidth=5; g.strokeRect(4,4,cw-8,ch-8);
+        g.fillStyle='#fff'; g.textAlign='center'; g.textBaseline='middle'; g.font='bold 38px sans-serif'; g.fillText('OTWARTE', cw/2, 50); g.font='bold 44px sans-serif'; g.fillStyle='#ffd54f'; g.fillText('8:00–22:00', cw/2, 108); });
+      supExterior.push(plane(1.3, 0.81, new THREE.MeshBasicMaterial({map:hs}), -3.35, 1.7, fz+0.1));
+      supDoor = {mesh:dm, sign:sg, rect:{x:SX, z:SZ+fz-0.25, w:gap, d:0.6}};
+    })();
     box(4,0.03,1.4,lamb(0x333333),0,0.06,fz-1,false);
     supExterior.push(box(8,0.25,2.5,dark,0,3.7,fz+1.2,false));
     const signMat = new THREE.MeshBasicMaterial({map:tex(1024,102,(g,cw,ch)=>{ g.fillStyle='#111111'; g.fillRect(0,0,cw,ch); g.strokeStyle='#ffffff'; g.lineWidth=6; g.strokeRect(5,5,cw-10,ch-10);
@@ -722,6 +853,13 @@
       inst(new THREE.CylinderGeometry(0.05,0.05,0.26,12), lamb(0xb71c1c), LC, [0,0.13,0]);
       inst(new THREE.CylinderGeometry(0.053,0.053,0.09,12), lamb(0xf5f5f5), LC, [0,0.13,0]);
       inst(new THREE.CylinderGeometry(0.03,0.03,0.03,8), lamb(0x222222), LC, [0,0.275,0]); });
+    // mrożona pizza w prawej części chłodni
+    header(13,'🍕 PIZZA MROŻONA 🍕',2.85,bz+0.43);
+    BY.forEach(y => { const LZ = []; for(let x=8; x<=18; x+=0.34) LZ.push([x,y+0.02,bz+0.05,0]);
+      inst(new THREE.BoxGeometry(0.3,0.3,0.04), lamb(0xe8c27a), LZ, [0,0.15,0]);
+      inst(new THREE.CylinderGeometry(0.115,0.115,0.01,14).rotateX(Math.PI/2), lamb(0xf2b134), LZ, [0,0.16,0.025]);
+      inst(new THREE.CylinderGeometry(0.03,0.03,0.012,8).rotateX(Math.PI/2), lamb(0xc62828), LZ, [0.045,0.19,0.03]);
+      inst(new THREE.CylinderGeometry(0.03,0.03,0.012,8).rotateX(Math.PI/2), lamb(0xc62828), LZ, [-0.045,0.13,0.03]); });
     // regał z elektroniką: komputery, telefony, ładowarki (trzy strefy)
     const RB2 = 6;
     header(RB2,'📱🔌🖥️ ELEKTRONIKA');
@@ -753,6 +891,21 @@
   })();
   let supInside = false;
   function updateSupermarket(){
+    const hour = ((START_HOUR/24 + gameElapsed/DAY_SECONDS) % 1) * 24, open = hour >= 8 && hour < 22;
+    if(supDoor && open !== supOpen){
+      supOpen = open; supDoor.mesh.visible = supDoor.sign.visible = !open;
+      const i = WALLS.indexOf(supDoor.rect);
+      if(!open && i < 0) WALLS.push(supDoor.rect); else if(open && i >= 0) WALLS.splice(i, 1);
+    }
+    if(!supOpen){
+      const px = player.position.x - SUPER.x, pz = player.position.z - SUPER.z;
+      if(Math.abs(px) < SUPER.w/2 - 0.2 && Math.abs(pz) < SUPER.d/2 - 0.2){          // zamknięcie: ochrona wyprowadza gracza
+        player.position.set(SUPER.x, player.position.y, SUPER.z + SUPER.d/2 + 1.5);
+        toast('Supermarket Pandy zamyka się – zapraszamy od 8:00 🐼');
+      } else if(Math.abs(px) < 6 && pz > SUPER.d/2 && pz < SUPER.d/2 + 3 && performance.now() - supToastAt > 4000){
+        supToastAt = performance.now(); toast('Supermarket Pandy jest zamknięty – otwarte codziennie 8:00–22:00 🐼');
+      }
+    }
     const inside = Math.abs(player.position.x - SUPER.x) < SUPER.w/2 - 0.2 && Math.abs(player.position.z - SUPER.z) < SUPER.d/2 - 0.2;
     if(inside === supInside) return;
     supInside = inside;
@@ -761,6 +914,137 @@
     // i oświetlenie zmieniałoby się skokowo. Teraz wnętrze wygląda tak samo z zewnątrz i w środku.
     if(supRoof){ supRoof.material.colorWrite = !inside; supRoof.material.depthWrite = !inside; }
     if(!inside && basket){ basket = null; renderBasket(); toast('Wyszedłeś bez płacenia – koszyk odłożony, towary wróciły na regały'); }
+  }
+
+  // ===== Sklep AGD „Domator” obok Pandy (po zachodniej stronie): inny układ niż supermarket – salon ze ścianami sprzętu i ladą =====
+  const agdExterior = [];
+  let agdRoof = null, agdInside = false, agdNpc = null;
+  const agdNpcDist = () => agdNpc ? Math.hypot(player.position.x - agdNpc.position.x, player.position.z - agdNpc.position.z) : 99;
+  const AGD_GOODS = [
+    {id:'oven',      p:40, n:'Piekarnik', big:true}
+  ];
+  (function buildApplianceStore(){
+    const SX = AGD.x, SZ = AGD.z, w = AGD.w, d = AGD.d, H = AGD.h, t = 0.4, gap = 4, fz = d/2;
+    const grp = new THREE.Group(); grp.position.set(SX, 0, SZ); scene.add(grp);
+    const lamb = c => new THREE.MeshLambertMaterial({color:c});
+    const box = (bw,bh,bd,mat,px,py,pz,collide) => {
+      if(collide) WALLS.push({x:SX+px, z:SZ+pz, w:bw, d:bd});
+      const m = new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), mat);
+      m.position.set(px,py,pz); m.castShadow = m.receiveShadow = true; grp.add(m); return m;
+    };
+    const plane = (pw,ph,mat,px,py,pz,ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(pw,ph), mat); m.position.set(px,py,pz); m.rotation.y = ry||0; grp.add(m); return m; };
+    const tex = (cw,ch,draw) => { const c = document.createElement('canvas'); c.width = cw; c.height = ch; draw(c.getContext('2d'),cw,ch); const tt = new THREE.CanvasTexture(c); tt.anisotropy = 8; return tt; };
+    const dark = lamb(0x222a30), wallMat = lamb(0xcfdde8), orange = lamb(0xe0702a);
+    const M = {white:lamb(0xf2f4f6), silver:lamb(0xb8c2ca), steel:lamb(0x8d98a2), black:lamb(0x1d2228), glass:lamb(0x2b4a63),
+               blue:new THREE.MeshBasicMaterial({color:0x4fc3f7}), graphite:lamb(0x3a4249)};
+
+    // parking i chodnik przed sklepem (przedłużenie parkingu Pandy)
+    const apron = new THREE.Mesh(new THREE.PlaneGeometry(32, 12), lamb(0x3d3d42));
+    apron.rotation.x = -Math.PI/2; apron.position.set(SX + 2, 0.03, -58); apron.receiveShadow = true; street.add(apron);
+    const lineMat = new THREE.MeshBasicMaterial({color:0xe8e8e8});
+    for(let i=0;i<=6;i++){ const ln = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 5), lineMat); ln.position.set(SX - 12 + i*4, 0.05, -59); street.add(ln); }
+    const walk = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, 2), walkMat); walk.position.set(SX, 0.025, -63); walk.receiveShadow = true; street.add(walk);
+
+    // ściany: tył, boki, front z wejściem pośrodku
+    box(w,H,t,wallMat,0,H/2,-fz+t/2,true);
+    box(t,H,d,wallMat,-w/2+t/2,H/2,0,true);
+    box(t,H,d,wallMat, w/2-t/2,H/2,0,true);
+    const seg = (w-gap)/2;
+    box(seg,H,t,wallMat,-(gap/2+seg/2),H/2,fz-t/2,true);
+    box(seg,H,t,wallMat, (gap/2+seg/2),H/2,fz-t/2,true);
+    box(gap,H-3.4,t,wallMat,0,3.4+(H-3.4)/2,fz-t/2,false);
+    box(w+0.02,0.35,0.12,orange,0,H-0.2,fz+0.02,false);                           // pomarańczowy pas pod dachem
+    agdRoof = box(w+0.6,0.4,d+0.6,lamb(0x5b6670),0,H+0.2,0,false);               // dach: w środku niewidoczny, ale nadal rzuca cień
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(w-2*t,d-2*t), lamb(0xf6f8fa));
+    ceil.rotation.x = Math.PI/2; ceil.position.set(0,H,0); grp.add(ceil);
+    const ft = tex(128,128,(g)=>{ g.fillStyle='#dfe9f0'; g.fillRect(0,0,128,128); g.fillStyle='#b9ccda'; g.fillRect(0,0,64,64); g.fillRect(64,64,64,64); g.strokeStyle='#a4b8c7'; g.strokeRect(0,0,128,128); });
+    ft.wrapS = ft.wrapT = THREE.RepeatWrapping; ft.repeat.set((w-2*t)/2.5,(d-2*t)/2.5);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(w-2*t,d-2*t), new THREE.MeshLambertMaterial({map:ft}));
+    floor.rotation.x = -Math.PI/2; floor.position.set(0,0.04,0); floor.receiveShadow = true; grp.add(floor);
+
+    // elewacja: okna (świecą nocą), framugi, wycieraczka, daszek, szyld
+    const glass = lamb(0x9fd3f0);
+    [-9,-5,5,9].forEach(x => box(3.2,2.2,0.1,glass,x,2.1,fz+0.04,false));
+    [-1,1].forEach(sd => box(0.3,3.4,0.5,dark,sd*gap/2,1.7,fz,false));
+    box(3.6,0.03,1.4,lamb(0x333333),0,0.07,fz-1,false);
+    agdExterior.push(box(7,0.25,2.2,orange,0,3.7,fz+1.1,false));
+    const signTex = tex(1024,128,(g,cw,ch)=>{ g.fillStyle='#e0702a'; g.fillRect(0,0,cw,ch); g.strokeStyle='#fff'; g.lineWidth=6; g.strokeRect(5,5,cw-10,ch-10);
+      g.fillStyle='#fff'; g.font='bold 78px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('⚡ AGD DOMATOR ⚡', cw/2, ch/2+4); });
+    agdExterior.push(plane(15,1.9,new THREE.MeshBasicMaterial({map:signTex}),0,H-1.45,fz+0.07));
+    const label = (text, pw, px, py, pz, ry, bg) => {
+      const lt = tex(512,96,(g,cw,ch)=>{ g.fillStyle=bg||'#1f3a52'; g.fillRect(0,0,cw,ch); g.strokeStyle='#fff'; g.lineWidth=4; g.strokeRect(4,4,cw-8,ch-8);
+        g.fillStyle='#fff'; g.font='bold 46px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(text, cw/2, ch/2+3); });
+      return plane(pw, pw*96/512, new THREE.MeshBasicMaterial({map:lt}), px, py, pz, ry);
+    };
+
+    // wystawa: tylko piekarniki przy prawej ścianie (front w stronę −X) – ten sam model, który kupuje się u sprzedawcy
+    const place = (g, x, y, z, ry) => { g.position.set(x, y, z); g.rotation.y = ry || 0; grp.add(g); return g; };
+    [-7,-5.2,-3.4,-1.6].forEach(z => place(makeOven(false), w/2-t-0.4, 0, z, -Math.PI/2));
+    WALLS.push({x:SX+w/2-t-0.4, z:SZ-4.3, w:0.8, d:7.2});
+    label('🍳 PIEKARNIKI', 3.4, w/2-t-0.05, 2.2, -4.3, -Math.PI/2, '#8a3a1a');
+
+    // lada kasowa przy wejściu (prawa strona) i kasjer
+    box(6,1.1,1.0,orange,8.5,0.55,6.6,true);
+    box(6.2,0.06,1.2,M.white,8.5,1.13,6.6,false);
+    box(0.5,0.3,0.4,M.black,7.2,1.31,6.55,false);
+    box(0.4,0.02,0.3,M.blue,7.2,1.48,6.5,false);
+    label('KASA', 1.6, 8.5, 2.4, 7.2, Math.PI, '#b3541c');
+
+    // oświetlenie sufitowe i światło wnętrza
+    const lightMat = new THREE.MeshBasicMaterial({color:0xf2f8ff});
+    [-8,0,8].forEach(lz => [-8,0,8].forEach(lx => box(3,0.08,0.5,lightMat,lx,H-0.06,lz,false)));
+    [-6,6].forEach(lx => { const pl = new THREE.PointLight(0xf4f8ff,0.8,32); pl.position.set(SX+lx,4.2,SZ); scene.add(pl); });
+
+    // sprzedawca
+    const npc5 = new THREE.Group();
+    const nb = (bw,bh,bd,c,x,y,z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), lamb(c)); m.position.set(x,y,z); m.castShadow = true; npc5.add(m); };
+    nb(0.7,0.9,0.4,0xe0702a,0,1.25,0);           // koszulka w kolorze sklepu
+    nb(0.55,0.8,0.04,0x2c3e50,0,1.2,0.22);       // kamizelka
+    nb(0.5,0.5,0.5,0xe0ac69,0,1.95,0);           // głowa
+    nb(0.54,0.14,0.54,0x2b2b2b,0,2.27,0);        // włosy
+    nb(0.08,0.08,0.02,0x000000,-0.12,2.0,0.26); nb(0.08,0.08,0.02,0x000000,0.12,2.0,0.26);
+    nb(0.25,0.8,0.25,0xe0702a,-0.48,1.25,0); nb(0.25,0.8,0.25,0xe0702a,0.48,1.25,0);
+    nb(0.25,0.8,0.25,0x37474f,-0.18,0.4,0); nb(0.25,0.8,0.25,0x37474f,0.18,0.4,0);
+    npc5.position.set(SX + 8.5, 0, SZ + 5.0);
+    scene.add(npc5); agdNpc = npc5;
+    const tc = document.createElement('canvas'); tc.width = 256; tc.height = 64; const tg = tc.getContext('2d');
+    tg.fillStyle = 'rgba(0,0,0,.55)'; tg.fillRect(0,8,256,48); tg.fillStyle = '#fff'; tg.font = 'bold 26px sans-serif'; tg.textAlign = 'center'; tg.textBaseline = 'middle'; tg.fillText('Adam • AGD', 128, 33);
+    const tsp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(tc), transparent:true}));
+    tsp.scale.set(1.8, 0.45, 1); tsp.position.set(npc5.position.x, 2.7, npc5.position.z); scene.add(tsp);
+
+    BUILDINGS.push({x:SX, z:SZ, w:w, d:d, open:true});
+  })();
+  function updateApplianceStore(dt, time){
+    const inside = Math.abs(player.position.x - AGD.x) < AGD.w/2 - 0.2 && Math.abs(player.position.z - AGD.z) < AGD.d/2 - 0.2;
+    if(inside !== agdInside){
+      agdInside = inside;
+      agdExterior.forEach(m => m.visible = !inside);
+      if(agdRoof){ agdRoof.material.colorWrite = !inside; agdRoof.material.depthWrite = !inside; }
+    }
+    if(agdInside && agdNpc){                                                        // sprzedawca patrzy na gracza
+      const target = Math.atan2(player.position.x - agdNpc.position.x, player.position.z - agdNpc.position.z);
+      agdNpc.rotation.y += Math.atan2(Math.sin(target - agdNpc.rotation.y), Math.cos(target - agdNpc.rotation.y)) * Math.min(1, dt*5);
+    }
+  }
+  function buyAgd(g){
+    if(g.big){
+      if(freeSlots() < BIG[g.id].slots){ toast(`${g.n} zajmuje ${BIG[g.id].slots} slotów – zrób miejsce w ekwipunku (wolne: ${freeSlots()})`); return; }
+    } else {
+      const canHold = inv.some(x => x && x.id === g.id) || inv.indexOf(null) >= 0;
+      if(!canHold){ toast('Ekwipunek pełny – zrób miejsce'); return; }
+    }
+    if(!payAny(g.p, 'zakup w AGD Domator: ' + g.n.toLowerCase())){
+      toast(`${g.n} kosztuje ${g.p} monet 🪙 (masz ${coins()}${bank.opened ? ' + ' + bank.balance + ' na koncie' : ''})`); return;
+    }
+    if(g.big) addBig(g.id); else addItem(g.id);
+    renderInv();
+    openAgdTalk('Dziękuję za zakup! Czy mogę jeszcze w czymś pomóc?');
+    toast(`Kupiono: ${ITEMS[g.id].i} ${ITEMS[g.id].n}`);
+  }
+  function openAgdTalk(msg){
+    say(msg || 'Witaj w AGD Domator! Mamy na sprzedaż piekarnik za 40 monet 🪙 – w ekwipunku zajmie 8 slotów, a ustawisz go w swoim domu.',
+      AGD_GOODS.map(g => ({label:`Kup ${g.n.toLowerCase()} (${g.p} 🪙)`, fn:() => buyAgd(g)})).concat([{label:'Wyjdź', fn:closeDialog}]),
+      '🔌 Adam, sprzedawca AGD', 'agd');
   }
 
   // Sklep z wnętrzem (front od strony ulicy, grupa obrócona o 180°)
@@ -1114,6 +1398,23 @@
     bx(0.56,1.9,0.03,0xa6733c,-0.29,1.05,0.315); bx(0.56,1.9,0.03,0xa6733c,0.29,1.05,0.315);   // drzwi
     bx(0.03,0.2,0.04,0xd9c79a,-0.07,1.05,0.345); bx(0.03,0.2,0.04,0xd9c79a,0.07,1.05,0.345);   // uchwyty
     bx(1.1,0.06,0.5,0x4a2c12,0,0.03,0);                                            // cokół
+    return g;
+  }
+
+  function makeOven(ghost){
+    const g = new THREE.Group();
+    const M = c => ghost ? deskGhostMat : new THREE.MeshLambertMaterial({color:c});
+    const bx = (w,h,d,c,x,y,z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), M(c)); m.position.set(x,y,z); if(!ghost) m.castShadow = m.receiveShadow = true; g.add(m); return m; };
+    const cy = (rt,rb,h,c,x,y,z) => { const m = new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,14), M(c)); m.position.set(x,y,z); g.add(m); return m; };
+    bx(0.9,0.82,0.7,0xe9edf0,0,0.41,0);                                            // korpus
+    bx(0.9,0.04,0.7,0x1d2228,0,0.84,0);                                            // płyta grzewcza
+    [[-0.22,-0.15],[0.22,-0.15],[-0.22,0.15],[0.22,0.15]].forEach(p => cy(0.1,0.1,0.015,0x555c63,p[0],0.865,p[1]));   // palniki
+    bx(0.9,0.14,0.05,0xcfd6db,0,0.77,0.33);                                        // panel z pokrętłami
+    [-0.3,-0.1,0.1,0.3].forEach(x => { const k = cy(0.035,0.035,0.04,0x20252b,x,0.77,0.375); k.rotation.x = Math.PI/2; });
+    bx(0.78,0.5,0.03,0x2b2f35,0,0.4,0.355);                                        // drzwi
+    g.userData.glass = bx(0.62,0.3,0.012,0x14262f,0,0.42,0.373);                  // szyba (świeci podczas pieczenia)
+    bx(0.66,0.03,0.04,0xb0bec5,0,0.62,0.39);                                       // uchwyt
+    bx(0.84,0.06,0.03,0xcfd6db,0,0.08,0.34);                                       // cokół
     return g;
   }
 
@@ -1476,8 +1777,8 @@
     const part = (geo, m, x, y, z) => { const o = new THREE.Mesh(geo, m); o.position.set(x,y,z); o.castShadow = true; g.add(o); return o; };
     const bodyMat = lm(color);
     part(new THREE.BoxGeometry(4.2,.7,1.9), bodyMat, 0, .68, 0);
-    part(new THREE.BoxGeometry(2.3,.62,1.7), bodyMat, -.2, 1.3, 0);
-    part(new THREE.BoxGeometry(2.35,.45,1.72), lm(0x2b3a46), -.2, 1.32, 0).scale.set(.97,1,1);
+    const cabin = part(new THREE.BoxGeometry(2.3,.62,1.7), bodyMat, -.2, 1.3, 0);
+    const glassBand = part(new THREE.BoxGeometry(2.35,.45,1.72), lm(0x2b3a46), -.2, 1.32, 0); glassBand.scale.set(.97,1,1);
     part(new THREE.BoxGeometry(.04,.14,1.5), new THREE.MeshBasicMaterial({color:0xfff2b0}), 2.11, .78, 0);
     part(new THREE.BoxGeometry(.04,.14,1.5), new THREE.MeshBasicMaterial({color:0xc01818}), -2.11, .78, 0);
     const sigGeo = new THREE.BoxGeometry(.1,.17,.3), sigL = new THREE.MeshBasicMaterial({color:SIG_OFF}), sigR = new THREE.MeshBasicMaterial({color:SIG_OFF});
@@ -1489,7 +1790,7 @@
     });
     g.rotation.y = -Math.PI/2;                                      // przód (+X modelu) → +Z grupy zewnętrznej
     const wrap = new THREE.Group(); wrap.add(g);
-    return {group:wrap, wheels, bodyMat, sigL, sigR};
+    return {group:wrap, wheels, bodyMat, sigL, sigR, root:g, cabin, glassBand};
   }
   BUILDINGS.push({x:CAR.x, z:CAR.z, w:CAR.d, d:CAR.w, open:true});
   const carWallMat = new THREE.MeshLambertMaterial({color:0xe9edf2});
@@ -1588,7 +1889,7 @@
   function buyCar(){
     if(hasCar){ toast('Masz już auto 🚗'); return; }
     if(!payAny(CAR_PRICE, 'zakup auta')){ toast(`Auto kosztuje ${CAR_PRICE} monet 🪙 – masz ${coins()}${bank.opened?` + ${bank.balance} na koncie`:''}`); return; }
-    placeCar(POP_X + 2.6, CAR.z, 0);
+    placeCar(POP_X + 2.6, CAR.z, 0); carFuel = 100; fuelLowWarned = fuelEmptyWarned = false;   // nowe auto ma pełny bak
     closeDialog(); renderInv(); renderShop();
     toast('Kupiłeś auto 🚗 Czeka przed salonem na ulicy Poprzecznej – podejdź i naciśnij F');
   }
@@ -1745,6 +2046,143 @@
       [{label:`Przemaluj auto (${PAINT_PRICE} 🪙)`, fn:openPaintUI}, {label:'Wyjdź', fn:closeDialog}], '🎨 Wojtek, lakiernik', 'paint');
   }
 
+  // ===== Stacja paliw na wzgórzu (x=67, z=170) – na razie tylko wygląd, bez funkcji =====
+  BUILDINGS.push({x:STATION.x, z:STATION.z, w:STATION.w, d:STATION.d, open:true});
+  const STATION_PUMPS = [];                                          // pozycje dystrybutorów w świecie (tankowanie)
+  (function buildGasStation(){
+    const SX = STATION.x, SZ = STATION.z, W = STATION.w, D = STATION.d, B = 0.02;
+    const grp = new THREE.Group(); grp.position.set(SX, STATION.y, SZ); scene.add(grp);          // front (lokalne -z) → ulica Społeczna
+    const lamb = c => new THREE.MeshLambertMaterial({color:c});
+    const put = (m, px, py, pz) => { m.position.set(px,py,pz); m.castShadow = m.receiveShadow = true; grp.add(m); return m; };
+    const col = (px, pz, bw, bd) => WALLS.push({x:SX + px, z:SZ + pz, w:bw, d:bd});
+    const box = (bw,bh,bd,mat,px,py,pz,collide) => { if(collide) col(px,pz,bw,bd); return put(new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), mat), px, py, pz); };
+    const plane = (pw,ph,mat,px,py,pz) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(pw,ph), mat); m.position.set(px,py,pz); m.rotation.y = Math.PI; grp.add(m); return m; };   // zwrócona w stronę -z
+    const flat = (pw,pd,mat,px,py,pz) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(pw,pd), mat); m.rotation.x = -Math.PI/2; m.position.set(px,py,pz); m.receiveShadow = true; grp.add(m); return m; };
+    const textMat = (text, cw, ch, bg, fg) => {
+      const c = document.createElement('canvas'); c.width = cw; c.height = ch; const g = c.getContext('2d');
+      g.fillStyle = bg; g.fillRect(0,0,cw,ch); g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+      let fs = Math.floor(ch*0.62); g.font = `bold ${fs}px sans-serif`;
+      while(g.measureText(text).width > cw*0.92 && fs > 12){ fs -= 2; g.font = `bold ${fs}px sans-serif`; }
+      g.fillText(text, cw/2, ch/2 + 2); return new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c)});
+    };
+    const red = lamb(0xd32f2f), white = lamb(0xf4f4f4), dark = lamb(0x37474f), concrete = lamb(0xbdbdb5), yellow = lamb(0xfdd835);
+
+    // nawierzchnia, strefa dystrybutorów, krawężniki i dwa wjazdy od strony ulicy
+    flat(W, D, new THREE.MeshLambertMaterial({color:0x3b3b40}), 0, B, 0);
+    flat(22, 10, lamb(0x7b8086), 0, B + 0.015, -2);
+    box(W, 0.18, 0.3, concrete, 0, 0.07, D/2 - 0.15, false);
+    box(0.3, 0.18, D, concrete, -(W/2 - 0.15), 0.07, 0, false);
+    box(0.3, 0.18, D, concrete,  (W/2 - 0.15), 0.07, 0, false);
+    [-9, 9].forEach(x => box(7, 0.4, 4.3, lamb(0x3b3b40), x, -0.17, -13.1, false));            // wjazd/wyjazd przez chodnik
+    box(W - 15, 0.18, 0.3, concrete, 0, 0.07, -D/2 + 0.15, false);
+
+    // wiata nad dystrybutorami
+    const CZ = -2;
+    box(22, 0.3, 10, white, 0, B + 5.25, CZ, false);
+    box(22.4, 0.8, 0.2, red, 0, B + 5.0, CZ - 5.1, false);
+    box(22.4, 0.8, 0.2, red, 0, B + 5.0, CZ + 5.1, false);
+    box(0.2, 0.8, 10.4, red, -11.1, B + 5.0, CZ, false);
+    box(0.2, 0.8, 10.4, red,  11.1, B + 5.0, CZ, false);
+    plane(7, 0.62, textMat('STACJA PALIW', 512, 64, '#d32f2f', '#ffffff'), 0, B + 5.0, CZ - 5.21);
+    const lampM = new THREE.MeshBasicMaterial({color:0xfff4cc});
+    [-8, 0, 8].forEach(x => [-4.5, 0.5].forEach(z => put(new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.06, 0.6), lampM), x, B + 5.07, z)));
+    [[-4,CZ],[4,CZ],[-10.3,CZ],[10.3,CZ]].forEach(q => {                                         // słupy wiaty
+      box(0.5, 5.1, 0.5, white, q[0], B + 2.55, q[1], Math.abs(q[0]) > 5);
+      box(0.52, 0.5, 0.52, red, q[0], B + 4.6, q[1], false);
+    });
+
+    // dwie wyspy po dwa dystrybutory
+    [-4, 4].forEach(ix => {
+      box(1.4, 0.2, 6.4, concrete, ix, B + 0.1, CZ, true);
+      [CZ - 1.5, CZ + 1.5].forEach(pz => {
+        STATION_PUMPS.push({x:SX + ix, z:SZ + pz});
+        box(0.56, 1.4, 0.95, white, ix, B + 0.9, pz, false);
+        box(0.58, 0.18, 0.97, red, ix, B + 0.45, pz, false);
+        box(0.62, 0.22, 1.0, red, ix, B + 1.71, pz, false);
+        [-1, 1].forEach(sd => {
+          box(0.04, 0.32, 0.55, lamb(0x12304a), ix + sd*0.29, B + 1.25, pz, false);               // wyświetlacz
+          box(0.1, 0.36, 0.14, dark, ix + sd*0.3, B + 0.8, pz + 0.3, false);                      // uchwyt pistoletu
+          box(0.05, 0.12, 0.12, lamb(0x43a047), ix + sd*0.34, B + 0.95, pz - 0.3, false);         // znacznik paliwa
+        });
+      });
+      [CZ - 3.4, CZ + 3.4].forEach(bz => put(new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.8, 10), yellow), ix, B + 0.6, bz));   // słupki
+    });
+
+    // sklep przy tylnej krawędzi platformy
+    const SHZ = 7.6;
+    box(16, 3.6, 5.4, lamb(0xe8e0d0), 0, B + 1.8, SHZ, true);
+    box(16.8, 0.7, 6.2, red, 0, B + 3.95, SHZ - 0.1, false);
+    plane(7, 0.55, textMat('SKLEP 24h', 512, 64, '#d32f2f', '#ffffff'), 0, B + 3.95, SHZ - 0.1 - 3.11);
+    const glass = new THREE.MeshLambertMaterial({color:0x7fb8d8, transparent:true, opacity:0.85});
+    [-4.8, 4.8].forEach(x => plane(5, 1.7, glass, x, B + 1.7, SHZ - 2.72));
+    plane(1.9, 2.6, dark, 0, B + 1.3, SHZ - 2.71);
+    plane(1.5, 2.3, glass, 0, B + 1.2, SHZ - 2.72);
+    box(0.5, 0.9, 0.5, dark, 6.8, B + 0.45, SHZ - 3.3, false);                                   // kosz
+    box(1.2, 0.5, 0.5, lamb(0x8d6e63), -6.4, B + 0.25, SHZ - 3.2, false);                        // ławka
+
+    // totem z nazwą stacji przy ulicy
+    box(0.45, 7.2, 0.45, lamb(0x78828a), -14.6, B + 3.6, -9.6, true);
+    const pc = document.createElement('canvas'); pc.width = 256; pc.height = 320; const pg = pc.getContext('2d');
+    pg.fillStyle = '#fff'; pg.fillRect(0,0,256,320); pg.fillStyle = '#d32f2f'; pg.fillRect(0,0,256,110);
+    pg.fillStyle = '#fff'; pg.textAlign = 'center'; pg.textBaseline = 'middle'; pg.font = 'bold 54px sans-serif';
+    pg.fillText('STACJA', 128, 34); pg.fillText('PALIW', 128, 84);
+    pg.fillStyle = '#263238'; pg.font = 'bold 40px sans-serif';
+    [['Pb95', 150], ['ON', 210], ['LPG', 270]].forEach(r => { pg.fillText(r[0], 74, r[1]); pg.fillText('—', 190, r[1]); });
+    const pm = new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(pc)}), pe = lamb(0xd32f2f);
+    const totem = box(2.4, 3.0, 0.3, [pe, pe, pe, pe, pm, pm], -14.6, B + 8.2, -9.6, false);
+    totem.material.forEach(m => m.side = THREE.FrontSide);
+
+    // dwie latarnie
+    [[15.2, -7], [-15.2, 6]].forEach(q => {
+      box(0.18, 5.2, 0.18, dark, q[0], B + 2.6, q[1], false);
+      put(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.1, 0.5), lampM), q[0], B + 5.25, q[1]);
+    });
+  })();
+
+  // ===== Przystanki autobusowe: (1) Długa, między domami nr 2 i 3; (2) między sklepem AGD a supermarketem Pandy =====
+  const BUS_STOPS = [
+    {name:'DŁUGA',       x:-33.25, z:-25.7, slab:3.55},    // domy 2 (x -46…-38) i 3 (x -28,5…-19,5): środek przerwy; płyta sięga chodnika (z = -22,15)
+    {name:'PANDY • AGD', x:105.5,  z:-65.5, slab:1.5},     // przerwa AGD (do x=103) – Pandy (od x=108); płyta kończy się na linii frontów (z = -64)
+    {name:'DOM G • UBRANIA', x:141.9, z:44.25, slab:3.8, rot:-Math.PI/2},   // Społeczna, wschodnia strona: przerwa między Domem G (z do 37,5) a Ubraniami (od z=51); front na zachód do chodnika (x=138,15)
+    {name:'STACJA PALIW', x:91, z:162, slab:3.8, rot:Math.PI}                // obok stacji (od wschodu), na płaskim grzbiecie wzgórza; front na północ do chodnika (z=158,15)
+  ];
+  BUS_STOPS.forEach(bs => {
+    const rot = bs.rot || 0, cr = Math.cos(rot), sr = Math.sin(rot), quarter = Math.abs(sr) > 0.5;
+    const grp = new THREE.Group(); grp.position.set(bs.x, terrainH(bs.x, bs.z), bs.z); grp.rotation.y = rot; scene.add(grp);   // front (lokalne +z) → ulica / parking
+    const toWorld = (px, pz) => ({x:bs.x + px*cr + pz*sr, z:bs.z - px*sr + pz*cr});
+    const lamb = c => new THREE.MeshLambertMaterial({color:c});
+    const put = (m, px, py, pz) => { m.position.set(px,py,pz); m.castShadow = m.receiveShadow = true; grp.add(m); return m; };
+    const col = (px, pz, bw, bd) => { const q = toWorld(px, pz); WALLS.push({x:q.x, z:q.z, w:quarter ? bd : bw, d:quarter ? bw : bd}); };
+    const box = (bw,bh,bd,mat,px,py,pz,collide) => { if(collide) col(px,pz,bw,bd); return put(new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), mat), px, py, pz); };
+    const dark = lamb(0x37474f), blue = lamb(0x1565c0), wood = lamb(0x8d6e63);
+    const glass = new THREE.MeshLambertMaterial({color:0x9fd3f0, transparent:true, opacity:0.38});
+    const SW = 3.6;
+    box(4.0, 0.12, bs.slab + 0.1, lamb(0xb8b8b0), 0, 0.06, bs.slab/2 - 0.05, false);               // betonowa płyta
+    box(SW, 1.7, 0.06, glass, 0, 1.0, 0.1, true);                                                  // tylna szyba
+    [-1,1].forEach(sd => box(0.06, 1.7, 1.4, glass, sd*(SW/2 - 0.03), 1.0, 0.85, true));            // szyby boczne
+    [[-1,0.1],[1,0.1],[-1,1.55],[1,1.55]].forEach(q => box(0.1, 2.4, 0.1, dark, q[0]*(SW/2 - 0.05), 1.25, q[1], false));   // słupki
+    box(SW + 0.3, 0.12, 1.9, blue, 0, 2.46, 0.8, false);                                           // dach
+    box(2.4, 0.08, 0.45, wood, 0, 0.5, 0.45, false);                                               // ławka
+    box(2.4, 0.4, 0.05, wood, 0, 0.82, 0.25, false);
+    [-1,1].forEach(sd => box(0.08, 0.44, 0.4, dark, sd*1.0, 0.28, 0.45, false));
+    // znak „przystanek autobusowy” na maszcie nad dachem (widoczny z ulicy z obu stron)
+    const c = document.createElement('canvas'); c.width = 256; c.height = 352; const g = c.getContext('2d');
+    g.fillStyle = '#0d47a1'; g.fillRect(0,0,256,256); g.strokeStyle = '#fff'; g.lineWidth = 8; g.strokeRect(8,8,240,240);
+    g.fillStyle = '#fff'; g.beginPath(); g.roundRect ? g.roundRect(46,70,164,110,18) : g.rect(46,70,164,110); g.fill();
+    g.fillStyle = '#0d47a1'; [[62,84],[110,84],[158,84]].forEach(q => g.fillRect(q[0],q[1],40,42)); g.fillRect(62,138,132,10);
+    g.fillStyle = '#fff'; [[78,190],[178,190]].forEach(q => { g.beginPath(); g.arc(q[0],q[1],19,0,Math.PI*2); g.fill(); });
+    g.fillStyle = '#fff'; g.fillRect(0,256,256,96); g.fillStyle = '#0d2a4a'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    let fs = 44; g.font = `bold ${fs}px sans-serif`; while(g.measureText(bs.name).width > 230 && fs > 16){ fs -= 2; g.font = `bold ${fs}px sans-serif`; }
+    g.fillText(bs.name, 128, 306);
+    const tex = new THREE.CanvasTexture(c); tex.anisotropy = 8;
+    const sm = new THREE.MeshBasicMaterial({map:tex});
+    put(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.9, 8), dark), 1.1, 2.97, 0.8);
+    const f1 = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.24), sm); f1.position.set(1.1, 3.7, 0.84); grp.add(f1);
+    const f2 = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.24), sm); f2.position.set(1.1, 3.7, 0.76); f2.rotation.y = Math.PI; grp.add(f2);
+    const bc = toWorld(0, bs.slab/2);
+    BUILDINGS.push({x:bc.x, z:bc.z, w:quarter ? bs.slab + 0.4 : 4.2, d:quarter ? 4.2 : bs.slab + 0.4, open:true});   // bez drzew; niebieski znacznik na mapie
+  });
+
   // ===== Mechanik na Poprzecznej (zachodnia strona): wjeżdżasz autem do środka, wysiadasz i rozmawiasz – ulepszenie skrętu =====
   const MECH_PRICES = [40, 80, 140];                                     // cena kolejnych poziomów skrętu (maks. 3)
   const MECH_TITLES = ['Sportowa kolumna kierownicza', 'Szybsza przekładnia i sztywniejsze zawieszenie', 'Pełny pakiet rajdowy'];
@@ -1866,15 +2304,15 @@
     say(`Fajne auto! Mogę poprawić jego skręt, żeby wchodziło w zakręty dużo lepiej. Teraz masz poziom ${steerLvl}/${MECH_PRICES.length}. Następny: ${MECH_TITLES[steerLvl]} – ${price} 🪙. Płacisz monetami przy sobie, a brakującą część pobiorę z konta bankowego.`,
       [{label:`Ulepsz skręt (${price} 🪙)`, fn:buySteer}, {label:'Wyjdź', fn:closeDialog}], W, 'mech');
   }
-  const dlgDist = () => dlgWho === 'mech' ? mechNpcDist() : dlgWho === 'paint' ? paintNpcDist() : dlgWho === 'car' ? carNpcDist() : dlgWho === 'cloth' ? clothNpcDist() : dlgWho === 'shop' ? shopNpcDist() : dlgWho === 'bank' ? bankNpcDist() : dlgWho === 'furn' ? furnNpcDist() : dlgWho === 'home' ? (dlgHome ? Math.hypot(player.position.x-homeDoorPos(dlgHome).x, player.position.z-homeDoorPos(dlgHome).z) : 0) : npcDist();
+  const dlgDist = () => dlgWho === 'fuel' ? pumpDist() : dlgWho === 'agd' ? agdNpcDist() : dlgWho === 'mech' ? mechNpcDist() : dlgWho === 'paint' ? paintNpcDist() : dlgWho === 'car' ? carNpcDist() : dlgWho === 'cloth' ? clothNpcDist() : dlgWho === 'shop' ? shopNpcDist() : dlgWho === 'bank' ? bankNpcDist() : dlgWho === 'furn' ? furnNpcDist() : dlgWho === 'home' ? (dlgHome ? Math.hypot(player.position.x-homeDoorPos(dlgHome).x, player.position.z-homeDoorPos(dlgHome).z) : 0) : npcDist();
 
   // ===== Ustawianie biurka w domu =====
   const placedDesks = [];
   let placing = null;
   const deskDims = r => (r % 2) ? {w:0.8, d:1.6} : {w:1.6, d:0.8};
-  const furnDims = (kind, r) => kind === 'lamp' ? {w:0.5, d:0.5} : kind === 'chair' ? {w:0.5, d:0.5} : kind === 'wardrobe' ? ((r % 2) ? {w:0.6, d:1.2} : {w:1.2, d:0.6}) : kind === 'computer' ? {w:0.82, d:0.62} : deskDims(r);
-  const furnNoun = kind => kind === 'lamp' ? {nom:'lampa', gen:'lampy'} : kind === 'chair' ? {nom:'krzesło', gen:'krzesła'} : kind === 'wardrobe' ? {nom:'szafa', gen:'szafy'} : kind === 'computer' ? {nom:'komputer', gen:'komputera'} : {nom:'biurko', gen:'biurka'};
-  const makeFurn = (kind, ghost) => kind === 'lamp' ? makeLamp(ghost) : kind === 'chair' ? makeChair(ghost) : kind === 'wardrobe' ? makeWardrobe(ghost) : kind === 'computer' ? makeComputer(ghost) : makeDesk(ghost);
+  const furnDims = (kind, r) => kind === 'lamp' ? {w:0.5, d:0.5} : kind === 'chair' ? {w:0.5, d:0.5} : kind === 'wardrobe' ? ((r % 2) ? {w:0.6, d:1.2} : {w:1.2, d:0.6}) : kind === 'computer' ? {w:0.82, d:0.62} : kind === 'oven' ? ((r % 2) ? {w:0.7, d:0.9} : {w:0.9, d:0.7}) : deskDims(r);
+  const furnNoun = kind => kind === 'lamp' ? {nom:'lampa', gen:'lampy'} : kind === 'chair' ? {nom:'krzesło', gen:'krzesła'} : kind === 'wardrobe' ? {nom:'szafa', gen:'szafy'} : kind === 'computer' ? {nom:'komputer', gen:'komputera'} : kind === 'oven' ? {nom:'piekarnik', gen:'piekarnika'} : {nom:'biurko', gen:'biurka'};
+  const makeFurn = (kind, ghost) => kind === 'lamp' ? makeLamp(ghost) : kind === 'chair' ? makeChair(ghost) : kind === 'wardrobe' ? makeWardrobe(ghost) : kind === 'computer' ? makeComputer(ghost) : kind === 'oven' ? makeOven(ghost) : makeDesk(ghost);
   const overlap = (ax,az,aw,ad,b) => Math.abs(ax-b.x) < (aw+b.w)/2 - 0.001 && Math.abs(az-b.z) < (ad+b.d)/2 - 0.001;
   const homeReserved = () => [
     homeRect(-2.4, -1.5, 2.3, 3.2),                      // łóżko
@@ -1882,10 +2320,10 @@
     homeRect(0, HOME.d/2-0.9, 2.4, 1.8)                  // wolne przejście przy drzwiach
   ];
   function startPlacement(k){
-    if(!homeInside){ toast('Biurko możesz ustawić tylko w swoim domu 🏠'); return; }
+    if(!homeInside){ toast('Meble możesz ustawiać tylko w swoim domu 🏠'); return; }
     if(placing) return;
     if(sitting){ toast('Najpierw wstań z krzesła'); return; }
-    const kind = inv[k] && ['chair','wardrobe','computer','lamp'].includes(inv[k].id) ? inv[k].id : 'desk';
+    const kind = inv[k] && ['chair','wardrobe','computer','lamp','oven'].includes(inv[k].id) ? inv[k].id : 'desk';
     const ghost = makeFurn(kind, true); scene.add(ghost);
     placing = {slot:k, kind, rot:0, ghost, valid:false, x:0, z:0};
     invEl.style.display = 'none';
@@ -1903,7 +2341,7 @@
   function rotatePlacement(){ if(placing) placing.rot = placing.kind === 'computer' ? (placing.rot + 1) % 2 : (placing.rot + 1) % 4; }
   function updatePlacement(){
     if(!placing) return;
-    if(!homeInside){ cancelPlacement('Wyszedłeś z domu – anulowano ustawianie biurka'); return; }
+    if(!homeInside){ cancelPlacement('Wyszedłeś z domu – anulowano ustawianie mebla'); return; }
     const dm = furnDims(placing.kind, placing.rot), t = 0.28;
     if(placing.kind === 'computer'){
       const tx = player.position.x + Math.sin(facing)*1.5, tz = player.position.z + Math.cos(facing)*1.5;
@@ -1971,7 +2409,7 @@
     const wall = {x, z, w:dm.w, d:dm.d}; WALLS.push(wall);
     placedDesks.push({mesh, wall, kind});
     cancelPlacement(); renderInv();
-    toast(kind === 'chair' ? 'Krzesło ustawione 🪑 (G przy krześle – podnieś)' : kind === 'wardrobe' ? 'Szafa ustawiona 🚪 (F – otwórz, G – podnieś)' : 'Biurko ustawione 🗄️ (F przy biurku – podnieś)');
+    toast(kind === 'oven' ? 'Piekarnik ustawiony 🍳 (F lub G przy piekarniku – podnieś)' : kind === 'chair' ? 'Krzesło ustawione 🪑 (G przy krześle – podnieś)' : kind === 'wardrobe' ? 'Szafa ustawiona 🚪 (F – otwórz, G – podnieś)' : 'Biurko ustawione 🗄️ (F przy biurku – podnieś)');
   }
   function pickupComputer(pd){
     if(!pd || !pd.computer) return;
@@ -2352,6 +2790,13 @@
       releaseLampLight(pd); scene.remove(pd.mesh); placedDesks.splice(placedDesks.indexOf(pd), 1);
       renderInv(); toast('Zdjęto lampę 💡'); return;
     }
+    if(pd.kind === 'oven'){
+      if(pd.pizza){ toast('Najpierw wyjmij pizzę z piekarnika 🍕'); return; }
+      if(freeSlots() < OVEN_SLOTS){ toast(`Potrzebujesz ${OVEN_SLOTS} wolnych slotów w ekwipunku (wolne: ${freeSlots()})`); return; }
+      addBig('oven'); scene.remove(pd.mesh);
+      WALLS.splice(WALLS.indexOf(pd.wall), 1); placedDesks.splice(placedDesks.indexOf(pd), 1);
+      renderInv(); toast('Podniesiono piekarnik 🍳'); return;
+    }
     if(pd.kind === 'chair' || pd.kind === 'wardrobe'){
       if(!addItem(pd.kind)){ toast('Ekwipunek pełny!'); return; }
       if(pd.kind === 'wardrobe') closeWardrobe();
@@ -2366,6 +2811,75 @@
     renderInv(); toast('Podniesiono biurko 🗄️');
   }
   document.getElementById('pRot').onclick = rotatePlacement; document.getElementById('pOk').onclick = confirmPlacement; document.getElementById('pNo').onclick = () => cancelPlacement();
+
+  // ===== Piekarnik: pizza z paskiem pieczenia. Pasek napełnia się przez OVEN_BAKE s (gotowe), potem jeszcze OVEN_OVER s „przepełnienia”;
+  // wyjęta w tym czasie jest dobra, a po przepełnieniu paska – spalona. Wyjęta przed napełnieniem paska wraca surowa.
+  const OVEN_BAKE = 25, OVEN_OVER = 8;
+  const ovenEl = document.getElementById('ovenUI');
+  let ovenCur = null;
+  const ovenOpen = () => ovenEl.style.display === 'block';
+  const ovenState = pd => !pd.pizza ? 'empty' : pd.pizza.t < OVEN_BAKE ? 'raw' : pd.pizza.t <= OVEN_BAKE + OVEN_OVER ? 'ready' : 'burnt';
+  function ovenGlow(pd){
+    const gl = pd.mesh && pd.mesh.userData && pd.mesh.userData.glass; if(!gl) return;
+    const st = ovenState(pd); if(pd.glow === st) return; pd.glow = st;
+    gl.material.emissive.setHex(st === 'empty' ? 0x000000 : st === 'raw' ? 0x7a3208 : st === 'ready' ? 0xd98a14 : 0x2a0000);
+  }
+  function updateOvens(dt){
+    for(const pd of placedDesks){
+      if(pd.kind !== 'oven') continue;
+      if(pd.pizza){
+        const before = ovenState(pd);
+        pd.pizza.t = Math.min(pd.pizza.t + dt, OVEN_BAKE + OVEN_OVER + 30);
+        const after = ovenState(pd);
+        if(before !== after){
+          if(after === 'ready') toast('Pizza gotowa! 🍕 Wyjmij ją z piekarnika, zanim się przepali');
+          else if(after === 'burnt') toast('Pizza się przepaliła 🔥 Wyjmij ją z piekarnika');
+        }
+      }
+      ovenGlow(pd);
+    }
+  }
+  function openOven(pd){
+    if(!pd) return;
+    ovenCur = pd; invEl.style.display = 'none'; promptEl.style.display = 'none';
+    ovenEl.style.display = 'block'; refreshOvenUI();
+  }
+  function closeOven(){ ovenEl.style.display = 'none'; ovenCur = null; }
+  function refreshOvenUI(){
+    const pd = ovenCur; if(!pd) return;
+    const st = ovenState(pd), t = pd.pizza ? pd.pizza.t : 0;
+    const bake = Math.min(1, t / OVEN_BAKE), over = Math.max(0, Math.min(1, (t - OVEN_BAKE) / OVEN_OVER));
+    const fill = document.getElementById('ovenFill'), ofill = document.getElementById('ovenOverFill');
+    fill.style.width = (bake*100).toFixed(1) + '%'; fill.className = bake >= 1 ? 'full' : '';
+    ofill.style.width = (over*100).toFixed(1) + '%';
+    document.getElementById('ovenPct').textContent = st === 'empty' ? '—' : Math.floor(bake*100) + '%';
+    document.getElementById('ovenOverWrap').style.display = (st === 'ready' || st === 'burnt') ? 'block' : 'none';
+    const msg = document.getElementById('ovenMsg');
+    msg.textContent = st === 'empty' ? 'Piekarnik jest pusty. Włóż mrożoną pizzę 🍕'
+      : st === 'raw' ? 'Pizza się piecze… poczekaj, aż pasek się napełni'
+      : st === 'ready' ? 'Pasek pełny – wyjmij pizzę! Jeśli pasek się przepełni, pizza się spali'
+      : 'Pasek się przepełnił – pizza jest spalona 🔥';
+    msg.className = st === 'ready' ? 'ok' : st === 'burnt' ? 'bad' : '';
+    document.getElementById('ovenPut').disabled = st !== 'empty';
+    document.getElementById('ovenTake').disabled = st === 'empty';
+  }
+  function ovenPut(){
+    const pd = ovenCur; if(!pd || pd.pizza) return;
+    const k = inv.findIndex(x => x && x.id === 'pizzafrozen');
+    if(k < 0){ toast('Nie masz mrożonej pizzy 🍕 – kupisz ją w lodówce w Pandy'); return; }
+    removeOne(k); pd.pizza = {t:0}; ovenGlow(pd); renderInv(); refreshOvenUI();
+    toast('Pizza w piekarniku 🍳 Wyjmij ją, gdy pasek się napełni');
+  }
+  function ovenTake(){
+    const pd = ovenCur; if(!pd || !pd.pizza) return;
+    const st = ovenState(pd), id = st === 'raw' ? 'pizzafrozen' : st === 'ready' ? 'pizza' : 'pizzaburnt';
+    if(!(inv.some(x => x && x.id === id) || inv.indexOf(null) >= 0)){ toast('Ekwipunek pełny – zrób miejsce'); return; }
+    addItem(id); pd.pizza = null; ovenGlow(pd); renderInv(); refreshOvenUI();
+    toast(st === 'raw' ? 'Pizza jeszcze się nie upiekła – wyjęto ją surową 🍕' : st === 'ready' ? 'Wyjęto upieczoną pizzę 🍕 Smacznego!' : 'Wyjęto spaloną pizzę 🔥');
+  }
+  document.getElementById('ovenPut').onclick = ovenPut; document.getElementById('ovenTake').onclick = ovenTake; document.getElementById('ovenClose').onclick = closeOven;
+  addEventListener('keydown', e => { if(e.code === 'Escape' && ovenOpen()) closeOven(); });
+  setInterval(() => { if(!ovenOpen()) return; if(!homeInside || !ovenCur || !placedDesks.includes(ovenCur) || nearDesk('oven') !== ovenCur){ closeOven(); return; } refreshOvenUI(); }, 120);
 
   // Drzewa (instancje – szybkie nawet przy setkach sztuk)
   const treeColl = [];
@@ -2405,6 +2919,73 @@
   });
   ROUND_COLL.forEach(c => treeColl.push(c));   // wyspa ronda
   SIGN_COLL.forEach(c => treeColl.push(c));    // słupki znaków i tabliczek ulic
+  let streetLampHalo = null;
+  const streetLampHeadMat = new THREE.MeshBasicMaterial({color:0x666660}), streetLampOn = new THREE.Color(0xfff0c0);
+
+  // ===== Lampy uliczne: słup + ramię + świecąca oprawa, poświata i kilka prawdziwych świateł przy graczu =====
+  const streetLampList = [];
+  (function buildStreetLamps(){
+    const OFF = ROAD_W/2 + 0.75;                       // przy krawężniku, po stronie jezdni
+    const add = (x, z, dx, dz, solid = true) => streetLampList.push({x, z, dx, dz, solid});
+    [-72,-52,-32,-14,14,34,54,98,108].forEach(x => add(x, ROAD_Z + OFF, 0, -1));      // Długa, strona północna
+    [-66,-42,-18,6,30,54,78,102].forEach(x => add(x, ROAD_Z - OFF, 0, 1));            // Długa, strona południowa
+    [6,30,54].forEach(z => add(SIDE_ROAD_X + OFF, z, -1, 0));                         // Krótka
+    [18,42,66].forEach(z => add(SIDE_ROAD_X - OFF, z, 1, 0));
+    [6,30,54].forEach(z => add(POP_X + OFF, z, -1, 0));                               // Poprzeczna
+    [18,42].forEach(z => add(POP_X - OFF, z, 1, 0));
+    [12,60].forEach(z => add(RB.x + OFF, z, -1, 0));                                  // Społeczna
+    [36,84].forEach(z => add(RB.x - OFF, z, 1, 0));
+    add(RB.x + OFF, -32, -1, 0); add(RB.x - OFF, -44, 1, 0);
+    add(AGD.x - 9, -61.5, 0, 1); add(AGD.x + 9, -61.5, 0, 1);                         // parking przed sklepem AGD                          // zjazd do supermarketu
+    [90, 210, 330].forEach(deg => {                                                    // wyspa ronda
+      const a = deg*Math.PI/180;
+      add(RB.x + Math.cos(a)*3.8, RB.z + Math.sin(a)*3.8, Math.cos(a), Math.sin(a), false);
+    });
+
+    const H = 5.6, ARM = 1.3, n = streetLampList.length;
+    const poleM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.11, H, 8), new THREE.MeshLambertMaterial({color:0x33363b}), n);
+    const armM  = new THREE.InstancedMesh(new THREE.BoxGeometry(ARM, 0.09, 0.09), new THREE.MeshLambertMaterial({color:0x33363b}), n);
+    const headM = new THREE.InstancedMesh(new THREE.BoxGeometry(0.85, 0.12, 0.34), streetLampHeadMat, n);
+    const d = new THREE.Object3D();
+    const haloPos = new Float32Array(n*3);
+    streetLampList.forEach((l, i) => {
+      const rot = Math.atan2(-l.dz, l.dx);
+      d.rotation.set(0, 0, 0); d.position.set(l.x, 0.2 + H/2, l.z); d.updateMatrix(); poleM.setMatrixAt(i, d.matrix);
+      d.rotation.set(0, rot, 0);
+      d.position.set(l.x + l.dx*ARM/2, 0.2 + H, l.z + l.dz*ARM/2); d.updateMatrix(); armM.setMatrixAt(i, d.matrix);
+      d.position.set(l.x + l.dx*ARM, 0.2 + H - 0.06, l.z + l.dz*ARM); d.updateMatrix(); headM.setMatrixAt(i, d.matrix);
+      l.hx = l.x + l.dx*ARM; l.hy = 0.2 + H - 0.2; l.hz = l.z + l.dz*ARM;            // punkt, z którego świeci lampa
+      haloPos.set([l.hx, l.hy + 0.1, l.hz], i*3);
+      if(l.solid) treeColl.push({x:l.x, z:l.z, r:0.32});
+    });
+    [poleM, armM, headM].forEach(m => { m.frustumCulled = false; scene.add(m); });
+    poleM.castShadow = true;
+
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+    const cg = cv.getContext('2d'), grd = cg.createRadialGradient(32,32,0,32,32,32);
+    grd.addColorStop(0, 'rgba(255,240,200,1)'); grd.addColorStop(0.25, 'rgba(255,220,150,.55)'); grd.addColorStop(1, 'rgba(255,200,120,0)');
+    cg.fillStyle = grd; cg.fillRect(0,0,64,64);
+    const hg = new THREE.BufferGeometry(); hg.setAttribute('position', new THREE.BufferAttribute(haloPos, 3));
+    streetLampHalo = new THREE.Points(hg, new THREE.PointsMaterial({map:new THREE.CanvasTexture(cv), size:3.2, sizeAttenuation:true, transparent:true, opacity:0,
+      blending:THREE.AdditiveBlending, depthWrite:false}));
+    streetLampHalo.frustumCulled = false; streetLampHalo.visible = false; scene.add(streetLampHalo);
+  })();
+  // Stała pula świateł (zmiana liczby świateł wymusiłaby rekompilację shaderów) – świecą lampy najbliższe graczowi.
+  const streetLampLights = [];
+  for(let i = 0; i < 6; i++){ const pl = new THREE.PointLight(0xffd79a, 0, 24); scene.add(pl); streetLampLights.push(pl); }
+  const streetLampOrder = streetLampList.map((_, i) => i), streetLampD2 = new Float32Array(streetLampList.length);
+  function updateStreetLamps(night, p){
+    const k = Math.min(1, Math.max(0, night*1.25 - 0.05));                           // zapalają się o zmierzchu, gasną o świcie
+    streetLampHeadMat.color.setRGB(0.4, 0.4, 0.38).lerp(streetLampOn, k);
+    streetLampHalo.material.opacity = k; streetLampHalo.visible = k > 0.01;
+    if(k <= 0.01){ streetLampLights.forEach(l => l.intensity = 0); return; }
+    streetLampList.forEach((l, i) => { const dx = l.x - p.x, dz = l.z - p.z; streetLampD2[i] = dx*dx + dz*dz; });
+    streetLampOrder.sort((a, b) => streetLampD2[a] - streetLampD2[b]);
+    streetLampLights.forEach((pl, i) => {
+      const l = streetLampList[streetLampOrder[i]];
+      pl.position.set(l.hx, l.hy, l.hz); pl.intensity = 1.6*k;
+    });
+  }
   scene.add(trunkM, crownM);
 
   // Postać
@@ -2431,6 +3012,23 @@
   shinL.visible = shinR.visible = false;
   const armL = limb(-0.48,0.85,0x2d6cdf,upper), armR = limb(0.48,0.85,0x2d6cdf,upper);
   const legL = limb(-0.18,0.8,0x333333,body), legR = limb(0.18,0.8,0x333333,body);
+  // Zielony plecak dostawcy – widoczny na plecach (−z; postać patrzy w stronę +z), gdy niesiesz zamówienie z restauracji
+  const deliveryBackpack = new THREE.Group(); deliveryBackpack.visible = false; upper.add(deliveryBackpack);
+  // bryła jak termiczny box kuriera (Glovo): prawie sześcian, zielony, z jaśniejszym pasem i logo z tyłu
+  box(0.7,0.7,0.62,0x2e9e4f,0,0.6,-0.53,deliveryBackpack);            // korpus-sześcian
+  box(0.72,0.1,0.64,0x23803f,0,0.92,-0.53,deliveryBackpack);          // pokrywa (ciemniejszy brzeg)
+  box(0.72,0.05,0.64,0x1b6a34,0,0.84,-0.53,deliveryBackpack);         // linia zamknięcia pokrywy
+  box(0.5,0.34,0.03,0x7ddc96,0,0.55,-0.85,deliveryBackpack);          // jasny panel z tyłu
+  box(0.2,0.2,0.035,0x1b6a34,0,0.55,-0.86,deliveryBackpack);          // znak/logo na panelu
+  box(0.72,0.06,0.64,0xd9f2df,0,0.36,-0.53,deliveryBackpack);         // odblaskowy pasek wokół
+  box(0.08,0.12,0.04,0xd9f2df,-0.28,0.9,-0.86,deliveryBackpack);      // zapięcia pokrywy
+  box(0.08,0.12,0.04,0xd9f2df,0.28,0.9,-0.86,deliveryBackpack);
+  box(0.07,0.8,0.05,0x16572b,-0.2,0.5,0.215,deliveryBackpack);        // szelki przed tułowiem
+  box(0.07,0.8,0.05,0x16572b,0.2,0.5,0.215,deliveryBackpack);
+  box(0.07,0.05,0.5,0x16572b,-0.2,0.9,0,deliveryBackpack);            // szelki na ramionach
+  box(0.07,0.05,0.5,0x16572b,0.2,0.9,0,deliveryBackpack);
+  box(0.07,0.07,0.2,0x16572b,-0.2,0.7,-0.25,deliveryBackpack);        // łączniki szelek z boxem
+  box(0.07,0.07,0.2,0x16572b,0.2,0.7,-0.25,deliveryBackpack);
   scene.add(player);
 
   // Rower gracza – pojawia się przed sklepem po zakupie
@@ -2690,20 +3288,43 @@
   const TR_R = 9.7;                                                          // promień pasa jazdy na rondzie (wyspa ma 5,5, asfalt 14)
   const LANE_SOUTH = RB.x + 2.5, LANE_NORTH = RB.x - 2.5;                    // pasy zjazdu do supermarketu: na południe (-z) i z powrotem
   const circ = (from, to) => { const pts = []; for(let a = from; a > to - 0.01; a -= 0.5) pts.push([RB.x + Math.cos(a)*TR_R, RB.z + Math.sin(a)*TR_R, 1]); return pts; };   // trzeci element = 1: punkt na rondzie (do kierunkowskazów)   // rondo: kierunek przeciwny do ruchu wskazówek w mapie (wyspa po lewej)
-  const parkSlot = () => { const west = Math.random() < 0.5; return {west, x: west ? [112,116,120,124][Math.floor(Math.random()*4)] : [140,144,148][Math.floor(Math.random()*3)]}; };
+  const AGD_PARK_X = [80,84,88,92,96,100];                                    // miejsca przed sklepem AGD (między liniami placu, z = -59,3)
+  const parkSlot = () => {
+    if(Math.random() < 0.4) return {agd:true, west:true, x:AGD_PARK_X[Math.floor(Math.random()*AGD_PARK_X.length)]};   // parking przed AGD
+    const west = Math.random() < 0.5; return {west, x: west ? [112,116,120,124][Math.floor(Math.random()*4)] : [140,144,148][Math.floor(Math.random()*3)]};
+  };
   const toParking = () => {                                                  // zjazd z ronda na parking i zaparkowanie przodem do budynku
     const sl = parkSlot(), pts = [[LANE_SOUTH,-27],[LANE_SOUTH,-50]];
-    if(sl.west) pts.push([131,-53],[sl.x+2.2,-55],[sl.x,-57.4],[sl.x,-59.3]);
+    if(sl.agd) pts.push([131,-53],[110,-53.5],[sl.x+6,-53.8],[sl.x+2.2,-55],[sl.x,-57.4],[sl.x,-59.3]);   // przez parking Pandy na plac AGD (jazda na zachód po południowej stronie)
+    else if(sl.west) pts.push([131,-53],[sl.x+2.2,-55],[sl.x,-57.4],[sl.x,-59.3]);
     else pts.push([133.5,-52.5],[sl.x-2.2,-54.3],[sl.x,-57.2],[sl.x,-59.3]);
     return pts;
   };
   const fromParking = () => {                                                // odjazd z miejsca parkingowego na północ, do ronda
     const sl = parkSlot();
-    return (sl.west ? [[sl.x,-59.3],[sl.x,-56.6],[sl.x+2.2,-54],[LANE_NORTH,-50.5]]
+    return (sl.agd ? [[sl.x,-59.3],[sl.x,-56.6],[sl.x+2.2,-54],[sl.x+6,-52.4],[110,-51.2],[LANE_NORTH,-50.5]]     // odjazd z placu AGD na wschód, do ronda
+          : sl.west ? [[sl.x,-59.3],[sl.x,-56.6],[sl.x+2.2,-54],[LANE_NORTH,-50.5]]
                     : [[sl.x,-59.3],[sl.x,-57.3],[sl.x-2.2,-55],[129.5,-53.5],[LANE_NORTH,-50.5]]).concat([[LANE_NORTH,-27]]);
   };
   const westExit = [[118,TRAFFIC_LANE_W],[112,TRAFFIC_LANE_W],[-79,TRAFFIC_LANE_W]];
   const SPOL_CAR_END = 82;                                                  // koniec trasy aut na Społecznej (jezdnia kończy się na 84)
+  // Pełna pętla po przedłużonej Społecznej: pas w stronę wzgórza (po prawej stronie jazdy), zakręt, odcinek na zachód do końca drogi,
+  // nawrót na końcu i pas powrotny. Pasy są przesunięte o 2,5 m od osi drogi (SPOL_PATH), więc podążają za zakrętem.
+  const spolHill = () => {
+    const n = SPOL_PATH.length, LANE = 2.5, pts = [];
+    const lane = (i, sgn) => {                                           // punkt pasa przy wierzchołku i osi: sgn=+1 pas „w stronę wzgórza”, -1 pas powrotny
+      const a = SPOL_PATH[Math.max(0, i-1)], b = SPOL_PATH[Math.min(n-1, i+1)];
+      const tx = b[0]-a[0], tz = b[1]-a[1], tl = Math.hypot(tx, tz) || 1;
+      return [SPOL_PATH[i][0] + sgn*LANE*(-tz/tl), SPOL_PATH[i][1] + sgn*LANE*(tx/tl)];   // prawa strona kierunku jazdy = (-tz, tx)
+    };
+    for(let i = 0; i <= n-2; i++) pts.push(lane(i, 1));                  // do końca łuku (przedostatni wierzchołek = początek odcinka na zachód)
+    const endX = SPOL_WEST_END, cxU = endX + 5;                          // nawrót: półokrąg o promieniu 2,5 m na końcu drogi
+    pts.push([endX + 12, SPOL_TURN_Z - LANE]);
+    for(let k = 0; k <= 4; k++){ const a = k*Math.PI/4; pts.push([cxU - LANE*Math.sin(a), SPOL_TURN_Z - LANE*Math.cos(a)]); }
+    pts.push([endX + 12, SPOL_TURN_Z + LANE]);
+    for(let i = n-2; i >= 0; i--) pts.push(lane(i, -1));                 // powrót pasem po drugiej stronie
+    return pts;
+  };
   const withPark = pts => { pts.park = true; return pts; };
   const withYield = (pts, kind, jx) => { pts.yield = {wp:1, kind, jx: jx || 0}; return pts; };      // wp = punkt linii zatrzymania; kind = kierunek skrętu
   const TRAFFIC_ROUTES = [
@@ -2734,13 +3355,15 @@
     () => withYield([[POP_X+2.5,POP_END-1],[POP_X+2.5,-6.5],[POP_X+2.2,-10],[POP_X+0.5,-14],[POP_X-3,TRAFFIC_LANE_W],[POP_X-8,TRAFFIC_LANE_W],[-79,TRAFFIC_LANE_W]], 'left', POP_X),
     // ===== Ulica Społeczna (x = RB.x): pasy RB.x-2,5 (na +z, zjazd z ronda) i RB.x+2,5 (na -z, wjazd na rondo) =====
     // Długa na wschód → rondo → zjazd w Społeczną
-    () => [[-79,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,2.0), [[RB.x-2.5,-4.6],[RB.x-2.5,-1],[RB.x-2.5,SPOL_CAR_END]]),
+    () => [[-79,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,2.0), [[RB.x-2.5,-4.6],[RB.x-2.5,-1]], spolHill(), [[RB.x+2.5,0]], circ(1.3,-2.4), westExit),
     // Społeczna → rondo → parking supermarketu
     () => withPark([[RB.x+2.5,SPOL_CAR_END],[RB.x+2.5,0]].concat(circ(1.3,-0.7), [[136,-23]], toParking())),
     // Społeczna → rondo → pełne okrążenie → Długa na zachód
     () => [[RB.x+2.5,SPOL_CAR_END],[RB.x+2.5,0]].concat(circ(1.3,-2.4), westExit),
     // parking supermarketu → rondo (pełne 3/4 okrążenia) → Społeczna
-    () => [].concat(fromParking(), circ(-1.9,-4.4), [[RB.x-2.5,-1],[RB.x-2.5,SPOL_CAR_END]])
+    () => [].concat(fromParking(), circ(-1.9,-4.4), [[RB.x-2.5,-1]], spolHill(), [[RB.x+2.5,0]], circ(1.3,-2.4), westExit),
+    // Długa → rondo → Społeczna aż do końca wzgórza i z powrotem → rondo → parking supermarketu
+    () => withPark([[-79,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,2.0), [[RB.x-2.5,-4.6],[RB.x-2.5,-1]], spolHill(), [[RB.x+2.5,0]], circ(1.3,-0.7), [[136,-23]], toParking()))
   ];
   const TRAFFIC_COLORS = [0xc0392b,0x2e6fb5,0xe0b020,0x2e8b57,0xeeeeee,0x6c3483,0xe67e22,0x333840];
   const trafficCars = [];
@@ -2760,17 +3383,279 @@
     // kierunkowskazy: lokalny +x = przód auta, +z = prawa strona (ruch prawostronny)
     const sigGeo = new THREE.BoxGeometry(.1,.17,.3), sigL = new THREE.MeshBasicMaterial({color:SIG_OFF}), sigR = new THREE.MeshBasicMaterial({color:SIG_OFF});
     [2.12,-2.12].forEach(x => { part(sigGeo, sigL, x, .78, -.84); part(sigGeo, sigR, x, .78, .84); });
-    g.visible = false; scene.add(g);
-    return {group:g, bodyMat, sigL, sigR, sig:0, sigT:0, active:false, wait:0.5, route:null, wp:1, heading:0, speed:0, cruise:9};
+    g.rotation.order = 'YXZ'; g.visible = false; scene.add(g);   // przechył (z) liczony po obrocie kierunku jazdy
+    return {group:g, pitch:0, bodyMat, sigL, sigR, sig:0, sigT:0, active:false, wait:0.5, route:null, wp:1, heading:0, speed:0, cruise:9,
+            bt:0, freeT:0, hr:0, hb:0, ht:0, hornF:380 + Math.random()*130};   // klakson: czas blokady, rundy, pozostałe sygnały, licznik
   }
   for(let i=0;i<6;i++){ const c = makeTrafficCar(); c.wait = 0.5 + i*1.5; trafficCars.push(c); }   // różne opóźnienia startu
 
+
+  // ===== Autobus miejski (linia 1): jedzie w jedną stronę po przystankach STACJA PALIW → DOM G • UBRANIA → PANDY • AGD → DŁUGA, potem jedzie dalej i znika =====
+  // Po kilkudziesięciu sekundach pojawia się na początku trasy i kurs się powtarza. Zatrzymuje się przy każdym przystanku (BUS_DWELL s).
+  const BUS_DWELL = 10;                                                     // postój na przystanku (s): drzwi otwarte, można wsiąść / wysiąść
+  const BUS_GAP = [40, 70];                                                 // przerwa między kursami (s): min, max
+  const BUS_ROUTE = (function(){
+    const Z_SP = SPOL_TURN_Z + 2.5, pts = [];                               // pas „w stronę ronda” na odcinku wschód–zachód Społecznej (z = 152,5), obok przystanku przy stacji
+    const flat = arr => arr.forEach(q => pts.push([q[0], q[1]]));           // circ() zwraca trzeci element (flaga ronda) – tu niepotrzebny
+    pts.push([52, Z_SP], [91, Z_SP, 'STACJA PALIW']);                       // start tuż przed przystankiem (przy stacji paliw), postój
+    const n = SPOL_PATH.length;
+    for(let i = n-2; i >= 0; i--){                                          // pas powrotny Społecznej (ten sam co w spolHill): łuk i prosta na północ
+      const a = SPOL_PATH[Math.max(0, i-1)], b = SPOL_PATH[Math.min(n-1, i+1)];
+      const tx = b[0]-a[0], tz = b[1]-a[1], tl = Math.hypot(tx, tz) || 1;
+      pts.push([SPOL_PATH[i][0] + 2.5*tz/tl, SPOL_PATH[i][1] - 2.5*tx/tl]);
+    }
+    pts.push([RB.x + 2.5, 44.25, 'DOM G • UBRANIA']);                       // przystanek po wschodniej stronie Społecznej (między Domem G a sklepem z ubraniami)
+    pts.push([RB.x + 2.5, 0]);
+    flat(circ(1.3, -0.7));                                                  // rondo → zjazd do supermarketu
+    pts.push([136, -23], [LANE_SOUTH, -27], [LANE_SOUTH, -49], [131.5, -52.2], [128, -53.7], [112, -53.7]);
+    pts.push([105.5, -53.7, 'PANDY • AGD']);                                // przystanek w przerwie między sklepem AGD a supermarketem Pandy (autobus staje na placu przed nimi)
+    pts.push([100, -53.6], [96, -53.3], [93, -52.2], [92, -50.2], [94.5, -48.6], [99, -48.6], [104, -49.8], [110, -51.2]);   // nawrót na placu
+    pts.push([LANE_NORTH, -50.5], [LANE_NORTH, -27]);
+    flat(circ(-1.9, -2.4));                                                 // rondo → Długa na zachód
+    pts.push([118, TRAFFIC_LANE_W], [112, TRAFFIC_LANE_W], [-33.25, TRAFFIC_LANE_W, 'DŁUGA'], [-79, TRAFFIC_LANE_W]);   // przystanek na Długiej (północna strona, między domami 2 i 3), potem dalej na zachód i znika
+    return pts;
+  })();
+  // --- Model autobusu: pusta w środku skorupa (podłoga, ściany z oknami i otworami drzwi, dach) + wnętrze (fotele, poręcze, kabina kierowcy) ---
+  const BUS_YF = 1.05;                                                      // wysokość podłogi wnętrza nad ziemią
+  const BUS_DOORS_X = [2.4, -1.0];                                          // drzwi po prawej stronie: lokalne x środka otworu (przednie i tylne)
+  const BUS_SEATS = [];                                                     // przeszkody wewnątrz (lokalnie: x do przodu, z w prawo): {x, z, hx, hz}
+  function makeBusModel(){                                                  // przód = +X, prawa strona (drzwi) = +Z, jak w autach ruchu
+    const g = new THREE.Group();
+    const lm = (c, em) => new THREE.MeshLambertMaterial({color:c, emissive:em || 0x000000});   // lekka emisja: wnętrze nie jest czarne w nocy
+    const bx = (w, h, d, m, x, y, z, shadow) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); if(shadow) o.castShadow = true; g.add(o); return o; };
+    const white = lm(0xf4f6f8, 0x2c2c2c), blue = lm(0x1565c0, 0x0a2a55), floorM = lm(0x55595e, 0x1c1d1f), dark = lm(0x2b2f33, 0x111213);
+    const steel = lm(0xb8c0c8, 0x303338), seatM = lm(0x2a5fa8, 0x10284a);
+    const glass = new THREE.MeshLambertMaterial({color:0x9fd3f0, transparent:true, opacity:0.32, emissive:0x10202a});
+    const L = 9.6, T = 0.08, ZC = 1.25;                                     // długość, grubość ścian, oś ścian bocznych (z = ±1,25)
+    bx(9.4, 0.65, 2.42, floorM, 0, 0.725, 0);                               // podłoga (góra na wysokości BUS_YF)
+    const roof = bx(L, 0.12, 2.64, white, 0, 3.26, 0, true);                // dach (chowany w widoku 3. osoby podczas jazdy)
+    bx(2.2, 0.3, 1.6, steel, -2.5, 3.5, 0, true);                           // klimatyzacja na dachu
+    // ściana lewa (bez drzwi)
+    bx(L, 0.65, T, blue, 0, 0.725, -ZC, true); bx(L, 0.35, T, white, 0, 1.225, -ZC, true);
+    bx(L, 1.1, T*0.5, glass, 0, 1.95, -ZC); bx(L, 0.7, T, white, 0, 2.85, -ZC, true);
+    [-3.5, -1.5, 0.5, 2.5, 4.0].forEach(x => bx(0.12, 1.1, T + 0.02, white, x, 1.95, -ZC));   // słupki między oknami
+    // ściana prawa: dwa otwory na drzwi (x ∈ [1,85; 2,95] i [-1,55; -0,45])
+    bx(L, 0.65, T, blue, 0, 0.725, ZC, true); bx(L, 0.7, T, white, 0, 2.85, ZC, true);
+    [[-4.8, -1.55], [-0.45, 1.85], [2.95, 4.8]].forEach(([a, b]) => {
+      const w = b - a, cx = (a + b)/2;
+      bx(w, 0.35, T, white, cx, 1.225, ZC, true); bx(w, 1.1, T*0.5, glass, cx, 1.95, ZC);
+    });
+    [-3.2, 0.7].forEach(x => bx(0.12, 1.1, T + 0.02, white, x, 1.95, ZC));
+    // ściana przednia i tylna (z szybami)
+    [[4.76, 1.2], [-4.76, 1.0]].forEach(([x, wh]) => {
+      bx(T, 1.0, 2.58, white, x, 0.9, 0, true); bx(T*0.5, 1.1, 2.4, glass, x, 1.95, 0); bx(T, 0.7, 2.58, white, x, 2.85, 0, true);
+    });
+    const lampOn = new THREE.MeshBasicMaterial({color:0xfff2b0}), lampRed = new THREE.MeshBasicMaterial({color:0xc01818});
+    [-0.85, 0.85].forEach(z => { bx(0.06, 0.2, 0.4, lampOn, 4.81, 0.95, z); bx(0.06, 0.2, 0.4, lampRed, -4.81, 0.95, z); });
+    const wheelGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.3, 16), wheelMat = lm(0x16161a);
+    [[3.1, 1.36], [3.1, -1.36], [-3.1, 1.36], [-3.1, -1.36]].forEach(([x, z]) => { const w = new THREE.Mesh(wheelGeo, wheelMat); w.position.set(x, 0.5, z); w.rotation.x = Math.PI/2; w.castShadow = true; g.add(w); });
+    // drzwi: dwie rozsuwane połówki w każdym otworze (animowane w updateBus → applyBusDoors)
+    const leafM = new THREE.MeshLambertMaterial({color:0x2a5b86, transparent:true, opacity:0.6, emissive:0x0a1a28});
+    const doors = BUS_DOORS_X.map(dx => ({dx, l:bx(0.55, 1.45, 0.05, leafM, dx - 0.275, 1.775, ZC), r:bx(0.55, 1.45, 0.05, leafM, dx + 0.275, 1.775, ZC)}));
+    // wnętrze: fotele (oparcie z tyłu, siedzisko zwrócone do przodu)
+    const seat = (x, z, w, solid) => {
+      bx(0.5, 0.1, w, seatM, x, BUS_YF + 0.45, z); bx(0.1, 0.6, w, seatM, x - 0.23, BUS_YF + 0.8, z); bx(0.1, 0.4, Math.max(0.1, w - 0.3), steel, x, BUS_YF + 0.22, z);
+      if(solid) BUS_SEATS.push({x:x - 0.05, z, hx:0.32, hz:w/2});
+    };
+    [[1.3, -0.77, 0.9], [0.4, -0.77, 0.9], [-2.1, -0.77, 0.9], [-3.1, -0.77, 0.9], [-2.1, 0.8, 0.45], [-3.1, 0.8, 0.45], [2.8, -0.77, 0.9]].forEach(a => seat(a[0], a[1], a[2], true));
+    seat(-4.25, 0, 2.2, true);                                              // tylna kanapa na całą szerokość
+    // kabina kierowcy: szyba, fotel, kierownica, deska rozdzielcza, kierowca
+    bx(0.05, 1.3, 1.1, glass, 3.45, BUS_YF + 0.75, -0.7);
+    seat(3.8, -0.6, 0.5, false);
+    bx(0.5, 0.5, 2.2, dark, 4.5, BUS_YF + 0.45, 0);
+    const sw = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.025, 8, 20), dark); sw.position.set(4.15, BUS_YF + 0.95, -0.6); sw.rotation.y = Math.PI/2; g.add(sw);
+    const orange = lm(0xf39c12, 0x4a2e04), skin = lm(0xe0b090, 0x3a2a20);
+    bx(0.3, 0.5, 0.45, orange, 3.82, BUS_YF + 0.95, -0.6);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.13, 10, 8), skin); head.position.set(3.85, BUS_YF + 1.38, -0.6); g.add(head);
+    bx(0.45, 0.09, 0.09, orange, 4.0, BUS_YF + 0.98, -0.78); bx(0.45, 0.09, 0.09, orange, 4.0, BUS_YF + 0.98, -0.42);
+    BUS_SEATS.push({x:4.1, z:-0.65, hx:0.75, hz:0.6}, {x:4.5, z:0, hx:0.35, hz:1.25});   // kabina i deska rozdzielcza – nie wejdziesz
+    // poręcze i oświetlenie sufitu
+    const poleGeo = new THREE.CylinderGeometry(0.03, 0.03, 2.15, 8);
+    [[1.7, 0.75], [3.1, 0.75], [-0.3, 0.75], [-1.7, 0.75]].forEach(([x, z]) => { const p = new THREE.Mesh(poleGeo, steel); p.position.set(x, BUS_YF + 1.075, z); g.add(p); });
+    [-0.35, 0.35].forEach(z => bx(7.6, 0.04, 0.04, steel, -0.8, 3.0, z));
+    const strip = new THREE.MeshBasicMaterial({color:0xfffbe0});
+    [-3.4, -1.2, 1.0, 3.0].forEach(x => bx(1.2, 0.03, 0.18, strip, x, 3.18, 0));
+    const sign = (cw, ch, draw, pw, ph, x, y, z, ry) => {                  // napisy na płaskich panelach
+      const c = document.createElement('canvas'); c.width = cw; c.height = ch; draw(c.getContext('2d'), cw, ch);
+      const t = new THREE.CanvasTexture(c); t.anisotropy = 4;
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshBasicMaterial({map:t}));
+      m.position.set(x, y, z); m.rotation.y = ry; g.add(m);
+    };
+    const front = (gc, w, h) => { gc.fillStyle = '#111'; gc.fillRect(0,0,w,h); gc.fillStyle = '#ffb300'; gc.font = 'bold 40px sans-serif'; gc.textAlign = 'center'; gc.textBaseline = 'middle'; gc.fillText('1  DŁUGA', w/2, h/2 + 2); };
+    const back = (gc, w, h) => { gc.fillStyle = '#111'; gc.fillRect(0,0,w,h); gc.fillStyle = '#ffb300'; gc.font = 'bold 44px sans-serif'; gc.textAlign = 'center'; gc.textBaseline = 'middle'; gc.fillText('1', w/2, h/2 + 2); };
+    const side = (gc, w, h) => { gc.fillStyle = '#1565c0'; gc.fillRect(0,0,w,h); gc.fillStyle = '#fff'; gc.font = 'bold 44px sans-serif'; gc.textAlign = 'center'; gc.textBaseline = 'middle'; gc.fillText('🚌 AUTOBUS • LINIA 1', w/2, h/2 + 2); };
+    sign(256, 64, front, 2.0, 0.22, 4.805, 2.85, 0, Math.PI/2);
+    sign(128, 64, back, 0.6, 0.22, -4.805, 2.85, 0, -Math.PI/2);
+    sign(512, 56, side, 5.2, 0.46, 0.0, 0.72, ZC + 0.045, 0);
+    sign(512, 56, side, 5.2, 0.46, 0.0, 0.72, -ZC - 0.045, Math.PI);
+    g.rotation.order = 'YXZ'; g.visible = false; scene.add(g);              // jak auta: przechył liczony po obrocie kierunku jazdy
+    return {group:g, roof, doors};
+  }
+  const BUS_MODEL = makeBusModel();
+  const BUS = {group:BUS_MODEL.group, roof:BUS_MODEL.roof, doors:BUS_MODEL.doors, door:0, doorTarget:0, active:false, route:BUS_ROUTE, wp:1, heading:0, speed:0, pitch:0, wait:3, dwell:0, stuck:0, hl:4.8, hw:1.35};
+  function applyBusDoors(){                                                 // 0 = zamknięte, 1 = otwarte: połówki najpierw wsuwają się do wnętrza, potem rozjeżdżają
+    const d = BUS.door, e = d*d*(3 - 2*d), sl = Math.min(1, e*2), sx = Math.max(0, e*2 - 1);
+    BUS.doors.forEach(D => {
+      D.l.position.set(D.dx - 0.275 - 0.58*sx, 1.775, 1.25 - 0.13*sl);
+      D.r.position.set(D.dx + 0.275 + 0.58*sx, 1.775, 1.25 - 0.13*sl);
+    });
+  }
+  // --- Jazda autobusem: gracz porusza się po wnętrzu we współrzędnych lokalnych autobusu (x do przodu, z w prawo) i jest przez niego wożony ---
+  let busRide = false, busPrevH = 0, busPrevFP = false;
+  const busLocal = {x:0, z:0};
+  const busToWorld = (lx, lz) => {
+    const c = Math.cos(BUS.heading), s = Math.sin(BUS.heading), cp = Math.cos(BUS.pitch);
+    return {x: BUS.group.position.x + lx*cp*c - lz*s, z: BUS.group.position.z + lx*cp*s + lz*c};
+  };
+  const busFloorY = () => BUS.group.position.y + BUS_YF*Math.cos(BUS.pitch) + busLocal.x*Math.sin(BUS.pitch);
+  function boardBus(dx){
+    if(!BUS.active || busRide) return;
+    busRide = true; busLocal.x = dx; busLocal.z = 0.55; busPrevH = BUS.heading; busPrevFP = firstPerson;
+    if(!firstPerson){ firstPerson = true; body.visible = false; refreshInteriorWallVisibility(); }   // w środku domyślnie widok z oczu
+    yaw = -BUS.heading - Math.PI/2; pitch = 0; facing = Math.PI/2 - BUS.heading; player.rotation.y = facing;   // patrzysz w stronę jazdy
+    vy = 0;
+    toast('Jedziesz autobusem 🚌  WASD – chodź po autobusie, F przy otwartych drzwiach – wysiądź, V – kamera');
+  }
+  function leaveBus(forced){
+    if(!busRide) return;
+    busRide = false;
+    let dx = BUS_DOORS_X[0]; if(Math.abs(busLocal.x - BUS_DOORS_X[1]) < Math.abs(busLocal.x - dx)) dx = BUS_DOORS_X[1];
+    const w = busToWorld(forced ? busLocal.x : dx, forced ? 2.8 : 2.6);      // wysiadasz po prawej stronie, przy najbliższych drzwiach
+    player.position.set(w.x, terrainH(w.x, w.z), w.z); vy = 0;
+    facing = -BUS.heading; player.rotation.y = facing;
+    if(!busPrevFP){ firstPerson = false; body.visible = true; refreshInteriorWallVisibility(); }
+    BUS.roof.visible = true;
+    toast(forced ? 'Koniec kursu 🚌 – wysiadasz' : 'Wysiadłeś z autobusu 🚌');
+  }
+  function busBoardAction(){                                                 // F przy otwartych drzwiach stojącego autobusu
+    if(!BUS.active || BUS.door < 0.6 || busRide || carDriving || bikeMounted) return null;
+    for(const dx of BUS_DOORS_X){
+      const w = busToWorld(dx, 2.0);
+      if(Math.hypot(player.position.x - w.x, player.position.z - w.z) < 2.3) return {text:'F – wsiądź do autobusu 🚌 (linia 1)', run:() => boardBus(dx)};
+    }
+    return null;
+  }
+  function busCarry(mx, mz, spd, dt){                                        // wołane co klatkę po updateBus: przenosi gracza razem z autobusem
+    const h = BUS.heading, c = Math.cos(h), s = Math.sin(h);
+    let dh = h - busPrevH; dh = Math.atan2(Math.sin(dh), Math.cos(dh)); busPrevH = h;
+    yaw -= dh; facing -= dh; player.rotation.y = facing;                     // widok obraca się razem z autobusem na zakrętach
+    const sp = Math.min(spd, 3.2);
+    busLocal.x += (mx*c + mz*s)*sp*dt; busLocal.z += (-mx*s + mz*c)*sp*dt;
+    const R = 0.3, clampLocal = () => { busLocal.x = Math.max(-4.35, Math.min(4.25, busLocal.x)); busLocal.z = Math.max(-1.05, Math.min(1.05, busLocal.z)); };
+    clampLocal();
+    for(const q of BUS_SEATS){                                               // fotele i kabina kierowcy są bryłami
+      const cx = Math.max(q.x - q.hx, Math.min(q.x + q.hx, busLocal.x)), cz = Math.max(q.z - q.hz, Math.min(q.z + q.hz, busLocal.z));
+      const ddx = busLocal.x - cx, ddz = busLocal.z - cz, dd = Math.hypot(ddx, ddz);
+      if(dd < R){
+        if(dd > 1e-5){ busLocal.x += ddx/dd*(R - dd); busLocal.z += ddz/dd*(R - dd); }
+        else {
+          const ox = q.hx - Math.abs(busLocal.x - q.x), oz = q.hz - Math.abs(busLocal.z - q.z);
+          if(ox < oz) busLocal.x += Math.sign(busLocal.x - q.x || 1)*(ox + R); else busLocal.z += Math.sign(busLocal.z - q.z || 1)*(oz + R);
+        }
+      }
+    }
+    clampLocal();
+    const w = busToWorld(busLocal.x, busLocal.z);
+    player.position.x = w.x; player.position.z = w.z;
+  }
+  function updateBus(dt){
+    if(BUS.dwell <= 0) BUS.doorTarget = 0;                                   // w ruchu drzwi są zawsze zamknięte
+    BUS.door += Math.max(-dt*1.6, Math.min(dt*1.6, BUS.doorTarget - BUS.door));
+    applyBusDoors();
+    BUS.roof.visible = !(busRide && !firstPerson);                           // w widoku z zewnątrz dach znika, żeby było widać wnętrze
+    if(!BUS.active){                                                         // czeka na kolejny kurs
+      BUS.wait -= dt;
+      if(BUS.wait > 0) return;
+      const sx = BUS_ROUTE[0][0], sz = BUS_ROUTE[0][1];
+      if(trafficCars.some(o => o.active && Math.hypot(o.group.position.x-sx, o.group.position.z-sz) < 14) || Math.hypot(player.position.x-sx, player.position.z-sz) < 14){ BUS.wait = 1; return; }   // miejsce zajęte / gracz tuż obok
+      BUS.wp = 1; BUS.speed = 0; BUS.dwell = 0; BUS.stuck = 0; BUS.pitch = 0; BUS.door = 0; BUS.doorTarget = 0;
+      BUS.heading = Math.atan2(BUS_ROUTE[1][1]-sz, BUS_ROUTE[1][0]-sx);
+      BUS.group.position.set(sx, terrainH(sx, sz) + 0.02, sz);
+      BUS.group.rotation.y = -BUS.heading; BUS.group.rotation.z = 0;
+      BUS.group.visible = true; BUS.active = true;
+      return;
+    }
+    if(BUS.dwell > 0){                                                       // postój: drzwi otwarte, na koniec zamykają się przed odjazdem
+      BUS.dwell -= dt; BUS.speed = 0; BUS.doorTarget = BUS.dwell > 1.4 ? 1 : 0;
+      return;
+    }
+    if(BUS.door > 0.02){ BUS.speed = 0; return; }                            // czeka, aż drzwi się domkną
+    const p = BUS.group.position, tgt = BUS_ROUTE[BUS.wp], tx = tgt[0], tz = tgt[1], stopName = tgt[2];
+    const dist = Math.hypot(tx-p.x, tz-p.z);
+    let da = Math.atan2(tz-p.z, tx-p.x) - BUS.heading; while(da > Math.PI) da -= Math.PI*2; while(da < -Math.PI) da += Math.PI*2;
+    BUS.heading += Math.sign(da) * Math.min(Math.abs(da), 1.7*dt);
+    const hx = Math.cos(BUS.heading), hz = Math.sin(BUS.heading);
+    const ahead = (x, z, range, side) => { const dx = x-p.x, dz = z-p.z, fwd = dx*hx + dz*hz, lat = -dx*hz + dz*hx; return fwd > 0 && fwd < range && Math.abs(lat) < side; };
+    let blocked = false;
+    if(BUS.stuck < 4){                                                       // po 4 s zakleszczenia autobus przejeżdża „przez” przeszkodę (jak auta)
+      blocked = trafficCars.some(o => o.active && ahead(o.group.position.x, o.group.position.z, 12, 2.5))
+             || (hasCar && !carDriving && pcar.group.visible && ahead(pcar.group.position.x, pcar.group.position.z, 11, 2.5));
+    }
+    if(!blocked && !busRide) blocked = ahead(player.position.x, player.position.z, 10, 2.2);   // gracz (pieszo lub autem) na jezdni; pasażer się nie liczy
+    BUS.stuck = (blocked && BUS.speed < 0.5) ? BUS.stuck + dt : 0;
+    if(BUS.stuck > 7) BUS.stuck = 0;
+    let cap = 8;
+    if(Math.abs(da) > 0.35) cap = Math.min(cap, 4);                          // zakręty i nawrót
+    if(Math.hypot(p.x-RB.x, p.z-RB.z) < 17) cap = Math.min(cap, 5);          // rondo
+    let target = blocked ? 0 : cap;
+    if(stopName) target = Math.min(target, Math.max(0, dist - 0.4) * 1.3);   // łagodne hamowanie do przystanku
+    BUS.speed += (target - BUS.speed) * Math.min(1, 2.5*dt);
+    p.x += hx * BUS.speed * dt; p.z += hz * BUS.speed * dt;
+    BUS.group.rotation.y = -BUS.heading;
+    { // wysokość i przechył wg nachylenia drogi (wzgórze): średnia pod osiami, dłuższy rozstaw niż w aucie
+      const hf = terrainH(p.x + hx*4, p.z + hz*4), hb = terrainH(p.x - hx*4, p.z - hz*4);
+      BUS.pitch += (Math.atan2(hf - hb, 8) - BUS.pitch) * Math.min(1, dt*8);
+      p.y = (hf + hb)/2 + 0.02; BUS.group.rotation.z = BUS.pitch;
+    }
+    const rel = (tx-p.x)*hx + (tz-p.z)*hz;                                   // <0: punkt jest już za autobusem
+    if(stopName){
+      if((dist < 1.0 && BUS.speed < 1.2) || (rel < 0 && dist < 5)){          // dojechał do przystanku – postój z otwartymi drzwiami
+        BUS.speed = 0; BUS.dwell = BUS_DWELL; BUS.doorTarget = 1; BUS.wp++;
+        if(busRide) toast('🚌 Przystanek: ' + stopName);
+      }
+    } else if(dist < 3.5) BUS.wp++;
+    if(BUS.wp >= BUS_ROUTE.length){                                          // koniec trasy: autobus znika, za jakiś czas pojawi się nowy kurs
+      if(busRide) leaveBus(true);                                            // pasażer wysiada przed zniknięciem
+      BUS.active = false; BUS.group.visible = false; BUS.speed = 0; BUS.door = 0; BUS.doorTarget = 0;
+      BUS.wait = BUS_GAP[0] + Math.random()*(BUS_GAP[1] - BUS_GAP[0]);
+    }
+  }
+
   // ===== Auto gracza (kupione w salonie za 300 monet): W/S gaz i hamulec / wsteczny, A/D skręt, Spacja – ręczny, F – wsiądź / wysiądź =====
   let hasCar = false, carDriving = false, carV = 0, carHeading = 0;
+  let carFuel = 100, fuelLowWarned = false, fuelEmptyWarned = false;   // paliwo auta w % (pełny bak po zakupie)
   let steerLvl = 0;                                                    // poziom ulepszenia skrętu u mechanika (0–3)
   const pcar = buildCarModel(PLAYER_CAR_COLOR);
+  pcar.group.rotation.order = 'YXZ';                                   // najpierw kierunek jazdy, potem przechył (nos góra/dół) w układzie auta
+  let carPitch = 0;                                                    // aktualny przechył auta (rad; ujemny = nos w górę)
+  function carTilt(x, z, h){                                           // przechył i wysokość środka auta wg nachylenia drogi pod osiami
+    const L = 2.0, sn = Math.sin(h), cs = Math.cos(h);
+    const hf = terrainH(x + sn*L, z + cs*L), hb = terrainH(x - sn*L, z - cs*L);
+    return {pitch: -Math.atan2(hf - hb, 2*L), y: (hf + hb)/2};
+  }
   pcar.group.visible = false; scene.add(pcar.group);
-  function placeCar(x, z, h){ hasCar = true; carHeading = h; carV = 0; pcar.group.position.set(x, 0.02, z); pcar.group.rotation.y = h; pcar.group.visible = true; }
+  // Wnętrze: bez niego w widoku pierwszoosobowym kamera jest w pustej bryle (ściany są jednostronne) i auto wygląda na przezroczyste.
+  // Układ lokalny modelu: przód = +X, prawa strona = +Z, kierowca po lewej (z = −0,42).
+  (function buildCarInterior(){
+    const g = new THREE.Group(), lm = c => new THREE.MeshLambertMaterial({color:c});
+    const bx = (w,h,d,c,x,y,z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), lm(c)); m.position.set(x,y,z); g.add(m); return m; };
+    bx(2.3,0.06,1.7,0x6b7078,-0.2,1.62,0);                                              // podsufitka
+    [[0.92,-0.8],[0.92,0.8],[-0.3,-0.82],[-0.3,0.82],[-1.3,-0.8],[-1.3,0.8]].forEach(([x,z]) => bx(0.08,0.62,0.08,0x2a2f35,x,1.3,z));   // słupki A / B / C
+    bx(0.5,0.16,1.62,0x2f343a,0.7,1.11,0);                                              // deska rozdzielcza
+    bx(0.2,0.1,0.5,0x15181c,0.78,1.22,-0.42);                                           // zegary przed kierowcą
+    bx(2.1,0.2,0.05,0x3b4046,-0.3,1.13,-0.8); bx(2.1,0.2,0.05,0x3b4046,-0.3,1.13,0.8);  // wnętrza drzwi (dolna część)
+    bx(0.5,0.13,0.46,0x4a3f36,-0.2,1.09,-0.42); bx(0.1,0.52,0.46,0x4a3f36,-0.48,1.33,-0.42);   // fotel kierowcy
+    bx(0.5,0.13,0.46,0x4a3f36,-0.2,1.09,0.42);  bx(0.1,0.52,0.46,0x4a3f36,-0.48,1.33,0.42);    // fotel pasażera
+    bx(0.5,0.13,1.5,0x4a3f36,-0.95,1.09,0); bx(0.1,0.5,1.5,0x4a3f36,-1.22,1.32,0);              // tylna kanapa
+    bx(0.06,0.06,0.3,0x20242a,0.82,1.5,0);                                              // lusterko wsteczne
+    const steer = new THREE.Group(); steer.position.set(0.5,1.22,-0.42); g.add(steer);
+    const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.17,0.022,8,22), lm(0x15181c)); wheel.rotation.y = Math.PI/2; steer.add(wheel);   // koło skierowane do kierowcy
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.04,0.04,0.03,10), lm(0x2a2f35)); hub.rotation.z = Math.PI/2; steer.add(hub);
+    const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.015,0.02,0.32), lm(0x15181c)); steer.add(spoke);
+    g.visible = false; pcar.root.add(g);
+    pcar.interior = g; pcar.steer = steer;
+  })();
+  function placeCar(x, z, h){ hasCar = true; carHeading = h; carV = 0; const tt = carTilt(x, z, h); carPitch = tt.pitch; pcar.group.position.set(x, tt.y + 0.02, z); pcar.group.rotation.y = h; pcar.group.rotation.x = carPitch; pcar.group.visible = true; }
   // Kierunkowskazy gracza: Z – lewy, C – prawy, X – awaryjne. Skręt wyłącza się sam po wykonaniu manewru (jak w prawdziwym aucie).
   let pSig = 0, pHazard = false, pSigStart = 0, pSigTurned = false;
   function setPlayerSignal(v){ pSig = (pSig === v) ? 0 : v; pSigStart = carHeading; pSigTurned = false; }
@@ -2780,6 +3665,103 @@
     else if(e.code === 'KeyC') setPlayerSignal(1);
     else if(e.code === 'KeyX') pHazard = !pHazard;
   });
+  // ===== Klakson: syntezator Web Audio (bez plików) – gracz trzyma H, a auta ruchu trąbią, gdy zastawisz im drogę =====
+  let audioCtx = null;
+  let soundOn = true;                                                                // ustawienie z menu pauzy: dźwięki włączone / wyłączone
+  try{ soundOn = localStorage.getItem('pz_sound') !== '0'; }catch(err){}
+  function getAudio(){
+    if(!soundOn) return null;                                                        // wyciszone: żaden syntezowany dźwięk nie powstaje
+    try{
+      if(!audioCtx){ const A = window.AudioContext || window.webkitAudioContext; if(!A) return null; audioCtx = new A(); }
+      if(audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }catch(err){ return null; }
+  }
+  // dur = czas w sekundach albo Infinity (trzymany klakson); zwraca uchwyt z stop()
+  // Obwiednia: szybkie narastanie (30 ms), stała głośność, potem łagodne wyciszenie (setTargetAtTime) – bez skoków i trzasków.
+  function hornTone(freq, dur, vol){
+    const a = getAudio(); if(!a || vol < 0.01) return null;
+    try{
+      const t = a.currentTime, g = a.createGain(), lp = a.createBiquadFilter();
+      lp.type = 'lowpass'; lp.frequency.value = 1700;
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vol, t + 0.03);
+      const oscs = [['sawtooth', freq], ['square', freq*1.26]].map(([type, f]) => { const o = a.createOscillator(); o.type = type; o.frequency.value = f; o.connect(lp); o.start(t); return o; });
+      lp.connect(g); g.connect(a.destination);
+      let stopped = false;
+      const release = (at) => {
+        if(stopped) return; stopped = true;
+        at = Math.max(at, t + 0.03);                                    // nigdy przed końcem narastania
+        g.gain.cancelScheduledValues(at); g.gain.setValueAtTime(vol, at);
+        g.gain.setTargetAtTime(0, at, 0.03);                            // wyciszenie ~0,1 s
+        oscs.forEach(o => o.stop(at + 0.4));
+      };
+      if(isFinite(dur)) release(t + dur);
+      return {stop:() => release(a.currentTime)};
+    }catch(err){ return null; }
+  }
+  let playerHorn = null;
+  // Przycisk „Dźwięk” w ekranie pauzy (obok Multiplayer): wycisza klakson, kliknięcia kierunkowskazów i nagrania w Plikach komputera
+  const soundBtn = document.createElement('button');
+  soundBtn.id = 'soundBtn'; soundBtn.type = 'button';
+  soundBtn.style.cssText = 'display:block;width:100%;margin-top:10px;border:0;border-radius:8px;padding:10px 20px;color:#fff;font-size:15px;font-weight:600;cursor:pointer';
+  function applySound(){
+    if(!soundOn && playerHorn){ playerHorn.stop(); playerHorn = null; }
+    try{ if(audioCtx){ if(soundOn) audioCtx.resume(); else audioCtx.suspend(); } }catch(err){}
+    try{ document.getElementById('pcFilesVideo').muted = !soundOn; }catch(err){}
+    soundBtn.textContent = soundOn ? '🔊 Dźwięk: włączony' : '🔇 Dźwięk: wyłączony';
+    soundBtn.style.background = soundOn ? 'rgba(46,125,50,.9)' : '#3d4654';
+  }
+  soundBtn.addEventListener('click', () => {
+    soundOn = !soundOn;
+    try{ localStorage.setItem('pz_sound', soundOn ? '1' : '0'); }catch(err){}
+    applySound();
+    if(soundOn) signalClick(true, 0.09);                                             // krótki klik na potwierdzenie
+  });
+  { const mpB = document.getElementById('mpBtn'); if(mpB) mpB.after(soundBtn); else document.getElementById('pauseCard').appendChild(soundBtn); }
+  applySound();
+  addEventListener('keydown', e => {
+    if(e.code !== 'KeyH' || e.repeat || isDead || isPaused || !carDriving || playerHorn) return;
+    playerHorn = hornTone(430, Infinity, 0.32) || {stop(){}};
+  });
+  addEventListener('keyup', e => { if(e.code === 'KeyH' && playerHorn){ playerHorn.stop(); playerHorn = null; } });
+  addEventListener('blur', () => { if(playerHorn){ playerHorn.stop(); playerHorn = null; } });
+  // Auto ruchu zajechane drogę przez auto gracza (jadące albo zaparkowane na jezdni)
+  function blockedByPlayerCar(car){
+    if(!hasCar || !pcar.group.visible) return false;
+    const hx = Math.cos(car.heading), hz = Math.sin(car.heading), p = car.group.position;
+    const dx = pcar.group.position.x - p.x, dz = pcar.group.position.z - p.z;
+    const fwd = dx*hx + dz*hz, lat = -dx*hz + dz*hx;
+    return fwd > 0 && fwd < 8 && Math.abs(lat) < 2.3;
+  }
+  // Eskalacja: po ~1 s postoju jeden krótki sygnał, potem rundy po 2, 3, 4 sygnały, za każdym razem dłuższe (do ok. 1,2 s)
+  function trafficHorn(car, dt){
+    if(isPaused) return;
+    if(blockedByPlayerCar(car) && car.speed < 1.5){ car.bt += dt; car.freeT = 0; }
+    else {
+      car.freeT += dt;
+      if(car.freeT > 2){ car.bt = 0; car.hr = 0; car.hb = 0; car.ht = 0; }          // droga wolna dłużej niż 2 s: zaczynamy od nowa
+      if(car.hb === 0) return;
+    }
+    car.ht -= dt;
+    if(car.hb === 0 && car.ht <= 0 && car.bt >= 1.0){ car.hb = Math.min(car.hr + 1, 4); car.hornDur = Math.min(0.18 + 0.12*car.hr, 1.2); }
+    if(car.hb > 0 && car.ht <= 0){
+      const d = Math.hypot(car.group.position.x - player.position.x, car.group.position.z - player.position.z);
+      hornTone(car.hornF, car.hornDur, 0.3*Math.pow(Math.max(0, 1 - d/70), 1.4));
+      car.hb--; car.ht = car.hornDur + 0.12;
+      if(car.hb === 0){ car.hr++; car.ht = car.hornDur + 1.4; }                     // koniec rundy – dłuższa przerwa
+    }
+  }
+  let sigSndActive = false, sigPhase = false;
+  function signalClick(high, vol){                                                   // krótki mechaniczny klik: impuls prostokątny z szybkim zanikiem
+    const a = getAudio(); if(!a || vol < 0.004) return;
+    try{
+      const t = a.currentTime, o = a.createOscillator(), g = a.createGain(), hp = a.createBiquadFilter();
+      o.type = 'square'; o.frequency.value = high ? 1900 : 1350;
+      hp.type = 'highpass'; hp.frequency.value = 900;
+      g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.035);
+      o.connect(hp); hp.connect(g); g.connect(a.destination); o.start(t); o.stop(t + 0.05);
+    }catch(err){}
+  }
   function updatePlayerSignals(steer){
     if(carDriving && pSig){
       const turned = pSig === 1 ? pSigStart - carHeading : carHeading - pSigStart;      // D (prawo) zmniejsza carHeading
@@ -2787,6 +3769,12 @@
       if(pSigTurned && Math.abs(steer) < 0.1) pSig = 0;                                 // skręt zrobiony i kierownica prosto
     }
     const on = (blinkT % 0.8) < 0.4;
+    const sigActive = hasCar && (pSig !== 0 || pHazard);
+    if(sigActive && (!sigSndActive ? on : on !== sigPhase)){                           // klik przekaźnika przy każdej zmianie fazy (tik przy zapaleniu, tak przy zgaśnięciu)
+      const dc = carDriving ? 0 : Math.hypot(pcar.group.position.x - player.position.x, pcar.group.position.z - player.position.z);
+      signalClick(on, 0.09*(carDriving ? 1 : Math.pow(Math.max(0, 1 - dc/25), 1.5)));   // w aucie głośno, z zewnątrz coraz ciszej z odległością
+    }
+    sigSndActive = sigActive; sigPhase = on;
     pcar.sigL.color.setHex(((pSig === -1) || pHazard) && on ? SIG_ON : SIG_OFF);
     pcar.sigR.color.setHex(((pSig === 1) || pHazard) && on ? SIG_ON : SIG_OFF);
   }
@@ -2795,7 +3783,7 @@
     if(bikeMounted) dismountBike();
     carDriving = true; carV = 0; player.visible = false; vy = 0;
     player.position.set(pcar.group.position.x, 0, pcar.group.position.z);
-    toast('Jedziesz autem 🚗  W/S – gaz i hamulec, A/D – skręt, Spacja – ręczny, Z / C – kierunkowskazy, X – awaryjne, Shift – wysiądź');
+    toast('Jedziesz autem 🚗  W/S – gaz i hamulec, A/D – skręt, Spacja – ręczny, Z / C – kierunkowskazy, X – awaryjne, H – klakson, Shift – wysiądź');
   }
   function exitCar(){
     if(!carDriving) return;
@@ -2807,6 +3795,7 @@
   }
   function driveCar(ix, iz, dt){
     const MAXF = 20, MAXR = 6;
+    if(carFuel <= 0) iz = 0;                                                         // bez paliwa silnik nie reaguje na gaz (hamować i toczyć się można)
     if(iz > 0.05) carV += (carV < 0 ? 26 : 10)*iz*dt;
     else if(iz < -0.05) carV -= (carV > 0 ? 26 : 8)*(-iz)*dt;
     else { const f = 6*dt; carV = Math.abs(carV) <= f ? 0 : carV - Math.sign(carV)*f; }
@@ -2816,29 +3805,83 @@
     carHeading -= ix * 1.9*(1 + 0.3*steerLvl)/(1 + Math.abs(carV)/(22 + 10*steerLvl)) * grip * Math.sign(carV) * dt;   // ulepszenia: ostrzejszy skręt także przy dużej prędkości
     player.position.x += Math.sin(carHeading)*carV*dt;
     player.position.z += Math.cos(carHeading)*carV*dt;
+    if(carFuel > 0){                                                                 // zużycie: bieg jałowy + droga + mocniejszy gaz
+      carFuel = Math.max(0, carFuel - (FUEL_IDLE + Math.abs(carV)*FUEL_PER_M)*dt - Math.max(0, iz)*FUEL_THROTTLE*dt);
+      if(carFuel < 15 && !fuelLowWarned){ fuelLowWarned = true; toast('Rezerwa paliwa ⛽ Zatankuj na stacji przy ulicy Społecznej'); }
+      if(carFuel <= 0 && !fuelEmptyWarned){ fuelEmptyWarned = true; toast('Skończyło się paliwo! ⛽ Silnik zgasł'); }
+    }
+    if(carFuel > 25) fuelLowWarned = false;
+    if(carFuel > 0) fuelEmptyWarned = false;
+  }
+  // ===== Paliwo: wskaźnik w aucie, zużycie i tankowanie na stacji (F przy dystrybutorze) =====
+  const FUEL_IDLE = 0.008, FUEL_PER_M = 0.02, FUEL_THROTTLE = 0.03;                   // % baku: na sekundę, na metr, na sekundę pełnego gazu
+  const FUEL_PRICE = 0.2;                                                            // monet za 1% baku (pełny bak = 20 🪙)
+  const fuelEl = document.createElement('div'); fuelEl.id = 'fuelGauge';
+  fuelEl.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);display:none;align-items:center;gap:8px;background:rgba(0,0,0,.55);color:#fff;padding:8px 14px;border-radius:10px;font:bold 13px system-ui,sans-serif;pointer-events:none;z-index:9';
+  fuelEl.innerHTML = '<span>⛽</span><span style="opacity:.7">E</span><div style="width:150px;height:12px;border-radius:6px;background:rgba(255,255,255,.22);overflow:hidden"><div id="fuelFill" style="height:100%;width:100%;background:#66bb6a"></div></div><span style="opacity:.7">F</span><span id="fuelVal" style="min-width:38px;text-align:right">100%</span>';
+  document.body.appendChild(fuelEl);
+  const fuelFill = fuelEl.querySelector('#fuelFill'), fuelVal = fuelEl.querySelector('#fuelVal');
+  let fuelVisible = false;
+  function updateFuelGauge(){
+    const show = carDriving && hasCar;
+    if(show !== fuelVisible){ fuelVisible = show; fuelEl.style.display = show ? 'flex' : 'none'; }
+    if(!show) return;
+    fuelFill.style.width = carFuel + '%';
+    fuelFill.style.background = carFuel < 15 ? '#ef5350' : carFuel < 30 ? '#ffa726' : '#66bb6a';
+    fuelVal.textContent = Math.round(carFuel) + '%';
+    fuelEl.style.opacity = carFuel < 15 && Math.sin(performance.now()/180) > 0 ? 0.55 : 1;   // miganie przy rezerwie
+  }
+  function pumpDist(){ let bd = 99; for(const q of STATION_PUMPS) bd = Math.min(bd, Math.hypot(player.position.x - q.x, player.position.z - q.z)); return bd; }
+  function nearestPump(){ let best = null, bd = 2.6; for(const q of STATION_PUMPS){ const d = Math.hypot(player.position.x - q.x, player.position.z - q.z); if(d < bd){ bd = d; best = q; } } return best; }
+  function fuelAction(){
+    if(bikeMounted) return null;
+    const pump = nearestPump(); if(!pump) return null;
+    if(!hasCar) return {text:'F – dystrybutor ⛽ (najpierw kup auto)', run:() => toast('Nie masz auta 🚗 – kupisz je w salonie przy ulicy Poprzecznej')};
+    if(Math.hypot(pcar.group.position.x - pump.x, pcar.group.position.z - pump.z) > 7) return {text:'F – dystrybutor ⛽ (podstaw auto bliżej)', run:() => toast('Podjedź autem bliżej dystrybutora ⛽')};
+    if(carFuel >= 99.5) return {text:'F – dystrybutor ⛽ (bak pełny)', run:() => toast('Masz już pełny bak ⛽')};
+    return {text:`F – zatankuj auto ⛽ (bak: ${Math.round(carFuel)}%)`, run:openFuelTalk};
+  }
+  const fuelCost = pct => Math.max(1, Math.ceil(pct*FUEL_PRICE));
+  function openFuelTalk(){
+    const missing = 100 - carFuel, q = Math.min(25, missing);
+    const btns = [];
+    if(missing > 25.5) btns.push({label:`Dolej 25% (${fuelCost(q)} 🪙)`, fn:() => refuel(q)});
+    btns.push({label:`Do pełna (${fuelCost(missing)} 🪙)`, fn:() => refuel(missing)}, {label:'Wyjdź', fn:closeDialog});
+    say(`Stacja paliw ⛽ Bak: ${Math.round(carFuel)}%. Pełny bak kosztuje ${Math.round(100*FUEL_PRICE)} 🪙. Płacisz monetami przy sobie, a brakującą część pobiorę z konta bankowego.`, btns, '⛽ Dystrybutor', 'fuel');
+  }
+  function refuel(pct){
+    pct = Math.min(pct, 100 - carFuel);
+    if(!hasCar || pumpDist() > 3.6 || pct <= 0.01){ closeDialog(); return; }
+    const price = fuelCost(pct);
+    if(!payAny(price, 'paliwo')){ toast(`Tankowanie kosztuje ${price} monet 🪙 – masz ${coins()}${bank.opened?` + ${bank.balance} na koncie`:''}`); return; }
+    carFuel = Math.min(100, carFuel + pct); fuelLowWarned = fuelEmptyWarned = false;
+    closeDialog(); toast(`Zatankowano ⛽ +${Math.round(pct)}% (−${price} 🪙) – bak: ${Math.round(carFuel)}%`);
   }
   function svApplyCar(c){
     if(carDriving){ carDriving = false; carV = 0; player.visible = true; }
     if(paintUiOpen) closePaintUI(false);
     steerLvl = (c && c.has) ? Math.max(0, Math.min(MECH_PRICES.length, (+c.s) | 0)) : 0;
+    carFuel = (c && c.has && c.f !== undefined && isFinite(+c.f)) ? Math.max(0, Math.min(100, +c.f)) : 100; fuelLowWarned = fuelEmptyWarned = false;   // stary zapis bez paliwa → pełny bak
     if(c && c.has && isFinite(+c.x) && isFinite(+c.z)){ placeCar(+c.x, +c.z, +c.r || 0); pcar.bodyMat.color.setHex(isFinite(+c.c) ? (+c.c & 0xffffff) : PLAYER_CAR_COLOR); }
     else { hasCar = false; pcar.group.visible = false; pcar.bodyMat.color.setHex(PLAYER_CAR_COLOR); }
   }
   function spawnTrafficCar(car){
     const route = TRAFFIC_ROUTES[Math.floor(Math.random()*TRAFFIC_ROUTES.length)]();
     const [sx, sz] = route[0];
-    if(trafficCars.some(o => o !== car && o.active && Math.hypot(o.group.position.x-sx, o.group.position.z-sz) < 14)) return false;   // miejsce zajęte
+    if(trafficCars.some(o => o !== car && o.active && Math.hypot(o.group.position.x-sx, o.group.position.z-sz) < 14) || (BUS.active && Math.hypot(BUS.group.position.x-sx, BUS.group.position.z-sz) < 14)) return false;   // miejsce zajęte
+    if(route.park){ const lx = route[route.length-1][0]; if(trafficCars.some(o => o !== car && o.active && o.route && o.route.park && o.route[o.route.length-1][0] === lx)) return false; }   // to miejsce parkingowe już zajmuje inne auto
     car.route = route; car.wp = 1; car.parked = false; car.stuck = 0; car.yieldWait = 0; car.sig = 0; car.sigT = 0;
     car.heading = Math.atan2(route[1][1]-sz, route[1][0]-sx);
     car.cruise = 7 + Math.random()*4; car.speed = car.cruise;
     car.bodyMat.color.setHex(TRAFFIC_COLORS[Math.floor(Math.random()*TRAFFIC_COLORS.length)]);
-    car.group.position.set(sx, 0.02, sz);
+    car.group.position.set(sx, 0.02, sz); car.pitch = 0; car.group.rotation.z = 0;
     car.group.rotation.y = -car.heading;
     car.group.visible = true; car.active = true;
+    car.bt = car.freeT = car.hr = car.hb = car.ht = 0;                          // klakson od nowa
     return true;
   }
   function junctionClear(car, kind, jx){                                           // czy na głównej jezdni przy skrzyżowaniu z ulicą boczną (x=jx: Krótka 0, Poprzeczna POP_X) nikt nie nadjeżdża
-    for(const o of trafficCars){
+    for(const o of trafficCars.concat(BUS)){
       if(o === car || !o.active) continue;
       const oz = o.group.position.z, ox = o.group.position.x;
       if(oz > -8 || oz < -20) continue;                                          // poza główną jezdnią
@@ -2857,6 +3900,7 @@
     };
     if(car.stuck < 4){                                                         // po 4 s zakleszczenia auto przejeżdża „przez” przeszkodę
       for(const o of trafficCars) if(o !== car && o.active && check(o.group.position.x, o.group.position.z, 9, 2.3)) return true;
+      if(BUS.active){ const bp = BUS.group.position, bcx = Math.cos(BUS.heading), bsz = Math.sin(BUS.heading); for(const k of [-3.5, 0, 3.5]) if(check(bp.x + bcx*k, bp.z + bsz*k, 8, 2.6)) return true; }   // autobus (długi): sprawdź tył, środek i przód
       if(hasCar && !carDriving && pcar.group.visible && check(pcar.group.position.x, pcar.group.position.z, 8, 2.3)) return true;   // zaparkowane auto gracza
     }
     return check(player.position.x, player.position.z, 8, 2.0);                // gracz na jezdni – auto zwalnia i staje
@@ -2881,6 +3925,7 @@
     let d = ang - car.heading; while(d > Math.PI) d -= Math.PI*2; while(d < -Math.PI) d += Math.PI*2;
     return d > 0.55 ? 1 : (d < -0.55 ? -1 : 0);
   }
+  let npcSigPhase = false;
   function updateTraffic(dt){
     blinkT += dt;
     const blinkOn = (blinkT % 0.8) < 0.4;
@@ -2892,6 +3937,16 @@
       } else car.sig = 0;
       car.sigL.color.setHex(car.sig === -1 && blinkOn ? SIG_ON : SIG_OFF);
       car.sigR.color.setHex(car.sig === 1 && blinkOn ? SIG_ON : SIG_OFF);
+    }
+    if(blinkOn !== npcSigPhase){                                                // jeden wspólny klik na zmianę fazy – głośność wg najbliższego auta z kierunkowskazem
+      npcSigPhase = blinkOn;
+      let vol = 0;
+      for(const car of trafficCars){
+        if(!car.active || !car.sig) continue;
+        const dc = Math.hypot(car.group.position.x - player.position.x, car.group.position.z - player.position.z);
+        vol = Math.max(vol, 0.07*Math.pow(Math.max(0, 1 - dc/30), 1.5));
+      }
+      if(vol > 0) signalClick(blinkOn, vol);
     }
     for(const car of trafficCars){
       if(!car.active){ car.wait -= dt; if(car.wait <= 0 && !spawnTrafficCar(car)) car.wait = 0.5; continue; }
@@ -2912,6 +3967,7 @@
       let da = want - car.heading; while(da > Math.PI) da -= Math.PI*2; while(da < -Math.PI) da += Math.PI*2;
       car.heading += Math.sign(da) * Math.min(Math.abs(da), 2.6*dt);
       const blocked = trafficBlocked(car);
+      trafficHorn(car, dt);
       car.stuck = (blocked && car.speed < 0.5) ? car.stuck + dt : 0;              // zakleszczenie dwóch aut: po 4 s jedno przejeżdża „przez” drugie
       if(car.stuck > 7) car.stuck = 0;
       let cap = car.cruise;
@@ -2924,6 +3980,12 @@
       p.x += Math.cos(car.heading) * car.speed * dt;
       p.z += Math.sin(car.heading) * car.speed * dt;
       car.group.rotation.y = -car.heading;
+      { // jazda po wzgórzu: wysokość środka = średnia pod osiami, nos wychyla się wg nachylenia drogi (płynnie)
+        const cx = Math.cos(car.heading), cz = Math.sin(car.heading);
+        const hf = terrainH(p.x + cx*2, p.z + cz*2), hb = terrainH(p.x - cx*2, p.z - cz*2);
+        car.pitch += (Math.atan2(hf - hb, 4) - car.pitch)*Math.min(1, dt*8);
+        p.y = (hf + hb)/2 + 0.02; car.group.rotation.z = car.pitch;
+      }
       if(!mustWait && Math.hypot(tx-p.x, tz-p.z) < ((car.route.park && car.wp === car.route.length-1) ? 0.5 : 2.5)){   // ostatni punkt parkowania – dokładnie w miejscu
         if(++car.wp >= car.route.length){
           if(car.route.park){ car.parked = true; car.parkTimer = 3 + Math.random()*4; car.speed = 0; }   // zaparkował
@@ -2939,17 +4001,35 @@
   const mapOverlay = document.getElementById('mapOverlay');
   const miniMapCtx = miniMapCanvas.getContext('2d');
   const bigMapCtx = bigMapCanvas.getContext('2d');
-  let fullMapOpen = false, mapView = null;
-  const MAP_BOUNDS = {minX:-92, maxX:152, minZ:-94, maxZ:92};
+  let mapCoords = true;                                                // współrzędne na mapie: włączone / wyłączone (zapamiętywane)
+  try{ if(localStorage.getItem('mapCoords') === '0') mapCoords = false; }catch(_){}
+  let fullMapOpen = false, mapView = null, mapCursor = null;          // mapCursor: {px,py} w pikselach płótna dużej mapy
+  const MAP_BOUNDS = {minX:0, maxX:1, minZ:0, maxZ:1};                 // liczone na bieżąco z MAP_EXTENTS (auto-dopasowanie)
   function drawCityMap(ctx, canvas, view){
     const w=canvas.width, h=canvas.height;
     ctx.clearRect(0,0,w,h);
     ctx.fillStyle='#8aa879'; ctx.fillRect(0,0,w,h);
     const k=view?view.k:1;
     ctx.save(); if(view){ctx.translate(view.tx,view.ty);ctx.scale(k,k);}   // przybliżenie dużej mapy
-    const pad=22, sx=(w-2*pad)/(MAP_BOUNDS.maxX-MAP_BOUNDS.minX), sz=(h-2*pad)/(MAP_BOUNDS.maxZ-MAP_BOUNDS.minZ);
+    // Auto-dopasowanie: obejmij cały teren, zachowaj proporcje (jedna skala na obu osiach) i wyśrodkuj
+    const pad=22, M=MAP_BOUNDS;
+    M.minX=Infinity; M.maxX=-Infinity; M.minZ=Infinity; M.maxZ=-Infinity;
+    for(const e of MAP_EXTENTS){ M.minX=Math.min(M.minX,e.minX); M.maxX=Math.max(M.maxX,e.maxX); M.minZ=Math.min(M.minZ,e.minZ); M.maxZ=Math.max(M.maxZ,e.maxZ); }
+    const fit=Math.min((w-2*pad)/(M.maxX-M.minX),(h-2*pad)/(M.maxZ-M.minZ)), sx=fit, sz=fit;
+    const offX=(w-(M.maxX-M.minX)*fit)/2, offY=(h-(M.maxZ-M.minZ)*fit)/2;
     // Odbicie osi X: mapa ma być zgodna z orientacją widzianą przez gracza
-    const pt=(x,z)=>({x:pad+(MAP_BOUNDS.maxX-x)*sx,y:h-pad-(z-MAP_BOUNDS.minZ)*sz});
+    const pt=(x,z)=>({x:offX+(MAP_BOUNDS.maxX-x)*sx,y:h-offY-(z-MAP_BOUNDS.minZ)*sz});
+    const isBig = canvas===bigMapCanvas;
+    // Siatka współrzędnych świata (co 20 m, po przybliżeniu co 10 m) z opisem osi X i Z
+    if(isBig && mapCoords){
+      const step = k>=2 ? 10 : 20, gx0=Math.ceil(M.minX/step)*step, gz0=Math.ceil(M.minZ/step)*step;
+      const gf = 10*Math.max(.62,Math.min(1.35,w/660))*(view?1.4/k:1);
+      ctx.save(); ctx.lineWidth=1/k; ctx.strokeStyle='rgba(255,255,255,.16)'; ctx.fillStyle='rgba(255,255,255,.78)';
+      ctx.font=`${gf}px system-ui`; ctx.shadowColor='#18232c'; ctx.shadowBlur=3;
+      for(let gx=gx0; gx<=M.maxX; gx+=step){ const a=pt(gx,M.minZ), b=pt(gx,M.maxZ); ctx.strokeStyle=gx===0?'rgba(255,255,255,.4)':'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.fillText('x'+gx,a.x,a.y-2/k); }
+      for(let gz=gz0; gz<=M.maxZ; gz+=step){ const a=pt(M.maxX,gz), b=pt(M.minX,gz); ctx.strokeStyle=gz===0?'rgba(255,255,255,.4)':'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText('z'+gz,a.x+3/k,a.y); }
+      ctx.restore();
+    }
     // Ulice i chodniki
     ctx.fillStyle='#c4c1b5';
     let a=pt(-80,ROAD_Z-11), b=pt(80,ROAD_Z+11); ctx.fillRect(Math.min(a.x,b.x),b.y,Math.abs(b.x-a.x),a.y-b.y);
@@ -2963,7 +4043,25 @@
     mrect(80,ROAD_Z-ROAD_W/2,RB.x-12,ROAD_Z+ROAD_W/2,'#454b50'); mrect(RB.x-ROAD_W/2,RB.z-12,RB.x+ROAD_W/2,-52,'#454b50');
     mrect(SUPER.x-SUPER.w/2,-52,SUPER.x+SUPER.w/2,-64,'#454b50');
     mrect(POP_X-POP_EDGE,SIDE_ROAD_START,POP_X+POP_EDGE,POP_END,'#c4c1b5'); mrect(POP_X-ROAD_W/2,SIDE_ROAD_START,POP_X+ROAD_W/2,POP_END,'#454b50');   // ulica Poprzeczna
-    mrect(RB.x-11,RB.z+12,RB.x+11,84,'#c4c1b5'); mrect(RB.x-ROAD_W/2,RB.z+12,RB.x+ROAD_W/2,84,'#454b50');   // ulica Społeczna
+    { // wzgórze: obraz policzony raz (jaśniejsza zieleń = wyżej), rysowany w skali mapy
+      if(!window.__hillMapImg){
+        const B=HILL_BOX, cw=Math.round((B.maxX-B.minX)/2), ch=Math.round((B.maxZ-B.minZ)/2), hc=document.createElement('canvas'); hc.width=cw; hc.height=ch;
+        const hx=hc.getContext('2d'), id=hx.createImageData(cw,ch);
+        for(let j=0;j<ch;j++) for(let i=0;i<cw;i++){
+          const wx=B.maxX-(i+.5)*2, wz=B.minZ+(ch-j-.5)*2, hh=terrainH(wx,wz)/HILL.h, o=(j*cw+i)*4;
+          id.data[o]=110-30*hh; id.data[o+1]=140-20*hh; id.data[o+2]=95-20*hh; id.data[o+3]=hh<0.02?0:255*(0.35+0.4*hh);
+        }
+        hx.putImageData(id,0,0); window.__hillMapImg=hc;
+      }
+      const B=HILL_BOX, p0=pt(B.maxX,B.maxZ), p1=pt(B.minX,B.minZ);
+      ctx.drawImage(window.__hillMapImg,p0.x,p0.y,p1.x-p0.x,p1.y-p0.y);
+    }
+    mrect(RB.x-11,RB.z+12,RB.x+11,SPOL_END,'#c4c1b5'); mrect(RB.x-ROAD_W/2,RB.z+12,RB.x+ROAD_W/2,SPOL_END,'#454b50');   // ulica Społeczna
+    { // przedłużenie Społecznej ze zakrętem: chodnik i jezdnia jako grube linie po osi ścieżki
+      const strokePath=(wm,color)=>{ ctx.save(); ctx.strokeStyle=color; ctx.lineWidth=wm*sx; ctx.lineJoin='round'; ctx.lineCap='butt'; ctx.beginPath();
+        SPOL_PATH.forEach((q,i)=>{ const c=pt(q[0],q[1]); if(i) ctx.lineTo(c.x,c.y); else ctx.moveTo(c.x,c.y); }); ctx.stroke(); ctx.restore(); };
+      strokePath(22,'#c4c1b5'); strokePath(ROAD_W,'#454b50');
+    }
     {const c=pt(RB.x,RB.z);ctx.fillStyle='#454b50';ctx.beginPath();ctx.arc(c.x,c.y,RB.rOut*sx,0,Math.PI*2);ctx.fill();
      ctx.fillStyle='#8aa879';ctx.beginPath();ctx.arc(c.x,c.y,RB.rIn*sx,0,Math.PI*2);ctx.fill();}
     // Budynki z rzeczywistych współrzędnych świata
@@ -2973,7 +4071,7 @@
       ctx.fillRect(Math.min(q.x,r.x),r.y,Math.abs(r.x-q.x),q.y-r.y);ctx.strokeRect(Math.min(q.x,r.x),r.y,Math.abs(r.x-q.x),q.y-r.y);
     }
     // Podpisy najważniejszych miejsc
-    const labels=[['Real Shop',SHOP.x,SHOP.z],['Restauracja',REST.x,REST.z],['Bank',BANK.x,BANK.z],['Mebelek',FURN.x,FURN.z],...HOMES.map(H=>[H.owned?H.label+' (twój)':H.rented?H.label:H.label+' (wynajem / kupno)',H.x,H.z]),['Supermarket Pandy',SUPER.x,SUPER.z],['Ubrania',CLOTH.x,CLOTH.z],['Salon samochodowy',CAR.x,CAR.z],['Lakiernik',PAINT.x,PAINT.z],['Mechanik',MECH.x,MECH.z]];
+    const labels=[['Real Shop',SHOP.x,SHOP.z],['Restauracja',REST.x,REST.z],['Bank',BANK.x,BANK.z],['Mebelek',FURN.x,FURN.z],...HOMES.map(H=>[H.owned?H.label+' (twój)':H.label,H.x,H.z]),['Supermarket Pandy (8–22)',SUPER.x,SUPER.z],['Sklep AGD',AGD.x,AGD.z],['Ubrania',CLOTH.x,CLOTH.z],['Salon samochodowy',CAR.x,CAR.z],['Lakiernik',PAINT.x,PAINT.z],['Mechanik',MECH.x,MECH.z],['Stacja paliw',STATION.x,STATION.z],...BUS_STOPS.map(b=>['Przystanek',b.x,b.z])];
     const scaleUI=Math.max(.62,Math.min(1.35,w/660)), scale=scaleUI*(view?1.4/k:1);
     ctx.font=`bold ${12*scale}px system-ui`;ctx.textAlign='center';ctx.textBaseline='middle';
     for(const [name,x,z] of labels){const q=pt(x,z);ctx.fillStyle='#fff';ctx.shadowColor='#18232c';ctx.shadowBlur=4;ctx.fillText(name,q.x,q.y-10*scale);}
@@ -2994,10 +4092,34 @@
       ctx.restore();
     }
     // Gracz i kierunek patrzenia
-    const p=pt(player.position.x,player.position.z);const ang=-(player.rotation.y||0);
+    const p=pt(player.position.x,player.position.z);const ang=-((carDriving?carHeading:player.rotation.y)||0);   // w aucie znacznik obraca się razem z autem
     ctx.save();ctx.translate(p.x,p.y);ctx.rotate(ang);ctx.fillStyle='#ffd54a';ctx.strokeStyle='#342600';ctx.lineWidth=2/k;
     ctx.beginPath();ctx.moveTo(0,-11*scale);ctx.lineTo(7*scale,8*scale);ctx.lineTo(0,5*scale);ctx.lineTo(-7*scale,8*scale);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
     ctx.restore();
+    // Współrzędne: pozycja gracza (x, y, z) na obu mapach + wskaźnik kursora na dużej mapie
+    if(mapCoords){
+      const f=isBig?15:22, pp=player.position;
+      const txt=`📍 x ${pp.x.toFixed(1)}  y ${pp.y.toFixed(1)}  z ${pp.z.toFixed(1)}`;
+      ctx.font=`bold ${f}px ui-monospace,Menlo,Consolas,monospace`; ctx.textAlign='left'; ctx.textBaseline='bottom';
+      const tw=ctx.measureText(txt).width;
+      ctx.fillStyle='rgba(12,20,27,.78)'; ctx.fillRect(6,h-f-14,tw+12,f+10);
+      ctx.fillStyle='#ffd54a'; ctx.fillText(txt,12,h-9);
+      if(isBig && mapCursor){
+        const lx=(mapCursor.px-(view?view.tx:0))/k, ly=(mapCursor.py-(view?view.ty:0))/k;
+        const wx=M.maxX-(lx-offX)/sx, wz=M.minZ+(h-offY-ly)/sz;
+        if(wx>=M.minX-5&&wx<=M.maxX+5&&wz>=M.minZ-5&&wz<=M.maxZ+5){
+          ctx.strokeStyle='rgba(255,255,255,.75)'; ctx.lineWidth=1; ctx.setLineDash([5,4]);
+          ctx.beginPath(); ctx.moveTo(mapCursor.px,0); ctx.lineTo(mapCursor.px,h); ctx.moveTo(0,mapCursor.py); ctx.lineTo(w,mapCursor.py); ctx.stroke(); ctx.setLineDash([]);
+          const ct=`🎯 x ${wx.toFixed(1)}  y ${terrainH(wx,wz).toFixed(1)}  z ${wz.toFixed(1)}`, hint='PPM – kopiuj';
+          ctx.font=`bold ${f}px ui-monospace,Menlo,Consolas,monospace`; const cw=Math.max(ctx.measureText(ct).width,ctx.measureText(hint).width);
+          const bx=Math.min(w-cw-18,Math.max(4,mapCursor.px+12)), by=Math.min(h-2*f-18,Math.max(4,mapCursor.py+12));
+          ctx.fillStyle='rgba(12,20,27,.85)'; ctx.fillRect(bx,by,cw+14,2*f+14);
+          ctx.fillStyle='#8be9ff'; ctx.textBaseline='top'; ctx.fillText(ct,bx+7,by+5);
+          ctx.fillStyle='#b8c4cc'; ctx.font=`${f-3}px system-ui`; ctx.fillText(hint,bx+7,by+f+8);
+          mapCursor.wx=wx; mapCursor.wy=terrainH(wx,wz); mapCursor.wz=wz;
+        }
+      }
+    }
     // Ramka mapy i kompas
     ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=2;ctx.strokeRect(1,1,w-2,h-2);
     ctx.fillStyle='#fff';ctx.font=`bold ${12*scaleUI}px system-ui`;ctx.textAlign='right';ctx.fillText('N ↑',w-10,18);
@@ -3019,10 +4141,34 @@
     }
     drawCityMap(bigMapCtx,bigMapCanvas,mapView);
   });
+  const mapPx=e=>{ const r=bigMapCanvas.getBoundingClientRect(); return {px:(e.clientX-r.left)*bigMapCanvas.width/r.width, py:(e.clientY-r.top)*bigMapCanvas.height/r.height}; };
+  bigMapCanvas.addEventListener('mousemove',e=>{ mapCursor=mapPx(e); });
+  bigMapCanvas.addEventListener('mouseleave',()=>{ mapCursor=null; });
+  bigMapCanvas.addEventListener('contextmenu',e=>{             // prawy klik: skopiuj współrzędne klikniętego miejsca
+    e.preventDefault(); mapCursor=mapPx(e); drawCityMap(bigMapCtx,bigMapCanvas,mapView);
+    if(!mapCoords || mapCursor.wx===undefined) return;
+    const t=`x ${mapCursor.wx.toFixed(1)}, y ${mapCursor.wy.toFixed(1)}, z ${mapCursor.wz.toFixed(1)}`;
+    try{ navigator.clipboard.writeText(t); }catch(_){}
+    toast('📋 Skopiowano: '+t);
+  });
   document.getElementById('mapClose').onclick=()=>setFullMap(false);
+  const coordBtn=document.createElement('button');                     // przełącznik współrzędnych w oknie dużej mapy
+  coordBtn.type='button'; coordBtn.id='mapCoordBtn';
+  coordBtn.style.cssText='position:absolute;right:170px;top:14px;border:0;border-radius:7px;padding:7px 11px;background:#2e7d32;color:#fff;font-size:14px;cursor:pointer';
+  document.getElementById('mapCard').appendChild(coordBtn);
+  function setMapCoords(on){
+    mapCoords=!!on; try{ localStorage.setItem('mapCoords', mapCoords?'1':'0'); }catch(_){}
+    coordBtn.textContent = mapCoords ? '📍 Współrzędne: WŁ (G)' : '📍 Współrzędne: WYŁ (G)';
+    coordBtn.style.background = mapCoords ? '#2e7d32' : '#6b7580';
+    if(!mapCoords) mapCursor=null;
+    if(fullMapOpen) drawCityMap(bigMapCtx,bigMapCanvas,mapView);
+  }
+  coordBtn.onclick=()=>setMapCoords(!mapCoords);
+  setMapCoords(mapCoords);
   mapOverlay.addEventListener('click',e=>{if(e.target===mapOverlay)setFullMap(false);});
   addEventListener('keydown',e=>{
     if(e.code==='KeyM'&&!e.repeat&&!isPaused&&!isDead){e.preventDefault();setFullMap(!fullMapOpen);}
+    if(e.code==='KeyG'&&!e.repeat&&fullMapOpen&&!isPaused&&!isDead){e.preventDefault();setMapCoords(!mapCoords);}
     if(e.code==='Escape'&&fullMapOpen)setFullMap(false);
   });
 
@@ -3080,9 +4226,19 @@
     order:{n:'Zamówienie', i:'📦', color:0xd9a441},
     desk:{n:'Biurko', i:'🗄️', color:0xb07a43, use:'Ustaw w domu'},
     deskpart:{n:'Biurko (część)', i:'🗄️', color:0xb07a43},
+    oven:{n:'Piekarnik', i:'🍳', color:0x9aa5ae, use:'Ustaw w domu'},
+    pizzafrozen:{n:'Pizza mrożona', i:'🍕', color:0xe8c27a, use:'Włóż do piekarnika'},
+    pizza:{n:'Upieczona pizza', i:'🍕', color:0xf2b134, use:'Zjedz'},
+    pizzaburnt:{n:'Spalona pizza', i:'🔥', color:0x2b2118, use:'Zjedz'},
+    ovenpart:{n:'Piekarnik (część)', i:'🍳', color:0x9aa5ae},
     chair:{n:'Krzesło', i:'🪑', color:0xb07a43, use:'Ustaw w domu'},
     wardrobe:{n:'Szafa', i:'🚪', color:0x7a4e2a, use:'Ustaw w domu'},
-    lamp:{n:'Lampa sufitowa', i:'💡', color:0xe07b39, use:'Zamontuj na suficie'}
+    lamp:{n:'Lampa sufitowa', i:'💡', color:0xe07b39, use:'Zamontuj na suficie'},
+    kettle:{n:'Czajnik elektryczny', i:'☕', color:0xb8c2ca},
+    toaster:{n:'Toster', i:'🥪', color:0x9aa5ae},
+    blender:{n:'Blender', i:'🍹', color:0x2b2f35},
+    microwave:{n:'Mikrofalówka', i:'🍲', color:0xc3ccd3},
+    vacuum:{n:'Odkurzacz', i:'🧹', color:0xd9412f}
   };
   const inv = new Array(20).fill(null);
   const $ = id => document.getElementById(id);
@@ -3143,31 +4299,114 @@
     if(k < 0) return false;
     inv[k] = {id, count:1}; return true;
   }
-  const DESK_SLOTS = 10;
+  const DESK_SLOTS = 10, OVEN_SLOTS = 8;
+  const BIG = {desk:{slots:DESK_SLOTS, part:'deskpart'}, oven:{slots:OVEN_SLOTS, part:'ovenpart'}};   // przedmioty zajmujące wiele slotów
   const freeSlots = () => inv.filter(x => !x).length;
-  function addDesk(){                                   // biurko zajmuje 10 slotów: jeden główny + 9 części
-    const free = []; inv.forEach((x,i) => { if(!x) free.push(i); });
-    if(free.length < DESK_SLOTS) return false;
+  function addBig(id){                                  // jeden slot główny + (slots-1) części
+    const B = BIG[id], free = []; inv.forEach((x,i) => { if(!x) free.push(i); });
+    if(!B || free.length < B.slots) return false;
     const k0 = free[0];
-    inv[k0] = {id:'desk', count:1};
-    for(let i=1;i<DESK_SLOTS;i++) inv[free[i]] = {id:'deskpart', count:1, main:k0};
+    inv[k0] = {id, count:1};
+    for(let i=1;i<B.slots;i++) inv[free[i]] = {id:B.part, count:1, main:k0};
     return true;
   }
+  const addDesk = () => addBig('desk');
   function removeOne(k){
     const s = inv[k]; if(!s) return;
-    if(s.id === 'deskpart') return;
-    if(s.id === 'desk'){ inv.forEach((q,i) => { if(q && q.main === k) inv[i] = null; }); inv[k] = null; return; }
+    if(s.id === 'deskpart' || s.id === 'ovenpart') return;
+    if(BIG[s.id]){ inv.forEach((q,i) => { if(q && q.main === k) inv[i] = null; }); inv[k] = null; return; }
     if(--s.count <= 0){
       inv[k] = null;
       if(s.id === 'hat'){ hatOn = false; hat.visible = false; }
       if(s.id === 'phone') closePhone();
     }
   }
+  // ===== Bagażnik auta: 30 slotów, kliknięcie przedmiotu przenosi cały stos (z ekwipunku do bagażnika i z powrotem) =====
+  const TRUNK_SLOTS = 30;
+  const trunk = new Array(TRUNK_SLOTS).fill(null);
+  const trunkEl = document.getElementById('trunk');
+  const trunkOpen = () => trunkEl.style.display === 'block';
+  function trunkAdd(id, n){
+    const t = trunk.find(x => x && x.id === id);
+    if(t){ t.count += n; return true; }
+    const k = trunk.indexOf(null); if(k < 0) return false;
+    trunk[k] = {id, count:n}; return true;
+  }
+  const trunkFree = () => trunk.filter(x => !x).length;
+  function trunkAddBig(id){                              // duży przedmiot: slot główny + części (tak jak w ekwipunku)
+    const B = BIG[id], free = []; trunk.forEach((x,i) => { if(!x) free.push(i); });
+    if(!B || free.length < B.slots) return false;
+    trunk[free[0]] = {id, count:1};
+    for(let i = 1; i < B.slots; i++) trunk[free[i]] = {id:B.part, count:1, main:free[0]};
+    return true;
+  }
+  function trunkSlotEl(s, onClick){
+    const d = document.createElement('div'); d.className = 'slot' + (s && (s.id === 'deskpart' || s.id === 'ovenpart') ? ' part' : '');
+    if(s){
+      if(s.id === 'coin') d.innerHTML = '<i class="coin inventory-coin" aria-label="Monety"></i>'; else d.textContent = ITEMS[s.id].i;
+      d.title = ITEMS[s.id].n + (s.count > 1 ? ' ×' + s.count : '');
+      if(s.count > 1) d.insertAdjacentHTML('beforeend', `<span class="n">${s.count}</span>`);
+      if(s.id === 'hat' && hatOn) d.insertAdjacentHTML('beforeend', '<span class="eq">✓</span>');
+    }
+    d.onclick = onClick; return d;
+  }
+  function renderTrunk(){
+    const tg = document.getElementById('trunkGrid'), ig = document.getElementById('trunkInvGrid');
+    tg.innerHTML = ''; ig.innerHTML = '';
+    trunk.forEach((s, k) => tg.appendChild(trunkSlotEl(s, () => trunkTake(k))));
+    inv.forEach((s, k) => ig.appendChild(trunkSlotEl(s, () => trunkPut(k))));
+    document.getElementById('trunkCount').textContent = `(${trunk.filter(x => x).length}/${TRUNK_SLOTS})`;
+  }
+  function trunkPut(k){                                  // ekwipunek → bagażnik
+    let s = inv[k]; if(!s) return;
+    if(s.main !== undefined){ k = s.main; s = inv[k]; if(!s) return; }      // kliknięto część dużego przedmiotu
+    if(s.id === 'order'){ toast('Zamówienia nie schowasz w bagażniku'); return; }
+    if(BIG[s.id]){
+      const need = BIG[s.id].slots;
+      if(trunkFree() < need){ toast(`${ITEMS[s.id].n} zajmuje ${need} slotów – w bagażniku brakuje miejsca (wolne: ${trunkFree()})`); return; }
+      trunkAddBig(s.id); removeOne(k); renderTrunk(); renderInv();
+      toast(`Schowano do bagażnika: ${ITEMS[s.id].i} ${ITEMS[s.id].n}`); return;
+    }
+    if(!trunkAdd(s.id, s.count)){ toast('Bagażnik pełny 🧳'); return; }
+    if(s.id === 'hat' && hatOn){ hatOn = false; hat.visible = false; }
+    if(s.id === 'phone') closePhone();
+    inv[k] = null; renderTrunk(); renderInv();
+    toast(`Schowano do bagażnika: ${ITEMS[s.id].i} ${ITEMS[s.id].n}${s.count > 1 ? ' ×' + s.count : ''}`);
+  }
+  function trunkTake(k){                                 // bagażnik → ekwipunek
+    let s = trunk[k]; if(!s) return;
+    if(s.main !== undefined){ k = s.main; s = trunk[k]; if(!s) return; }
+    if(BIG[s.id]){
+      const need = BIG[s.id].slots;
+      if(freeSlots() < need){ toast(`${ITEMS[s.id].n} zajmuje ${need} slotów – zrób miejsce w ekwipunku (wolne: ${freeSlots()})`); return; }
+      addBig(s.id); trunk.forEach((q,i) => { if(q && q.main === k) trunk[i] = null; }); trunk[k] = null;
+      renderTrunk(); renderInv(); toast(`Wyjęto z bagażnika: ${ITEMS[s.id].i} ${ITEMS[s.id].n}`); return;
+    }
+    if(!(inv.some(x => x && x.id === s.id) || inv.indexOf(null) >= 0)){ toast('Ekwipunek pełny – zrób miejsce'); return; }
+    for(let i = 0; i < s.count; i++) addItem(s.id);
+    trunk[k] = null; renderTrunk(); renderInv();
+    toast(`Wyjęto z bagażnika: ${ITEMS[s.id].i} ${ITEMS[s.id].n}${s.count > 1 ? ' ×' + s.count : ''}`);
+  }
+  function trunkNearRear(){                              // tył auta (bagażnik jest z tyłu, przód = +Z grupy)
+    if(!hasCar || carDriving || !pcar.group.visible) return false;
+    const rx = pcar.group.position.x - Math.sin(carHeading)*3.1, rz = pcar.group.position.z - Math.cos(carHeading)*3.1;
+    return Math.hypot(player.position.x - rx, player.position.z - rz) < 2.0;
+  }
+  function openTrunk(){
+    if(!hasCar) return;
+    invEl.style.display = 'none'; promptEl.style.display = 'none';
+    renderTrunk(); trunkEl.style.display = 'block';
+  }
+  function closeTrunk(){ trunkEl.style.display = 'none'; }
+  document.getElementById('trunkClose').onclick = closeTrunk;
+  addEventListener('keydown', e => { if(e.code === 'Escape' && trunkOpen()) closeTrunk(); });
+  setInterval(() => { if(trunkOpen() && !trunkNearRear()) closeTrunk(); }, 300);   // odejście od auta zamyka bagażnik
+
   function renderInv(){
     gridEl.innerHTML = '';
     inv.forEach((s, k) => {
       const d = document.createElement('div');
-      d.className = 'slot' + ((k === sel || (s && s.main !== undefined && s.main === sel)) ? ' sel' : '') + (s && s.id === 'deskpart' ? ' part' : '');
+      d.className = 'slot' + ((k === sel || (s && s.main !== undefined && s.main === sel)) ? ' sel' : '') + (s && (s.id === 'deskpart' || s.id === 'ovenpart') ? ' part' : '');
       if(s){
         // Monety w ekwipunku pokazuj jako tę samą złotą grafikę co w sklepie.
         if(s.id === 'coin'){
@@ -3182,7 +4421,7 @@
       gridEl.appendChild(d);
     });
     const s = inv[sel];
-    infoEl.textContent = s ? (s.id === 'desk' ? `Biurko – zajmuje ${DESK_SLOTS} slotów` : `${ITEMS[s.id].n} ×${s.count}`) : 'Wybierz przedmiot';
+    infoEl.textContent = s ? (BIG[s.id] ? `${ITEMS[s.id].n} – zajmuje ${BIG[s.id].slots} slotów` : `${ITEMS[s.id].n} ×${s.count}`) : 'Wybierz przedmiot';
     useBtn.disabled = !(s && ITEMS[s.id].use);
     useBtn.textContent = s && ITEMS[s.id].use ? ITEMS[s.id].use : 'Użyj';
     dropBtn.disabled = !s;
@@ -3191,10 +4430,13 @@
     const s = inv[sel]; if(!s) return;
     if(s.id === 'apple'){ removeOne(sel); addStats(15, 3); toast('Smaczne! 🍎 +15 sytości'); }
     else if(s.id === 'bread'){ removeOne(sel); addStats(30, 3); toast('Świeży chleb! 🍞 +30 sytości'); }
+    else if(s.id === 'pizza'){ removeOne(sel); addStats(55, 5); toast('Pyszna pizza! 🍕 +55 sytości, +5 energii'); }
+    else if(s.id === 'pizzaburnt'){ removeOne(sel); addStats(5, 0); toast('Spalona pizza… ledwo da się zjeść 🔥 +5 sytości'); }
+    else if(s.id === 'pizzafrozen'){ const po = homeInside ? nearDesk('oven') : null; if(po) openOven(po); else toast('Włóż pizzę do piekarnika w swoim domu 🍳'); }
     else if(s.id === 'cola'){ removeOne(sel); addStats(5, 15); toast('Orzeźwiająca cola! 🥤 +15 energii, +5 sytości'); }
     else if(s.id === 'phone'){ openPhone(); }
     else if(s.id === 'charger'){ if(homeInside && nearOutlet() < 2.2) plugCharger(); else toast('Podłącz ładowarkę do gniazdka w swoim domu 🏠'); }
-    else if(s.id === 'desk' || s.id === 'chair' || s.id === 'wardrobe' || s.id === 'computer' || s.id === 'lamp'){ startPlacement(sel); }
+    else if(s.id === 'desk' || s.id === 'chair' || s.id === 'wardrobe' || s.id === 'computer' || s.id === 'lamp' || s.id === 'oven'){ startPlacement(sel); }
     else if(s.id === 'hat'){ hatOn = !hatOn; hat.visible = hatOn; toast(hatOn ? 'Założono czapkę' : 'Zdjęto czapkę'); }
     renderInv();
   };
@@ -3202,6 +4444,7 @@
     const s = inv[sel]; if(!s) return;
     if(s.id === 'order'){ toast('Nie możesz wyrzucić zamówienia'); return; }
     if(s.id === 'desk'){ toast('Biurka nie wyrzucisz – ustaw je w swoim domu 🏠'); return; }
+    if(s.id === 'oven'){ toast('Piekarnika nie wyrzucisz – ustaw go w swoim domu 🏠'); return; }
     if(s.id === 'chair'){ toast('Krzesła nie wyrzucisz – ustaw je w swoim domu 🏠'); return; }
     if(s.id === 'wardrobe'){ toast('Szafy nie wyrzucisz – ustaw ją w swoim domu 🏠'); return; }
     if(s.id === 'lamp'){ toast('Lampy nie wyrzucisz – zamontuj ją na suficie w swoim domu 🏠'); return; }
@@ -3528,11 +4771,13 @@
       if(shopEl.style.display === 'block') closeShop();
       else if($('fridge').style.display === 'block') closeFridge();
       else if($('wardrobe').style.display === 'block') closeWardrobe();
+      else if(trunkOpen()) closeTrunk();
+      else if(ovenOpen()) closeOven();
       else if(dlgEl.style.display === 'flex') closeDialog();
       else if(carDriving) return;                                               // z auta wysiada się Shiftem
       else if(curAct && !bikeMounted) curAct.run();
     }
-    if(e.code === 'KeyG' && homeInside && !sitting && !placing){ const pc = nearDesk('chair') || nearDesk('wardrobe') || nearLamp(); if(pc) pickupDesk(pc); }
+    if(e.code === 'KeyG' && homeInside && !sitting && !placing){ const pc = nearDesk('chair') || nearDesk('wardrobe') || nearDesk('oven') || nearLamp(); if(pc) pickupDesk(pc); }
     if(e.code === 'KeyP') phoneEl.style.display === 'flex' ? closePhone() : openPhone();
     if(e.code === 'Escape'){ closeShop(); closePhone(); closeDialog(); closeFridge(); closeWardrobe(); cancelPlacement(); closePaintUI(true); }
   });
@@ -3640,7 +4885,7 @@
     ['ul. Krótka',6.65,20], ['ul. Krótka',-6.65,52],
     ['ul. Poprzeczna',71.35,8], ['Mechanik',71.35,42], ['Salon samochodowy',84.65,25], ['Lakiernik',84.65,46], ['ul. Poprzeczna',84.65,58],
     ['Rondo',112,-7.4], ['ul. Społeczna',123.35,30], ['ul. Społeczna',136.65,18], ['Sklep z ubraniami',136.65,56],
-    ['Supermarket Pandy',124,-61]
+    ['Supermarket Pandy',124,-61], ['Sklep AGD',92,-61]
   ];
   const upperRoute = (a, b) => Math.abs(a[1]-b[1]) + Math.abs(a[2]-b[2]);       // trasa ≈ odległość „po ulicach”
   const upperFare = m => Math.max(4, Math.round(3 + m*0.08));                    // zarobek rośnie z długością trasy (ok. 1 moneta na 12 m)
@@ -3792,7 +5037,7 @@
     upperApp.hired = !!(u && u.h); upperApp.done = u ? Math.max(0, u.n|0) : 0; upperApp.earned = u ? Math.max(0, u.e|0) : 0;
   }
   // ===== Zakupy w Supermarkecie Pandy: koszyk, towary z regałów, płatność przy kasie =====
-  const SUP_PRODUCTS = {apple:{n:'Jabłko',i:'🍎',p:2}, cola:{n:'Cola',i:'🥤',p:3}, bread:{n:'Chleb',i:'🍞',p:4}, computer:{n:'Komputer',i:'🖥️',p:100}, phone:{n:'Telefon',i:'📱',p:5}, charger:{n:'Ładowarka',i:'🔌',p:8}};
+  const SUP_PRODUCTS = {apple:{n:'Jabłko',i:'🍎',p:2}, cola:{n:'Cola',i:'🥤',p:3}, bread:{n:'Chleb',i:'🍞',p:4}, computer:{n:'Komputer',i:'🖥️',p:100}, phone:{n:'Telefon',i:'📱',p:5}, charger:{n:'Ładowarka',i:'🔌',p:8}, pizzafrozen:{n:'Pizza mrożona',i:'🍕',p:6}};
   let basket = null;                        // null = brak koszyka; w koszyku: {id: liczba}
   const basketMesh = new THREE.Group();
   (function(){
@@ -3830,6 +5075,7 @@
   function supShelfProduct(){                // towar, który leży przy graczu (regały mają strefy)
     const px = player.position.x - SUPER.x, zr = player.position.z - SUPER.z;
     if(zr < -9.2 && Math.abs(px) < 7.5) return 'cola';            // lodówka przy tylnej ścianie
+    if(zr < -9.2 && px >= 7.5 && px < 19) return 'pizzafrozen';   // mrożonki w prawej części lodówki
     if(zr < -9.5 || zr > 3.8) return null;
     if(px > -5.3 && px < -3.2) return zr < -3 ? 'apple' : 'bread';
     if(px > 3.2 && px < 5.3) return zr < -5.5 ? 'computer' : zr < -1.15 ? 'phone' : 'charger';
@@ -3854,8 +5100,12 @@
   }
   function findAction(){
     if(paintUiOpen) return null;
-    if(shopEl.style.display === 'block' || dlgEl.style.display === 'flex' || $('fridge').style.display === 'block' || $('wardrobe').style.display === 'block') return null;
+    if(shopEl.style.display === 'block' || dlgEl.style.display === 'flex' || $('fridge').style.display === 'block' || $('wardrobe').style.display === 'block' || trunkOpen() || ovenOpen()) return null;
     if(placing) return null;
+    if(busRide){                                                                  // pasażer autobusu: wysiadka tylko przy otwartych drzwiach
+      if(BUS.door > 0.6) return {text:'F – wysiądź z autobusu 🚌', run:() => leaveBus(false)};
+      return {text:'🚌 Autobus jedzie – wysiądziesz na przystanku', run:() => {}};
+    }
     if(sitting){
       let pcDesk = null, bestPc = 3.6;
       for(const pd of placedDesks){
@@ -3867,6 +5117,9 @@
       return {text:'F – wstań z krzesła', run:standUp};
     }
     if(carDriving) return {text:'Shift – wysiądź z auta 🚗', run:()=>{}};
+    { const ba = busBoardAction(); if(ba) return ba; }                           // F przy otwartych drzwiach autobusu
+    { const fa = fuelAction(); if(fa) return fa; }                              // dystrybutor ma pierwszeństwo przed „wsiądź do auta”
+    if(trunkNearRear() && !bikeMounted) return {text:'F – otwórz bagażnik 🧳', run:openTrunk};
     if(hasCar && Math.hypot(player.position.x-pcar.group.position.x, player.position.z-pcar.group.position.z) < 3.6 && !bikeMounted) return {text:'F – wsiądź do auta 🚗', run:enterCar};
     if(bikeMounted) return {text:'Shift – zsiądź z roweru',run:dismountBike};
     if(bikePurchased && Math.hypot(player.position.x-bike.position.x,player.position.z-bike.position.z)<2.6)
@@ -3910,6 +5163,7 @@
       }};
       const pch = nearDesk('chair'); if(pch) return {text:'F – usiądź na krześle  •  G – podnieś', run:() => sitOn(pch)};
       const pwd = nearDesk('wardrobe'); if(pwd) return {text:'F – otwórz szafę  •  G – podnieś', run:openWardrobe};
+      const pov = nearDesk('oven'); if(pov) return {text:'F – użyj piekarnika 🍳  •  G – podnieś', run:() => openOven(pov)};
       const plp = nearLamp(); if(plp) return {text:'F – zdejmij lampę 💡', run:() => pickupDesk(plp)};
       const pdk = nearDesk(); if(pdk && pdk.computer) return {text:'F – podnieś komputer 🖥️', run:() => pickupComputer(pdk)};
       if(pdk) return {text: pdk.kind === 'chair' ? 'F – podnieś krzesło' : 'F – podnieś biurko', run:() => pickupDesk(pdk)};
@@ -3918,6 +5172,7 @@
     if(shopInside && shopNpcDist() < 3.4) return {text:'F – porozmawiaj ze sprzedawczynią', run:openShopTalk};
     if(bankInside && bankNpcDist() < 3.4) return {text:'F – porozmawiaj z bankierem', run:openBankTalk};
     if(furnInside && furnNpcDist() < 3.4) return {text:'F – porozmawiaj ze sprzedawcą mebli', run:openFurnTalk};
+    if(agdInside && agdNpcDist() < 4.2) return {text:'F – porozmawiaj ze sprzedawcą AGD 🔌', run:openAgdTalk};
     if(mechInside && mechNpcDist() < 4.2) return {text:'F – porozmawiaj z mechanikiem 🔧', run:openMechTalk};
     if(paintInside && paintNpcDist() < 3.4) return {text:'F – porozmawiaj z lakiernikiem 🎨', run:openPaintTalk};
     if(carInside && carNpcDist() < 3.4) return {text:'F – porozmawiaj z doradcą salonu', run:openCarTalk};
@@ -3928,6 +5183,7 @@
     const dx = player.position.x - npc.position.x, dz = player.position.z - npc.position.z;
     const target = (restInside && Math.hypot(dx,dz) < 7) ? Math.atan2(dx, dz) : 0;
     npc.rotation.y += Math.atan2(Math.sin(target - npc.rotation.y), Math.cos(target - npc.rotation.y)) * Math.min(1, dt*5);
+    deliveryBackpack.visible = !!job.carrying;                                   // zielony plecak, gdy niesiesz zamówienie
     mark.visible = !job.carrying; mark.position.y = 3.25 + Math.sin(time*3)*0.07;
     beacon.visible = job.carrying;
     if(job.carrying) cone.position.y = 9.6 + Math.sin(time*3)*0.4;
@@ -4053,6 +5309,7 @@
     // wnętrza i okna
     restLight.intensity = shopLight.intensity = bankLight.intensity = furnLight.intensity = clothLight.intensity = carLight.intensity = paintLight.intensity = mechLight.intensity = 1.0*night;
     lampPool.forEach(l => l.intensity = l.userData.used ? 0.55 + 0.65*night : 0);   // lampy w domu
+    updateStreetLamps(night, p);   // lampy uliczne
     glowMats.forEach(m => m.emissive.setRGB(1, 0.78, 0.4).multiplyScalar(night*0.85));
 
     // zegar
@@ -4093,6 +5350,7 @@
     });
   }
   let yaw = 0, pitch = 0.45, dist = 8, sens = 2;
+  const minPitch = () => firstPerson ? -1.35 : -Math.asin(Math.min(1, 1.3/Math.max(dist, 1.3)));   // w 3. osobie kamera nie zejdzie pod ziemię
   let firstPerson = false;
   function refreshInteriorWallVisibility(){
     const insideStates = [
@@ -4130,7 +5388,7 @@
   el.addEventListener('pointermove', e => {
     if(e.pointerId === camPtr && (e.pointerType !== 'mouse' || uiBlocking())){
       yaw -= (e.clientX-lx)*0.005*sens;
-      pitch = Math.min(1.4, Math.max(-1.35, pitch + (e.clientY-ly)*0.005*sens*(firstPerson ? -1 : 1)));
+      pitch = Math.min(1.4, Math.max(minPitch(), pitch + (e.clientY-ly)*0.005*sens*(firstPerson ? -1 : 1)));
       lx = e.clientX; ly = e.clientY;
     } else if(e.pointerId === joyPtr){
       const r = stick.getBoundingClientRect();
@@ -4144,13 +5402,13 @@
   document.addEventListener('mousemove', e => {
     if(!uiBlocking()){
       yaw -= e.movementX * 0.0025 * sens;
-      pitch = Math.min(1.35, Math.max(-1.35, pitch + e.movementY * 0.0025 * sens * (firstPerson ? -1 : 1)));
+      pitch = Math.min(1.35, Math.max(minPitch(), pitch + e.movementY * 0.0025 * sens * (firstPerson ? -1 : 1)));
     }
   });
   // Kursor znika i kamera podąża za myszką; gdy otwarte jest jakieś okno (sklep, ekwipunek, telefon...), kursor wraca
   function uiBlocking(){
     if(isDead || isPaused || computerUiOpen || fullMapOpen || placing) return true;
-    return ['shop','dlg','phone','fridge','wardrobe','inv','placeUI','paintUI'].some(id => {
+    return ['shop','dlg','phone','fridge','wardrobe','trunk','ovenUI','inv','placeUI','paintUI'].some(id => {
       const e = document.getElementById(id);
       return e && getComputedStyle(e).display !== 'none';
     });
@@ -4209,15 +5467,21 @@
   // Kamera pierwszo- lub trzecioosobowa (także podczas snu)
   function updateCamera(){
     const p = player.position;
-    if(firstPerson){
+    const inCab = firstPerson && carDriving && hasCar;
+    if(pcar.interior){ pcar.cabin.visible = pcar.glassBand.visible = !inCab; pcar.interior.visible = inCab; }
+    if(inCab){
+      const c = Math.cos(carHeading), sn = Math.sin(carHeading), lx = 0.42, lz = -0.12;         // oczy kierowcy: lewa strona, lekko za środkiem
+      const ex = p.x + lx*c + lz*sn, ez = p.z - lx*sn + lz*c;
+      const ey = p.y + 1.28, tl = carPitch*Math.cos(yaw - carHeading);   // przechył auta pochyla widok, gdy patrzysz do przodu
+      camera.position.set(ex, ey, ez);
+      camera.lookAt(ex - Math.sin(yaw)*Math.cos(pitch), ey + Math.sin(pitch + tl), ez - Math.cos(yaw)*Math.cos(pitch));
+    } else if(firstPerson){
       camera.position.set(p.x, p.y + 1.62, p.z);
       camera.lookAt(p.x - Math.sin(yaw)*Math.cos(pitch), p.y + 1.62 + Math.sin(pitch), p.z - Math.cos(yaw)*Math.cos(pitch));
     } else {
-      camera.position.set(
-        p.x + Math.sin(yaw)*Math.cos(pitch)*dist,
-        p.y + 1.6 + Math.sin(pitch)*dist,
-        p.z + Math.cos(yaw)*Math.cos(pitch)*dist
-      );
+      pitch = Math.max(pitch, minPitch());                                         // także po zmianie zoomu / przełączeniu kamery
+      const cx3 = p.x + Math.sin(yaw)*Math.cos(pitch)*dist, cz3 = p.z + Math.cos(yaw)*Math.cos(pitch)*dist;
+      camera.position.set(cx3, Math.max(p.y + 1.6 + Math.sin(pitch)*dist, terrainH(cx3, cz3) + 0.3), cz3);   // nie pod terenem
       camera.lookAt(p.x, p.y + 1.5, p.z);
     }
     sun.target.position.copy(p);
@@ -4400,10 +5664,11 @@
       energy: +stats.energy.toFixed(1),
       elapsed: Math.round(gameElapsed),
       bank: JSON.stringify({opened:!!bank.opened, balance:bank.balance|0, number:String(bank.number||''), tx:(bank.tx||[]).slice(-40)}),
+      trunk: JSON.stringify(trunk.map(s => s ? (s.main != null ? {id:s.id, count:s.count, main:s.main} : {id:s.id, count:s.count}) : null)),
       fridge: JSON.stringify(fridgeStock),
       homes: JSON.stringify(HOMES.map(H => ({id:H.id, rented:!!H.rented, owned:!!H.owned, paid:H.owned ? 0 : Math.round(H.paidUntil||0), open:!!(H.door && H.door.open)}))),
-      furn: JSON.stringify(placedDesks.slice(0,40).map(pd => ({k:pd.kind||'desk', x:+pd.wall.x.toFixed(2), z:+pd.wall.z.toFixed(2), r:svRot4(pd.mesh.rotation.y), c:pd.computer ? (Math.round(pd.computer.rotation.y/Math.PI) & 1) : -1}))),
-      car: JSON.stringify(hasCar ? {has:true, x:+pcar.group.position.x.toFixed(2), z:+pcar.group.position.z.toFixed(2), r:+carHeading.toFixed(3), c:pcar.bodyMat.color.getHex(), s:steerLvl} : {has:false}),
+      furn: JSON.stringify(placedDesks.slice(0,40).map(pd => ({k:pd.kind||'desk', x:+pd.wall.x.toFixed(2), z:+pd.wall.z.toFixed(2), r:svRot4(pd.mesh.rotation.y), c:pd.computer ? (Math.round(pd.computer.rotation.y/Math.PI) & 1) : -1, p:pd.pizza ? +pd.pizza.t.toFixed(1) : -1}))),
+      car: JSON.stringify(hasCar ? {has:true, x:+pcar.group.position.x.toFixed(2), z:+pcar.group.position.z.toFixed(2), r:+carHeading.toFixed(3), c:pcar.bodyMat.color.getHex(), s:steerLvl, f:+carFuel.toFixed(1)} : {has:false}),
       upper: JSON.stringify({h:upperApp.hired?1:0, n:upperApp.done|0, e:upperApp.earned|0}),
       phone: JSON.stringify({plug:!!chargerPlugged, home:chargerHome ? chargerHome.id : '', dock:!!phoneDocked, bat:+(+phoneBattery).toFixed(1)}),
       pos: JSON.stringify(svPos())
@@ -4453,7 +5718,7 @@
   function svApplyFurn(arr){
     for(const pd of placedDesks.splice(0)){ scene.remove(pd.mesh); const i = WALLS.indexOf(pd.wall); if(i >= 0) WALLS.splice(i, 1); }
     for(const f of arr.slice(0,40)){
-      const kind = ['desk','chair','wardrobe','lamp'].includes(f.k) ? f.k : 'desk', x = +f.x, z = +f.z, r = ((f.r|0) % 4 + 4) % 4;
+      const kind = ['desk','chair','wardrobe','lamp','oven'].includes(f.k) ? f.k : 'desk', x = +f.x, z = +f.z, r = ((f.r|0) % 4 + 4) % 4;
       if(!isFinite(x) || !isFinite(z) || !HOMES.some(H => Math.abs(x-H.x) < 6 && Math.abs(z-H.z) < 6)) continue;   // tylko wewnątrz domów
       if(kind === 'lamp'){
         const lm = makeLamp(false); lm.position.set(x, HOME.h, z); scene.add(lm);
@@ -4463,6 +5728,7 @@
       mesh.position.set(x, 0.07, z); mesh.rotation.y = r*Math.PI/2; scene.add(mesh);
       const wall = {x, z, w:dm.w, d:dm.d}; WALLS.push(wall);
       const pd = {mesh, wall, kind}; placedDesks.push(pd);
+      if(kind === 'oven' && isFinite(+f.p) && +f.p >= 0){ pd.pizza = {t:Math.min(+f.p, OVEN_BAKE + OVEN_OVER + 30)}; ovenGlow(pd); }
       if(kind === 'desk' && (f.c|0) >= 0){ const cm = makeComputer(false); cm.position.set(0,0.78,0); cm.rotation.y = (f.c&1)*Math.PI; mesh.add(cm); pd.computer = cm; }
     }
   }
@@ -4494,6 +5760,18 @@
       stats.hunger = Math.max(1, cl(d.hunger, 100)); stats.energy = Math.max(1, cl(d.energy, 100));
       if(isFinite(+d.elapsed) && +d.elapsed >= 0) gameElapsed = +d.elapsed;
       try{ const b = JSON.parse(d.bank || '{}'); bank.opened = !!b.opened; bank.balance = Math.max(0, b.balance|0); bank.number = String(b.number || ''); bank.tx = Array.isArray(b.tx) ? b.tx.slice(-40) : []; }catch(e){}
+      try{
+        const t = JSON.parse(d.trunk || '[]');
+        for(let i = 0; i < TRUNK_SLOTS; i++){
+          const q = t[i];
+          trunk[i] = (q && ITEMS[q.id] && q.id !== 'order') ? Object.assign({id:q.id, count:Math.max(1, q.count|0)}, q.main != null ? {main:q.main|0} : {}) : null;
+        }
+        for(let i = 0; i < TRUNK_SLOTS; i++){                  // duży przedmiot musi mieć komplet części, a część – swój przedmiot
+          const q = trunk[i]; if(!q) continue;
+          if(BIG[q.id] && trunk.filter(x => x && x.main === i && x.id === BIG[q.id].part).length !== BIG[q.id].slots - 1){ trunk.forEach((x,j) => { if(x && x.main === i) trunk[j] = null; }); trunk[i] = null; }
+        }
+        for(let i = 0; i < TRUNK_SLOTS; i++){ const q = trunk[i]; if(q && q.main !== undefined && !(trunk[q.main] && BIG[trunk[q.main].id])) trunk[i] = null; }
+      }catch(e){}
       try{ const f = JSON.parse(d.fridge || '{}'); for(const k in fridgeStock) if(isFinite(+f[k])) fridgeStock[k] = Math.max(0, f[k]|0); }catch(e){}
       if(d.homes) try{ svApplyHomes(JSON.parse(d.homes)); }catch(e){}
       if(d.furn) try{ svApplyFurn(JSON.parse(d.furn)); }catch(e){}
@@ -4691,27 +5969,75 @@
         }
       }
     }
-    // Kolizje gracza z samochodami: nie można przechodzić przez auta.
-    for(const car of trafficCars){
+    // Kolizje gracza z samochodami: obrócony prostokąt dopasowany do modelu auta (4,2 × 1,9 m), a nie duże koło.
+    for(const car of trafficCars.concat(busRide ? [] : [BUS])){
       if(!car.active || !car.group.visible) continue;
-      const cp = car.group.position;
+      const cp = car.group.position, th = car.heading, vhl = car.hl || 2.1, vhw = car.hw || 0.95;
+      const tfx = Math.cos(th), tfz = Math.sin(th);                      // przód auta ruchu; bok: (-tfz, tfx)
       const dx = player.position.x - cp.x, dz = player.position.z - cp.z;
-      const d = Math.hypot(dx, dz), min = carDriving ? 4.0 : 2.45;
-      if(d < min && d > 0.0001){
-        if(carDriving) carV *= 0.5;
-        player.position.x = cp.x + dx/d*min;
-        player.position.z = cp.z + dz/d*min;
-      } else if(d <= 0.0001){
-        player.position.x += 2.45;
+      if(Math.abs(dx) > vhl + 4 || Math.abs(dz) > vhl + 4) continue;
+      if(carDriving){
+        // auto gracza (przód = (sin h, cos h)) kontra auto ruchu: twierdzenie o osiach rozdzielających (SAT), wypchnięcie najmniejszą penetracją
+        const pfx = Math.sin(carHeading), pfz = Math.cos(carHeading);
+        const axes = [[pfx,pfz],[pfz,-pfx],[tfx,tfz],[-tfz,tfx]];
+        let best = Infinity, bax = 0, baz = 0, hit = true;
+        for(const [ax, az] of axes){
+          const rP = 2.1*Math.abs(pfx*ax + pfz*az) + 0.95*Math.abs(pfz*ax - pfx*az);
+          const rT = vhl*Math.abs(tfx*ax + tfz*az) + vhw*Math.abs(-tfz*ax + tfx*az);
+          const dist = dx*ax + dz*az, pen = rP + rT - Math.abs(dist);
+          if(pen <= 0){ hit = false; break; }
+          if(pen < best){ best = pen; bax = ax*(dist < 0 ? -1 : 1); baz = az*(dist < 0 ? -1 : 1); }
+        }
+        if(hit){ carV *= 0.5; player.position.x += bax*best; player.position.z += baz*best; }
+      } else {
+        // pieszy (koło r = 0,35) kontra prostokąt auta
+        const R = 0.35, hl = vhl, hw = vhw;
+        const along = dx*tfx + dz*tfz, lat = -dx*tfz + dz*tfx;
+        const qa = Math.max(-hl, Math.min(hl, along)), ql = Math.max(-hw, Math.min(hw, lat));
+        const ea = along - qa, el = lat - ql, dd = Math.hypot(ea, el);
+        if(dd < R){
+          let na, nl, push;
+          if(dd > 1e-5){ na = ea/dd; nl = el/dd; push = R - dd; }
+          else {                                                          // środek postaci wewnątrz prostokąta – wypchnij najbliższą krawędzią
+            const oa = hl - Math.abs(along), ol = hw - Math.abs(lat);
+            if(oa < ol){ na = Math.sign(along || 1); nl = 0; push = oa + R; } else { na = 0; nl = Math.sign(lat || 1); push = ol + R; }
+          }
+          player.position.x += (na*tfx - nl*tfz)*push;
+          player.position.z += (na*tfz + nl*tfx)*push;
+        }
+      }
+    }
+    if(hasCar && !carDriving && pcar.group.visible && player.position.y < 1.6){          // zaparkowane auto gracza jest bryłą – nie da się przez nie przejść
+      const cp = pcar.group.position, pfx = Math.sin(carHeading), pfz = Math.cos(carHeading);
+      const dx = player.position.x - cp.x, dz = player.position.z - cp.z;
+      if(Math.abs(dx) < 4 && Math.abs(dz) < 4){
+        const R = 0.35, hl = 2.1, hw = 0.95;
+        const along = dx*pfx + dz*pfz, lat = dx*pfz - dz*pfx;                            // oś wzdłuż auta i oś poprzeczna (prawa strona = +lat)
+        const qa = Math.max(-hl, Math.min(hl, along)), ql = Math.max(-hw, Math.min(hw, lat));
+        const ea = along - qa, el = lat - ql, dd = Math.hypot(ea, el);
+        if(dd < R){
+          let na, nl, push;
+          if(dd > 1e-5){ na = ea/dd; nl = el/dd; push = R - dd; }
+          else {                                                                           // środek postaci w prostokącie – wypchnij najbliższą krawędzią
+            const oa = hl - Math.abs(along), ol = hw - Math.abs(lat);
+            if(oa < ol){ na = Math.sign(along || 1); nl = 0; push = oa + R; } else { na = 0; nl = Math.sign(lat || 1); push = ol + R; }
+          }
+          player.position.x += (na*pfx + nl*pfz)*push;
+          player.position.z += (na*pfz - nl*pfx)*push;
+        }
       }
     }
     if(carDriving && Math.hypot(player.position.x - preX, player.position.z - preZ) > 0.02) carV *= Math.max(0, 1 - dt*9);   // uderzenie w przeszkodę hamuje auto
     updateShop();
     updateRestaurant();
     updateSupermarket();
+    updateApplianceStore(dt, gameElapsed);
     updateHomeInterior();
     updateHomeDoor(dt);
     updateTraffic(dt);
+    updateBus(dt);
+    if(busRide) busCarry(mx, mz, speed, dt);                                     // gracz jedzie razem z autobusem
+    updateOvens(dt);
     updateUpper(dt, gameElapsed);
     updatePlayerSignals(typeof drvX === 'number' ? drvX : 0);
     updateJob(dt, gameElapsed);
@@ -4733,24 +6059,27 @@
       walkT += dt*speed*1.6;
     }
     if(carDriving){
-      pcar.group.position.set(player.position.x, 0.02, player.position.z); pcar.group.rotation.y = carHeading;
+      const tt = carTilt(player.position.x, player.position.z, carHeading); carPitch += (tt.pitch - carPitch)*Math.min(1, dt*8);   // płynne wychylanie nosa
+      pcar.group.position.set(player.position.x, tt.y + 0.02, player.position.z); pcar.group.rotation.y = carHeading; pcar.group.rotation.x = carPitch;
       pcar.wheels.forEach(w => { w.rotation.z -= carV*dt/0.36; });
+      if(pcar.steer) pcar.steer.rotation.x = -(typeof drvX === 'number' ? drvX : 0)*0.9;
       if(carV > 2 && camPtr === null){                                          // kamera sama ustawia się za autem
         let dd = carHeading + Math.PI - yaw; dd = Math.atan2(Math.sin(dd), Math.cos(dd)); yaw += dd*Math.min(1, dt*1.8);
       }
     }
     if(bikeMounted){
-      bike.position.set(player.position.x,0,player.position.z);
+      bike.position.set(player.position.x,terrainH(player.position.x,player.position.z),player.position.z);
       bike.rotation.y=facing;
       bikeWheels.forEach(w=>{w.rotation.x += len*dt*speed*1.8;});
     }
 
     // skok
     const gy = groundAt(player.position.x, player.position.z, player.position.y);
-    if(!bikeMounted && !carDriving && !sitting && keys.Space && player.position.y <= gy + 0.001 && stats.energy >= 3){ vy = 7.5; addStats(0, -2); }
+    if(!bikeMounted && !carDriving && !busRide && !sitting && keys.Space && player.position.y <= gy + 0.001 && stats.energy >= 3){ vy = 7.5; addStats(0, -2); }
     vy -= 20*dt;
     player.position.y = Math.max(gy, player.position.y + vy*dt);
     if(player.position.y === gy && vy < 0) vy = 0;
+    if(busRide){ player.position.y = busFloorY(); vy = 0; }                       // stoisz na podłodze autobusu (także na wzniesieniu)
 
     // animacja
     riderBlend += ((bikeMounted ? 1 : 0) - riderBlend) * Math.min(1, dt*10);
@@ -4792,7 +6121,7 @@
     if(stats.hunger > 30) hungryWarned = false;
     if(stats.energy < 15 && !tiredWarned){ tiredWarned = true; toast('Brakuje ci energii ⚡ Odpocznij'); }
     if(stats.energy > 30) tiredWarned = false;
-    renderStats();
+    renderStats(); updateFuelGauge();
     if(checkDeath()) return;
 
     updatePlacement();

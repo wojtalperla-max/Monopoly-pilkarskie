@@ -27,7 +27,7 @@ if(!ok){try{Object.defineProperty(window,n,{value:mem(),configurable:true})}catc
 </script>
 </head>
 <body>
-<div id="hud"><b>Real life</b><br>WASD / strzałki – ruch<br>Shift – bieg / wstawanie ze snu / zsiadanie z roweru, Spacja – skok<br>V – kamera pierwszoosobowa / trzecioosobowa<br>Q / E lub przeciągnięcie myszą – obrót kamery<br>Kółko – zoom, I – ekwipunek, M – mapa<br>F – interakcja / rower, P – telefon<br>W aucie: Z / C – kierunkowskaz lewy / prawy, X – awaryjne</div>
+<div id="hud"><b>Real life</b><br>WASD / strzałki – ruch<br>Shift – bieg / wstawanie ze snu / zsiadanie z roweru, Spacja – skok<br>V – kamera pierwszoosobowa / trzecioosobowa<br>Q / E lub przeciągnięcie myszą – obrót kamery<br>Kółko – zoom, I – ekwipunek, M – mapa<br>F – interakcja / rower, P – telefon<br>W aucie: Z / C – kierunkowskaz lewy / prawy, X – awaryjne, H – klakson (przytrzymaj)</div>
 <div id="stats">
   <div class="stat" id="stHunger"><span class="ic">🍖</span><div class="bar"><div class="fill" id="hungerFill"></div></div><span class="val" id="hungerVal">100</span></div>
   <div class="stat" id="stEnergy"><span class="ic">⚡</span><div class="bar"><div class="fill" id="energyFill"></div></div><span class="val" id="energyVal">100</span></div>
@@ -85,6 +85,24 @@ if(!ok){try{Object.defineProperty(window,n,{value:mem(),configurable:true})}catc
   <h3>🚪 Szafa</h3>
   <div id="wardrobeList"></div>
   <button id="wardrobeClose">Zamknij</button>
+</div>
+<div id="trunk">
+  <h3>🧳 Bagażnik <span id="trunkCount"></span></h3>
+  <div class="tsub">Bagażnik – kliknij przedmiot, aby wyjąć</div>
+  <div id="trunkGrid"></div>
+  <div class="tsub">Twój ekwipunek – kliknij przedmiot, aby schować</div>
+  <div id="trunkInvGrid"></div>
+  <button id="trunkClose" type="button">Zamknij (F / Esc)</button>
+</div>
+<div id="ovenUI">
+  <h3>🍳 Piekarnik</h3>
+  <div class="ovLbl">Pieczenie <span id="ovenPct"></span></div>
+  <div class="ovBar"><div id="ovenFill"></div></div>
+  <div id="ovenOverWrap"><div class="ovLbl">Przepełnienie – pizza się spali 🔥</div><div class="ovBar over"><div id="ovenOverFill"></div></div></div>
+  <div id="ovenMsg"></div>
+  <button id="ovenPut" type="button">🍕 Włóż pizzę</button>
+  <button id="ovenTake" type="button">✋ Wyjmij</button>
+  <button id="ovenClose" type="button" class="no">Zamknij (F / Esc)</button>
 </div>
 <div id="shop">
   <h3>🛒 Sklep „Real Shop”</h3>

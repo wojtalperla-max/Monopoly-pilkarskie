@@ -269,3 +269,25 @@ html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:non
     #scBin{width:auto;height:96px;border-right:0;border-bottom:1px solid #262b34}
     #scTimeline{height:140px}
   }
+
+  #trunk{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(400px,calc(100vw - 28px));max-height:86vh;overflow:auto;background:rgba(20,24,30,.97);color:#fff;border-radius:14px;padding:14px;display:none;z-index:25;box-sizing:border-box}
+  #trunk h3{margin:0 0 8px}
+  #trunk .tsub{font-size:12px;opacity:.75;margin:10px 0 6px}
+  #trunkGrid,#trunkInvGrid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+  #trunk .slot{font-size:22px}
+  #trunk .slot:hover{border-color:#3a7bd5}
+  #trunk button{background:#3a7bd5;color:#fff;border:0;border-radius:6px;padding:7px 12px;margin-top:12px;cursor:pointer}
+
+  #ovenUI{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(360px,calc(100vw - 28px));background:rgba(20,24,30,.97);color:#fff;border-radius:14px;padding:16px;display:none;z-index:25;box-sizing:border-box}
+  #ovenUI h3{margin:0 0 10px}
+  #ovenUI .ovLbl{font-size:12px;opacity:.8;margin:8px 0 4px;display:flex;justify-content:space-between}
+  #ovenUI .ovBar{height:18px;background:rgba(255,255,255,.12);border-radius:9px;overflow:hidden}
+  #ovenFill{height:100%;width:0;background:#ff9800;transition:width .12s linear}
+  #ovenFill.full{background:#43a047}
+  #ovenOverWrap{display:none}
+  #ovenOverFill{height:100%;width:0;background:#e53935;transition:width .12s linear}
+  #ovenMsg{min-height:36px;margin:12px 0 4px;font-size:13px;line-height:1.4}
+  #ovenMsg.ok{color:#7dff9a} #ovenMsg.bad{color:#ff8a80}
+  #ovenUI button{background:#3a7bd5;color:#fff;border:0;border-radius:6px;padding:7px 12px;margin:8px 6px 0 0;cursor:pointer}
+  #ovenUI button:disabled{opacity:.4;cursor:default}
+  #ovenUI button.no{background:#555}
