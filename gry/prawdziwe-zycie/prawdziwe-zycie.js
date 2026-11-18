@@ -123,6 +123,12 @@
   const SIDEWALK_OFFSET = ROAD_W/2 + SIDEWALK_GAP + SIDEWALK_W/2;
   // Ulica Poprzeczna: w prawo (+z) z Długiej, za domem nr 10 – salon samochodowy po wschodniej stronie
   const POP_X = 78, POP_END = 62, POP_EDGE = ROAD_W/2 + SIDEWALK_GAP + SIDEWALK_W;   // POP_EDGE = 8.15
+  // Ulica Górnicza: odchodzi z Długiej na północ (−z) w przerwie między domami nr 5 (x=38) i nr 6 (x=58); wąska, bo przerwa ma tylko ~11 m
+  const GORN_X = 47.75, GORN_W = 7, GORN_SW = 1.2, GORN_END = -92, GORN_START = ROAD_Z - ROAD_W/2;
+  const GORN_EDGE = GORN_W/2 + SIDEWALK_GAP + GORN_SW;                                // połowa szerokości z chodnikami (4,85)
+  const MINE_ROCKS = []; let mineRocksHidden = false;                                  // skały zewnętrznego wzgórza – chowane, gdy gracz jest w środku kopalni
+  let MINE_GROUND = null;                                                              // ustawiane przez kopalnię: wysokość wykopanego terenu
+  const MINE = {x:37.5, z:-62, depth:16.5};                                           // wejście do kopalni po lewej (zachodniej) stronie Górniczej, wejściem na wschód; x – lico skały
 
   // Dwa chodniki przy głównej ulicy. Przy wlocie bocznej ulicy
   // górny chodnik jest przerwany, żeby nie przecinał skrzyżowania.
@@ -145,12 +151,12 @@
         });
       });
     } else {
-      const sidewalk = new THREE.Mesh(
-        new THREE.BoxGeometry(ROAD_LEN/2 - (WR.x + WR.rOut), 0.2, SIDEWALK_W), walkMat   // południowy chodnik: od brzegu zachodniego ronda do x=80
-      );
-      sidewalk.position.set(((WR.x + WR.rOut) + ROAD_LEN/2)/2, 0.1, z);
-      sidewalk.receiveShadow = true;
-      street.add(sidewalk);
+      [[WR.x + WR.rOut, GORN_X - GORN_EDGE], [GORN_X + GORN_EDGE, ROAD_LEN/2]].forEach(([x0, x1]) => {   // chodnik od ronda do x=80, przerwany na wlocie ulicy Górniczej
+        const sidewalk = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 0.2, SIDEWALK_W), walkMat);
+        sidewalk.position.set((x0 + x1)/2, 0.1, z);
+        sidewalk.receiveShadow = true;
+        street.add(sidewalk);
+      });
     }
   });
 
@@ -209,6 +215,39 @@
       const face = new THREE.Mesh(new THREE.PlaneGeometry(2.55, 0.64), new THREE.MeshBasicMaterial({map:tx, side:THREE.FrontSide}));
       face.position.set(px + sd*0.11, 2.65, pz); face.rotation.y = sd > 0 ? Math.PI/2 : -Math.PI/2; street.add(face);
     });
+  })();
+
+  // Ulica Górnicza (x = GORN_X, od krawędzi Długiej w stronę −z, do ślepego końca)
+  (function buildGornicza(){
+    const len = GORN_START - GORN_END, cz = (GORN_START + GORN_END)/2;
+    const tex = roadTex.clone(); tex.needsUpdate = true; tex.repeat.set(len/TILE, 1);
+    const g = new THREE.Group(); g.position.set(GORN_X, 0, cz); g.rotation.y = Math.PI/2;
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(len, GORN_W), new THREE.MeshLambertMaterial({map:tex}));
+    mesh.rotation.x = -Math.PI/2; mesh.position.y = 0.025; mesh.receiveShadow = true; g.add(mesh); street.add(g);
+    [-1,1].forEach(sd => {
+      const sw = new THREE.Mesh(new THREE.BoxGeometry(GORN_SW, 0.2, len), walkMat);
+      sw.position.set(GORN_X + sd*(GORN_W/2 + SIDEWALK_GAP + GORN_SW/2), 0.1, cz); sw.receiveShadow = true; street.add(sw);
+    });
+    // tabliczka „GÓRNICZA” na rogu skrzyżowania (na chodniku Długiej, po zachodniej stronie wlotu)
+    const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128;
+    const c2 = cv.getContext('2d'); c2.fillStyle = '#174b78'; c2.fillRect(0,0,512,128);
+    c2.strokeStyle = '#fff'; c2.lineWidth = 9; c2.strokeRect(6,6,500,116);
+    c2.fillStyle = '#fff'; c2.font = 'bold 60px sans-serif'; c2.textAlign = 'center'; c2.textBaseline = 'middle'; c2.fillText('GÓRNICZA', 256, 66);
+    const tx = new THREE.CanvasTexture(cv); tx.anisotropy = 8;
+    const px = GORN_X - GORN_EDGE - 0.6, pz = ROAD_Z - ROAD_W/2 - 1.9;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 3.2, 10), new THREE.MeshLambertMaterial({color:0x55585c}));
+    pole.position.set(px, 1.6, pz); pole.castShadow = true; street.add(pole); solidPole(px, pz);
+    [1,-1].forEach(sd => {
+      const face = new THREE.Mesh(new THREE.PlaneGeometry(2.55, 0.64), new THREE.MeshBasicMaterial({map:tx, side:THREE.FrontSide}));
+      face.position.set(px + sd*0.11, 2.65, pz); face.rotation.y = sd > 0 ? Math.PI/2 : -Math.PI/2; street.add(face);
+    });
+    // zakończenie ulicy: biało-czerwona rogatka (ślepy koniec)
+    const bc = document.createElement('canvas'); bc.width = 256; bc.height = 32; const bg = bc.getContext('2d');
+    for(let i=0;i<8;i++){ bg.fillStyle = i%2 ? '#f4f4f4' : '#d32f2f'; bg.fillRect(i*32,0,32,32); }
+    const bt = new THREE.CanvasTexture(bc);
+    const bar = new THREE.Mesh(new THREE.BoxGeometry(GORN_W - 1, 0.22, 0.12), new THREE.MeshLambertMaterial({map:bt}));
+    bar.position.set(GORN_X, 1.0, GORN_END + 1); bar.castShadow = true; street.add(bar);
+    [-1,1].forEach(sd => { const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.2, 0.16), new THREE.MeshLambertMaterial({color:0x55585c})); post.position.set(GORN_X + sd*(GORN_W/2 - 0.4), 0.6, GORN_END + 1); street.add(post); });
   })();
 
   // Nazwy ulic na tabliczkach przy skrzyżowaniu.
@@ -480,6 +519,8 @@
     (Math.abs(x - (AGD.x + 2)) < 16 + m && z < -52 + m && z > AGD.z - AGD.d/2 - m) ||           // sklep AGD z parkingiem
     (Math.abs(x - RB.x) < 22 + m && z > RB.z + 8 - m && z < 90 + m) ||                          // ulica Społeczna z domami i sklepem odzieżowym
     (Math.abs(x - POP_X) < POP_EDGE + m && z > SIDE_ROAD_START - m && z < POP_END + m) ||       // ulica Poprzeczna
+    (Math.abs(x - GORN_X) < GORN_EDGE + m && z < GORN_START + m && z > GORN_END - m) ||         // ulica Górnicza
+    (x > MINE.x - 32 - m && x < GORN_X - GORN_EDGE + m && Math.abs(z - MINE.z) < 14 + m) ||     // kopalnia z placem
     onHill(x, z, m) ||                                                                          // wzgórze za Społeczną
     (Math.abs(x - PKS.x) < PKS.w/2 + PKS.blend + m && Math.abs(z - PKS.z) < PKS.d/2 + PKS.blend + m) ||   // plac PKS
     (Math.abs(x - CAR.x) < CAR.d/2 + 2 + m && Math.abs(z - CAR.z) < CAR.w/2 + 2 + m) ||        // salon samochodowy
@@ -671,9 +712,78 @@
   const PLATFORMS = [];                   // powierzchnie, na które można wskoczyć (łóżko): {x,z,w,d,top,enter}
   function groundAt(x, z, y){                // wysokość podłoża pod graczem (0 albo blat platformy, jeśli już jest nad jej krawędzią)
     let g = terrainH(x, z);
+    if(MINE_GROUND){ const mg = MINE_GROUND(x, z); if(mg !== null) g = mg; }
     for(const p of PLATFORMS) if(y >= p.enter && Math.abs(x-p.x) < p.w/2-0.05 && Math.abs(z-p.z) < p.d/2-0.05 && p.top > g) g = p.top;
     return g;
   }
+
+  // ===== Kopalnia: wejście w skalne wzgórze po zachodniej stronie ulicy Górniczej – sztolnia (16,5 m) z szynami, wózkiem i latarniami =====
+  (function buildMine(){
+    const MX = MINE.x, MZ = MINE.z, TW = 1.8, TH = 3.2, TD = MINE.depth;             // TW – połowa szerokości sztolni, TH – wysokość, TD – głębokość
+    const g = new THREE.Group(); scene.add(g);
+    const lamb = (c, flat) => new THREE.MeshLambertMaterial({color:c, flatShading:!!flat});
+    const bx = (w,h,d,c,x,y,z,shadow) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), lamb(c)); m.position.set(x,y,z); if(shadow) m.castShadow = true; m.receiveShadow = true; g.add(m); return m; };
+    function rockGeo(rx, ry, rz, seed){                                                // chropowata bryła skalna (szum zależny od pozycji – szwy się nie rozchodzą)
+      const geo = new THREE.IcosahedronGeometry(1, 2), pos = geo.attributes.position;
+      for(let i=0;i<pos.count;i++){
+        const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+        const n = Math.sin(x*4.1 + seed)*Math.cos(z*3.7 - seed*1.3)*0.5 + Math.sin(y*5.3 + x*2.1 + seed*2.1)*0.5;
+        const k = 1 + 0.1*n; pos.setXYZ(i, x*k*rx, y*k*ry, z*k*rz);
+      }
+      geo.computeVertexNormals(); return geo;
+    }
+    const rock = (rx,ry,rz,x,y,z,c,seed) => { const m = new THREE.Mesh(rockGeo(rx,ry,rz,seed), lamb(c, true)); m.position.set(x,y,z); m.castShadow = m.receiveShadow = true; g.add(m); MINE_ROCKS.push(m); return m; };
+    // bryła wzgórza: masyw z tyłu, dwa boki i „most” nad wejściem
+    rock(9.5, 5.4, 10.5, MX-12, 2.8, MZ, 0x716b63, 1);
+    rock(8, 4.0, 4.6, MX-8, 2.0, MZ-6.8, 0x7d766d, 2);
+    rock(8, 4.0, 4.6, MX-8, 2.0, MZ+6.8, 0x6a645c, 3);
+    rock(5, 2.8, 5.2, MX-4.5, 6.0, MZ, 0x78726a, 4);
+    rock(3.2, 2.0, 3.0, MX-3, 1.0, MZ-8.8, 0x857d73, 5);                                // kilka głazów przy podstawie
+    rock(2.6, 1.6, 2.6, MX-2.5, 0.8, MZ+9.2, 0x6f695f, 6);
+    rock(10.5, 4.6, 10, 13.5, 1.9, MZ, 0x6f6960, 7); rock(4.5, 3, 4.5, 8.5, 1.2, MZ-6.5, 0x7a736a, 8); rock(4.5, 3, 4.5, 8.5, 1.2, MZ+6.5, 0x6a645c, 9);   // wzgórze nad wykopaliskiem
+    // sztolnia: podłoga, ściany, strop, ściana końcowa
+    bx(TD-0.2, 0.06, TW*2, 0x4b4238, MX-0.2-(TD-0.2)/2, 0.04, MZ);
+    bx(TD-0.2, TH, 0.3, 0x3d362f, MX-0.2-(TD-0.2)/2, TH/2, MZ-TW-0.15);
+    bx(TD-0.2, TH, 0.3, 0x3d362f, MX-0.2-(TD-0.2)/2, TH/2, MZ+TW+0.15);
+    bx(TD-0.2, 0.3, TW*2+0.6, 0x2f2a25, MX-0.2-(TD-0.2)/2, TH+0.15, MZ);
+    // drewniana podpora wejścia i obudowa sztolni
+    const wood = 0x6b4a2a, woodD = 0x4f3720;
+    [-1,1].forEach(sd => bx(0.34, 5.4, 0.34, wood, MX+0.2, 2.7, MZ + sd*(TW+0.4), true));
+    bx(0.4, 0.42, TW*2 + 1.4, woodD, MX+0.2, TH+0.4, MZ, true);
+    for(let i=0;i<5;i++){
+      const x = MX - 2.4 - i*3.1;                                                       // ramy podporowe w głębi
+      [-1,1].forEach(sd => bx(0.22, TH-0.1, 0.22, wood, x, (TH-0.1)/2, MZ + sd*(TW-0.12), true));
+      bx(0.24, 0.22, TW*2, woodD, x, TH-0.2, MZ, true);
+    }
+    // szyld „KOPALNIA”
+    const sc = document.createElement('canvas'); sc.width = 512; sc.height = 128; const sg = sc.getContext('2d');
+    sg.fillStyle = '#5a3d22'; sg.fillRect(0,0,512,128); sg.strokeStyle = '#2d1d0e'; sg.lineWidth = 8; sg.strokeRect(4,4,504,120);
+    sg.fillStyle = '#f1d9a0'; sg.font = 'bold 74px sans-serif'; sg.textAlign = 'center'; sg.textBaseline = 'middle'; sg.fillText('⛏ KOPALNIA', 256, 68);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(3.4, 0.85), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sc)}));
+    sign.position.set(MX+0.42, 4.65, MZ); sign.rotation.y = Math.PI/2; g.add(sign);
+    // plac przed wejściem (żwir do chodnika ulicy)
+    const yardLen = (GORN_X - GORN_EDGE) - MX;
+    bx(yardLen, 0.05, 9, 0x8a8170, MX + yardLen/2, 0.03, MZ);
+    // szyny wychodzące na plac, podkłady, wózek z węglem
+    const railZ = MZ - 1.0;
+    for(let x = MX + 3.8; x > MX - TD + 0.6; x -= 0.9) bx(0.16, 0.06, 1.1, 0x4a3520, x, 0.1, railZ);
+    const railLen = TD + 3.4;
+    [-0.28,0.28].forEach(o => bx(railLen, 0.07, 0.06, 0x8c949c, MX + 3.8 - railLen/2, 0.17, railZ + o));
+    const cart = new THREE.Group(); cart.position.set(MX - 6, 0, railZ); g.add(cart);
+    const cm = (w,h,d,c,x,y,z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), lamb(c)); m.position.set(x,y,z); m.castShadow = true; cart.add(m); };
+    cm(1.5, 0.62, 0.95, 0x7a4b2d, 0, 0.72, 0); cm(1.58, 0.08, 1.03, 0x5b3720, 0, 1.05, 0);
+    [[-0.5,-0.5],[0.5,-0.5],[-0.5,0.5],[0.5,0.5]].forEach(([x,z]) => { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.17,0.17,0.08,12), lamb(0x2a2d31)); w.rotation.x = Math.PI/2; w.position.set(x, 0.3, z*0.95); cart.add(w); });
+    for(let i=0;i<7;i++){ const c = new THREE.Mesh(new THREE.IcosahedronGeometry(0.2 + (i%3)*0.04, 0), lamb(0x1b1c1e, true)); c.position.set(-0.5 + (i%4)*0.34, 1.1 + (i%2)*0.08, -0.22 + Math.floor(i/4)*0.4); cart.add(c); }
+    // latarnie wzdłuż sztolni + jedno stałe światło (liczba świateł w scenie nie może się zmieniać w trakcie gry)
+    const lampMat = new THREE.MeshBasicMaterial({color:0xffc46b});
+    [MX-3.5, MX-9, MX-14.2].forEach(x => { const l = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.26,0.18), lampMat); l.position.set(x, TH-0.55, MZ+TW-0.35); g.add(l); bx(0.04, 0.3, 0.04, 0x222222, x, TH-0.3, MZ+TW-0.35); });
+    const mineLight = new THREE.PointLight(0xffb55a, 1.0, 17); mineLight.position.set(MX - 8.5, TH-0.6, MZ); scene.add(mineLight);
+    // kolizje: lita skała z korytarzem (korytarz: |z−MZ| < TW, x od MX−TD do MX), wózek
+    const fx0 = MX - TD, fx1 = MX + 0.1, fz = 11.4;
+    WALLS.push({x:(fx0+fx1)/2, z:MZ - (fz+TW)/2, w:fx1-fx0, d:fz-TW});                 // północny bok
+    WALLS.push({x:(fx0+fx1)/2, z:MZ + (fz+TW)/2, w:fx1-fx0, d:fz-TW});                 // południowy bok
+    WALLS.push({x:MX - 6, z:railZ, w:1.6, d:1.05});                                      // wózek
+  })();
   const restWallMat = new THREE.MeshLambertMaterial({color:0xf0e6d2});
   const restExterior = [];                // elementy ukrywane, gdy jesteś w środku
   (function buildRestaurant(){
@@ -790,43 +900,6 @@
     restWallMat.transparent = false; restWallMat.opacity = 1;
     restWallMat.depthWrite = true;
   }
-
-  // ===== Wielki transparent urodzinowy nad Długą, tuż przed rondem przy Pandy (czytelny dla jadących od strony Długiej, z tyłu też) =====
-  (function buildBirthdayBanner(){
-    const BX = RB.x - 20, BW = 17, BH = 2.8, BY = 8.2;               // x przed tarczą ronda (jej brzeg to RB.x-14), szerokość, wysokość i środek wysokości transparentu
-    const lamb = c => new THREE.MeshLambertMaterial({color:c});
-    const TXT = 'WSZYSTKIEGO NAJLEPSZEGO GABRYŚ!';
-    const cv = document.createElement('canvas'); cv.width = 2048; cv.height = Math.round(2048*BH/BW);
-    const g = cv.getContext('2d'), cw = cv.width, ch = cv.height;
-    const grad = g.createLinearGradient(0,0,cw,0);
-    grad.addColorStop(0,'#d81b60'); grad.addColorStop(.5,'#7b1fa2'); grad.addColorStop(1,'#1565c0');
-    g.fillStyle = grad; g.fillRect(0,0,cw,ch);
-    g.strokeStyle = '#ffd54f'; g.lineWidth = 14; g.strokeRect(10,10,cw-20,ch-20);
-    g.strokeStyle = '#ffffff'; g.lineWidth = 4; g.strokeRect(30,30,cw-60,ch-60);
-    g.textAlign = 'center'; g.textBaseline = 'middle';
-    let fs = 130; g.font = 'bold ' + fs + 'px sans-serif';
-    while(g.measureText(TXT).width > cw - 330 && fs > 40){ fs -= 4; g.font = 'bold ' + fs + 'px sans-serif'; }
-    g.lineWidth = 12; g.strokeStyle = 'rgba(0,0,0,.45)'; g.strokeText(TXT, cw/2, ch/2 + 6);
-    g.fillStyle = '#fff176'; g.fillText(TXT, cw/2, ch/2 + 6);
-    g.font = '110px sans-serif'; g.fillText('🎉', 110, ch/2 + 6); g.fillText('🎂', cw - 110, ch/2 + 6);
-    const tx = new THREE.CanvasTexture(cv); tx.anisotropy = 8;
-    const mat = new THREE.MeshBasicMaterial({map:tx});
-    [[-Math.PI/2, -0.12], [Math.PI/2, 0.12]].forEach(([ry, dx]) => {   // dwie płaszczyzny – tekst czytelny z obu stron
-      const p = new THREE.Mesh(new THREE.PlaneGeometry(BW, BH), mat);
-      p.position.set(BX + dx, BY, ROAD_Z); p.rotation.y = ry; street.add(p);
-    });
-    const back = new THREE.Mesh(new THREE.BoxGeometry(0.18, BH + 0.3, BW + 0.3), lamb(0x222222));   // ramka/podkład między stronami
-    back.position.set(BX, BY, ROAD_Z); street.add(back);
-    // dwa słupy po bokach jezdni (na chodnikach) + belka nad transparentem
-    const postH = BY + BH/2 + 0.6;
-    [-1,1].forEach(sd => {
-      const pz = ROAD_Z + sd*(BW/2 + 0.5);   // słupy poza krawędzią transparentu – nie zasłaniają napisu
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.4, postH, 0.4), lamb(0x55585c));
-      post.position.set(BX, postH/2, pz); post.castShadow = true; street.add(post); solidPole(BX, pz);
-    });
-    const beam = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, BW + 1.4), lamb(0x55585c));
-    beam.position.set(BX, postH - 0.15, ROAD_Z); street.add(beam);
-  })();
 
   // Supermarket Pandy (z wnętrzem, do którego można wejść)
   const supWallMat = new THREE.MeshLambertMaterial({color:0xdcd6c8});
@@ -1517,12 +1590,22 @@
     add(new THREE.CylinderGeometry(0.012,0.012,0.4,6), M(0x263238), -0.24);                                   // przewód
     add(new THREE.CylinderGeometry(0.08,0.26,0.24,18,1,true), M(0xe07b39, {side:THREE.DoubleSide}), -0.56);   // klosz
     add(new THREE.SphereGeometry(0.09,12,10), ghost ? deskGhostMat : new THREE.MeshBasicMaterial({color:0xfff4cc}), -0.64);   // żarówka
+    if(!ghost){
+      if(!makeLamp.glowTex){
+        const cv = document.createElement('canvas'); cv.width = cv.height = 128; const c2 = cv.getContext('2d');
+        const gr = c2.createRadialGradient(64,64,0,64,64,64);
+        gr.addColorStop(0,'rgba(255,236,180,1)'); gr.addColorStop(0.25,'rgba(255,214,140,0.55)'); gr.addColorStop(1,'rgba(255,190,100,0)');
+        c2.fillStyle = gr; c2.fillRect(0,0,128,128); makeLamp.glowTex = new THREE.CanvasTexture(cv);
+      }
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({map:makeLamp.glowTex, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, fog:false}));
+      glow.scale.set(1.5,1.5,1); glow.position.y = -0.66; g.add(glow);                                                           // ciepła poświata wokół żarówki
+    }
     if(ghost) add(new THREE.CylinderGeometry(0.3,0.3,0.02,20), deskGhostMat, 0.09 - HOME.h);                  // znacznik na podłodze pod lampą
     return g;
   }
   // Stała pula świateł (zmiana liczby świateł w scenie wymuszałaby przekompilowanie shaderów) – świecą pierwsze 3 lampy.
   const lampPool = [];
-  for(let i = 0; i < 3; i++){ const l = new THREE.PointLight(0xffe2a8, 0, 8); l.userData.used = false; scene.add(l); lampPool.push(l); }
+  for(let i = 0; i < 3; i++){ const l = new THREE.PointLight(0xffd9a0, 0, 12); l.userData.used = false; scene.add(l); lampPool.push(l); }
   function attachLampLight(pd){
     const l = lampPool.find(q => !q.userData.used); if(!l) return;
     l.userData.used = true; l.position.set(pd.wall.x, HOME.h - 0.75, pd.wall.z); pd.light = l;
@@ -1729,7 +1812,15 @@
   // ===== Sklep z ubraniami przy ulicy Społecznej (wschodnia strona, drzwi na zachód – w stronę jezdni) =====
   const CLOTH = {x:144, z:56, w:10, d:7, h:3.6};                 // w – wzdłuż osi Z świata, d – wzdłuż osi X świata
   BUILDINGS.push({x:CLOTH.x, z:CLOTH.z, w:CLOTH.d, d:CLOTH.w, open:true});
-  const HAT_PRICE = 10;
+  const HAT_PRICE = 10, CAP_PRICE = 8;
+  function buildCapGroup(color){                         // czapka z daszkiem: kopuła + półokrągły daszek + guzik, jeden materiał (jeden kolor)
+    const g = new THREE.Group(), m = new THREE.MeshLambertMaterial({color});
+    const crown = new THREE.Mesh(new THREE.SphereGeometry(0.3, 18, 10, 0, Math.PI*2, 0, Math.PI/2), m); crown.scale.y = 0.8;
+    const visor = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 0.03, 18, 1, false, -Math.PI/2, Math.PI), m);
+    visor.position.set(0, 0.02, 0.2); visor.rotation.x = 0.18;                 // daszek z przodu (+z), lekko opuszczony
+    const knob = new THREE.Mesh(new THREE.SphereGeometry(0.04, 8, 6), m); knob.position.y = 0.24;
+    g.add(crown, visor, knob); g.userData.mat = m; return g;
+  }
   const clothWallMat = new THREE.MeshLambertMaterial({color:0xf4e4ee});
   const clothExterior = [];
   let clothInside = false, clothNpc = null;
@@ -1787,6 +1878,16 @@
     pg.font = 'bold 44px sans-serif'; pg.fillStyle = '#c0392b'; pg.fillText(HAT_PRICE + ' monet', 128, 92);
     const price = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.4), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(pc)}));
     price.position.set(-3.6, 0.7, 1.86); grp.add(price);
+    // stojak z czapką z daszkiem i ceną
+    box(0.5, 0.9, 0.5, dark, -2.4, 0.45, 1.6, true);
+    const cdisp = buildCapGroup(0xc62828); cdisp.position.set(-2.4, 0.9, 1.6); cdisp.rotation.y = 0.35;
+    cdisp.traverse(o => { if(o.isMesh) o.castShadow = true; }); grp.add(cdisp);
+    const cpc = document.createElement('canvas'); cpc.width = 256; cpc.height = 128;
+    const cpg = cpc.getContext('2d'); cpg.fillStyle = '#fff6d6'; cpg.fillRect(0,0,256,128); cpg.strokeStyle = '#d1477a'; cpg.lineWidth = 8; cpg.strokeRect(4,4,248,120);
+    cpg.fillStyle = '#222'; cpg.textAlign = 'center'; cpg.textBaseline = 'middle'; cpg.font = 'bold 27px sans-serif'; cpg.fillText('CZAPKA Z DASZKIEM', 128, 40);
+    cpg.font = 'bold 44px sans-serif'; cpg.fillStyle = '#c0392b'; cpg.fillText(CAP_PRICE + ' monet', 128, 92);
+    const cprice = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.4), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cpc)}));
+    cprice.position.set(-2.4, 0.7, 1.86); grp.add(cprice);
 
     // lada sprzedawcy
     box(3.7, 1.1, 0.8, dark, 2.45, 0.55, -1.2, true);
@@ -1824,19 +1925,85 @@
     clothExterior.forEach(m => m.visible = !inside);
     clothWallMat.transparent = false; clothWallMat.opacity = 1; clothWallMat.depthWrite = true;
   }
-  function buyHat(){
-    if(coins() < HAT_PRICE){ toast(`Kapelusz kosztuje ${HAT_PRICE} monet 🪙 (masz ${coins()})`); return; }
-    for(let i=0;i<HAT_PRICE;i++) removeOne(inv.findIndex(x => x && x.id === 'coin'));
-    if(!addItem('hat')){
-      for(let i=0;i<HAT_PRICE;i++) addItem('coin');
-      toast('Ekwipunek pełny – zrób miejsce na kapelusz'); renderInv(); return;
-    }
-    renderInv(); renderShop(); openClothTalk('Dziękuję za zakup kapelusza! Czy mogę jeszcze w czymś pomóc?');
-    toast('Kupiono kapelusz 🎩 – załóż go w ekwipunku (I)');
+  const HEAD_DEF = {
+    hat:{price:HAT_PRICE, name:'Kapelusz', acc:'kapelusz', gen:'kapelusza', emoji:'🎩', def:0x222222},
+    cap:{price:CAP_PRICE, name:'Czapka z daszkiem', acc:'czapkę z daszkiem', gen:'czapki z daszkiem', emoji:'🧢', def:0xc62828}
+  };
+  const canAddItem = (id, color) => inv.some(x => x && x.id === id && x.color === color) || inv.indexOf(null) >= 0;
+  function buyHeadwear(kind, color){
+    const D = HEAD_DEF[kind];
+    if(coins() < D.price){ toast(`${D.name} kosztuje ${D.price} monet 🪙 (masz ${coins()})`); return false; }
+    if(!canAddItem(kind, color)){ toast(`Ekwipunek pełny – zrób miejsce na ${D.acc}`); return false; }
+    for(let i=0;i<D.price;i++) removeOne(inv.findIndex(x => x && x.id === 'coin'));
+    addItem(kind, color);
+    renderInv(); renderShop();
+    return true;
   }
+  // okno wyboru koloru RGB kapelusza / czapki (podgląd na żywo na postaci)
+  let headUiKind = null, headPrevWorn = null, headColor = 0;
+  const headUI = document.createElement('div'); headUI.id = 'headUI';
+  headUI.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(330px,calc(100vw - 28px));background:rgba(20,24,30,.97);color:#fff;border-radius:14px;padding:16px;display:none;z-index:40;box-sizing:border-box;font-size:14px';
+  const hRow = (id, name, col) => `<div style="display:flex;align-items:center;gap:8px;margin:8px 0"><b style="width:16px;color:${col}">${name}</b><input id="${id}" type="range" min="0" max="255" value="0" style="flex:1"><input id="${id}n" type="number" min="0" max="255" value="0" style="width:58px;padding:3px;border-radius:6px;border:0;background:#2b3340;color:#fff"></div>`;
+  const HEAD_PRESETS = [0x222222,0xffffff,0xc62828,0xef6c00,0xf9a825,0x2e7d32,0x1565c0,0x6a1b9a,0xd1477a,0x6d4c41];
+  headUI.innerHTML = `<h3 id="headTitle" style="margin:0 0 10px"></h3>
+    <div id="headSwatch" style="height:54px;border-radius:10px;border:2px solid rgba(255,255,255,.25);margin-bottom:10px"></div>
+    <div style="display:flex;align-items:center;gap:10px"><span>Paleta:</span><input id="headPick" type="color" style="width:56px;height:32px;border:0;background:none;padding:0"><span id="headHex" style="opacity:.8;font-family:monospace"></span></div>
+    <div id="headPresets" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px"></div>
+    ${hRow('headR','R','#ff6b6b')}${hRow('headG','G','#6bff8a')}${hRow('headB','B','#6bb5ff')}
+    <div style="opacity:.75;font-size:12px;margin:4px 0 10px">Podgląd widzisz na swojej postaci.</div>
+    <div style="display:flex;gap:8px"><button id="headOk" type="button" style="flex:1;padding:10px;border:0;border-radius:8px;background:#2e7d32;color:#fff;cursor:pointer;font-size:14px"></button><button id="headNo" type="button" style="padding:10px 14px;border:0;border-radius:8px;background:#555;color:#fff;cursor:pointer;font-size:14px">Anuluj</button></div>`;
+  document.body.appendChild(headUI);
+  const hEl = id => document.getElementById(id);
+  HEAD_PRESETS.forEach(c => {
+    const b = document.createElement('button'); b.type = 'button'; b.title = '#' + c.toString(16).padStart(6,'0');
+    b.style.cssText = `width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.55);cursor:pointer;padding:0;background:#${c.toString(16).padStart(6,'0')}`;
+    b.onclick = () => headSet(c >> 16 & 255, c >> 8 & 255, c & 255);
+    hEl('headPresets').appendChild(b);
+  });
+  function headSet(r, g, b){
+    const c = v => Math.max(0, Math.min(255, Math.round(+v || 0)));
+    r = c(r); g = c(g); b = c(b);
+    const hex = '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+    hEl('headR').value = hEl('headRn').value = r; hEl('headG').value = hEl('headGn').value = g; hEl('headB').value = hEl('headBn').value = b;
+    hEl('headPick').value = hex; hEl('headHex').textContent = hex.toUpperCase() + `  (${r}, ${g}, ${b})`; hEl('headSwatch').style.background = hex;
+    headColor = (r << 16) | (g << 8) | b;
+    if(headUiKind) setWorn({id:headUiKind, color:headColor});                 // podgląd na postaci
+  }
+  ['R','G','B'].forEach(k => ['','n'].forEach(sfx => { hEl('head'+k+sfx).oninput = e => {
+    const v = {R:hEl('headR').value, G:hEl('headG').value, B:hEl('headB').value}; v[k] = e.target.value; headSet(v.R, v.G, v.B);
+  }; }));
+  hEl('headPick').oninput = () => { const h = hEl('headPick').value; headSet(parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)); };
+  function closeHeadUI(cancel, reopenTalk){
+    if(!headUiKind) return;
+    setWorn(headPrevWorn);                                                     // wracamy do tego, co gracz miał na głowie
+    headUiKind = null; headUI.style.display = 'none';
+    if(reopenTalk) openClothTalk();
+  }
+  function openHeadPicker(kind){
+    closeDialog();
+    headPrevWorn = worn ? {id:worn.id, color:worn.color} : null; headUiKind = kind;
+    const D = HEAD_DEF[kind];
+    hEl('headTitle').textContent = `${D.emoji} ${D.name} – wybierz kolor`;
+    hEl('headOk').innerHTML = coinHTML(`Kup (${D.price} 🪙)`);
+    headUI.style.display = 'block';
+    headSet(D.def >> 16 & 255, D.def >> 8 & 255, D.def & 255);
+    if(document.pointerLockElement) try{ document.exitPointerLock(); }catch(e){}
+    hEl('headOk').focus();
+  }
+  hEl('headOk').onclick = () => {
+    const kind = headUiKind, color = headColor; if(!kind) return;
+    const D = HEAD_DEF[kind];
+    if(!buyHeadwear(kind, color)) return;
+    closeHeadUI(false);
+    openClothTalk(`Dziękuję za zakup ${D.gen}! Czy mogę jeszcze w czymś pomóc?`);
+    toast(`Kupiono ${D.acc} ${D.emoji} – załóż w ekwipunku (I)`);
+  };
+  hEl('headNo').onclick = () => closeHeadUI(true, true);
+  headUI.addEventListener('keydown', e => { e.stopPropagation(); if(e.code === 'Escape') closeHeadUI(true, true); });
+  headUI.addEventListener('keyup', e => e.stopPropagation());
   function openClothTalk(msg){
-    say(msg || `Witaj w sklepie z ubraniami! Mam elegancki kapelusz za ${HAT_PRICE} monet 🪙. Założysz go w ekwipunku (I).`,
-      [{label:`Kup kapelusz (${HAT_PRICE} 🪙)`, fn:buyHat}, {label:'Wyjdź', fn:closeDialog}], '👗 Ola, sprzedawczyni', 'cloth');
+    say(msg || `Witaj w sklepie z ubraniami! Mam elegancki kapelusz za ${HAT_PRICE} monet 🪙 i czapkę z daszkiem za ${CAP_PRICE} monet 🪙. Kolor wybierzesz sam z palety RGB. Założysz je w ekwipunku (I).`,
+      [{label:`Kup kapelusz (${HAT_PRICE} 🪙)`, fn:() => openHeadPicker('hat')}, {label:`Kup czapkę z daszkiem (${CAP_PRICE} 🪙)`, fn:() => openHeadPicker('cap')}, {label:'Wyjdź', fn:closeDialog}], '👗 Ola, sprzedawczyni', 'cloth');
   }
 
   // ===== Salon samochodowy przy ulicy Poprzecznej (wschodnia strona, drzwi na zachód) =====
@@ -2338,14 +2505,16 @@
     {name:'SPOŁECZNA', x:118.05, z:42.5, slab:3.8, rot:Math.PI/2},           // zachodnia strona Społecznej, w przerwie między Domem D (z do 37,5) a Domem E (od z=47,5); front na wschód do chodnika (x = 121,85)
     {name:'GÓRNA',     x:91,    z:138.05, slab:3.8}                       // północna strona Górnej, naprzeciwko przystanku przy stacji; front na południe do chodnika (z = 141,85)
   ];
+  const BENCH_SEATS = [];                                                                         // ławki na przystankach: twarde i można na nich siedzieć (F)
   BUS_STOPS.forEach(bs => {
     const rot = bs.rot || 0, cr = Math.cos(rot), sr = Math.sin(rot), quarter = Math.abs(sr) > 0.5;
     const grp = new THREE.Group(); grp.position.set(bs.x, terrainH(bs.x, bs.z), bs.z); grp.rotation.y = rot; scene.add(grp);   // front (lokalne +z) → ulica / parking
     const toWorld = (px, pz) => ({x:bs.x + px*cr + pz*sr, z:bs.z - px*sr + pz*cr});
     const lamb = c => new THREE.MeshLambertMaterial({color:c});
     const put = (m, px, py, pz) => { m.position.set(px,py,pz); m.castShadow = m.receiveShadow = true; grp.add(m); return m; };
-    const col = (px, pz, bw, bd) => { const q = toWorld(px, pz); WALLS.push({x:q.x, z:q.z, w:quarter ? bd : bw, d:quarter ? bw : bd}); };
-    const box = (bw,bh,bd,mat,px,py,pz,collide) => { if(collide) col(px,pz,bw,bd); return put(new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), mat), px, py, pz); };
+    const col = (px, pz, bw, bd) => { const q = toWorld(px, pz); const wl = {x:q.x, z:q.z, w:quarter ? bd : bw, d:quarter ? bw : bd}; WALLS.push(wl); return wl; };
+    let lastCol = null;
+    const box = (bw,bh,bd,mat,px,py,pz,collide) => { if(collide) lastCol = col(px,pz,bw,bd); return put(new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), mat), px, py, pz); };
     const dark = lamb(0x37474f), blue = lamb(0x1565c0), wood = lamb(0x8d6e63);
     const glass = new THREE.MeshLambertMaterial({color:0x9fd3f0, transparent:true, opacity:0.38});
     const SW = 3.6;
@@ -2354,7 +2523,8 @@
     [-1,1].forEach(sd => box(0.06, 1.7, 1.4, glass, sd*(SW/2 - 0.03), 1.0, 0.85, true));            // szyby boczne
     [[-1,0.1],[1,0.1],[-1,1.55],[1,1.55]].forEach(q => box(0.1, 2.4, 0.1, dark, q[0]*(SW/2 - 0.05), 1.25, q[1], false));   // słupki
     box(SW + 0.3, 0.12, 1.9, blue, 0, 2.46, 0.8, false);                                           // dach
-    box(2.4, 0.08, 0.45, wood, 0, 0.5, 0.45, false);                                               // ławka
+    box(2.4, 0.08, 0.45, wood, 0, 0.5, 0.45, true);                                                // ławka (twarda – kolizja)
+    { const bq = toWorld(0, 0.45); BENCH_SEATS.push({x:bq.x, z:bq.z, pd:{kind:'bench', mesh:{rotation:{y:rot}}, wall:lastCol}}); }   // pd jak przy krześle: siadanie/wstawanie przez sitOn/standUp
     box(2.4, 0.4, 0.05, wood, 0, 0.82, 0.25, false);
     [-1,1].forEach(sd => box(0.08, 0.44, 0.4, dark, sd*1.0, 0.28, 0.45, false));
     // znak „przystanek autobusowy” na maszcie nad dachem (widoczny z ulicy z obu stron)
@@ -2496,7 +2666,7 @@
     say(`Fajne auto! Mogę poprawić jego skręt, żeby wchodziło w zakręty dużo lepiej. Teraz masz poziom ${steerLvl}/${MECH_PRICES.length}. Następny: ${MECH_TITLES[steerLvl]} – ${price} 🪙. Płacisz monetami przy sobie, a brakującą część pobiorę z konta bankowego.`,
       [{label:`Ulepsz skręt (${price} 🪙)`, fn:buySteer}, {label:'Wyjdź', fn:closeDialog}], W, 'mech');
   }
-  const dlgDist = () => dlgWho === 'fuel' ? pumpDist() : dlgWho === 'agd' ? agdNpcDist() : dlgWho === 'mech' ? mechNpcDist() : dlgWho === 'paint' ? paintNpcDist() : dlgWho === 'car' ? carNpcDist() : dlgWho === 'cloth' ? clothNpcDist() : dlgWho === 'shop' ? shopNpcDist() : dlgWho === 'bank' ? bankNpcDist() : dlgWho === 'furn' ? furnNpcDist() : dlgWho === 'home' ? (dlgHome ? Math.hypot(player.position.x-homeDoorPos(dlgHome).x, player.position.z-homeDoorPos(dlgHome).z) : 0) : npcDist();
+  const dlgDist = () => dlgWho === 'miner' ? minerDist() : dlgWho === 'nbr' ? nbrDist() : dlgWho === 'fuel' ? pumpDist() : dlgWho === 'agd' ? agdNpcDist() : dlgWho === 'mech' ? mechNpcDist() : dlgWho === 'paint' ? paintNpcDist() : dlgWho === 'car' ? carNpcDist() : dlgWho === 'cloth' ? clothNpcDist() : dlgWho === 'shop' ? shopNpcDist() : dlgWho === 'bank' ? bankNpcDist() : dlgWho === 'furn' ? furnNpcDist() : dlgWho === 'home' ? (dlgHome ? Math.hypot(player.position.x-homeDoorPos(dlgHome).x, player.position.z-homeDoorPos(dlgHome).z) : 0) : npcDist();
 
   // ===== Ustawianie biurka w domu =====
   const placedDesks = [];
@@ -3256,7 +3426,7 @@
     const th = pd.mesh.rotation.y;
     player.position.set(pd.wall.x, 0, pd.wall.z); vy = 0;
     facing = th; player.rotation.y = th;
-    toast('Siedzisz 🪑 F lub Shift – wstań');
+    toast(pd.kind === 'bench' ? 'Siedzisz na ławce 🪑 F lub Shift – wstań' : 'Siedzisz 🪑 F lub Shift – wstań');
   }
   function standUp(){
     if(!sitting) return;
@@ -3409,12 +3579,14 @@
   (function buildStreetLamps(){
     const OFF = ROAD_W/2 + 0.75;                       // przy krawężniku, po stronie jezdni
     const add = (x, z, dx, dz, solid = true) => streetLampList.push({x, z, dx, dz, solid});
-    [-72,-52,-32,-14,14,34,54,98,108].forEach(x => add(x, ROAD_Z + OFF, 0, -1));      // Długa, strona północna
+    [-52,-32,-14,14,34,54,98,108].forEach(x => add(x, ROAD_Z + OFF, 0, -1));         // Długa, strona północna (bez x=-72: stała na zachodnim rondzie)
     [-66,-42,-18,6,30,54,78,102].forEach(x => add(x, ROAD_Z - OFF, 0, 1));            // Długa, strona południowa
     [6,30,54].forEach(z => add(SIDE_ROAD_X + OFF, z, -1, 0));                         // Krótka
     [18,42,66].forEach(z => add(SIDE_ROAD_X - OFF, z, 1, 0));
     [6,30,54].forEach(z => add(POP_X + OFF, z, -1, 0));                               // Poprzeczna
     [18,42].forEach(z => add(POP_X - OFF, z, 1, 0));
+    [-30,-48,-66,-84].forEach(z => add(GORN_X + GORN_W/2 + 0.65, z, -1, 0));          // Górnicza
+    [-39,-57,-75].forEach(z => add(GORN_X - GORN_W/2 - 0.65, z, 1, 0));
     [12,60].forEach(z => add(RB.x + OFF, z, -1, 0));                                  // Społeczna
     [36,84].forEach(z => add(RB.x - OFF, z, 1, 0));
     add(RB.x + OFF, -32, -1, 0); add(RB.x - OFF, -44, 1, 0);
@@ -3516,7 +3688,11 @@
   // Rower gracza – pojawia się przed sklepem po zakupie
   let bikePurchased = false, bikeMounted = false;
   const bike = new THREE.Group();
+  bike.rotation.order = 'YXZ';                                      // najpierw kierunek jazdy, potem przechył (nos góra/dół) w układzie roweru
+  let bikePitch = 0;                                                // aktualny przechył roweru (rad; ujemny = przód w górę)
   bike.visible = false;
+  const BIKE_COLL = [-0.65, 0, 0.65].map(o => ({x:1e5, z:1e5, r:0.28, o}));   // twardy rower: trzy okręgi wzdłuż ramy (kolizja jak pnie drzew), aktywne tylko gdy rower stoi
+  BIKE_COLL.forEach(c => treeColl.push(c));
   const bikeWheels = [];
   const bikeBlack = new THREE.MeshLambertMaterial({color:0x20252b});
   const bikeFrame = new THREE.MeshLambertMaterial({color:0x7b3fd1});
@@ -3559,7 +3735,7 @@
     if(!bikeMounted) return;
     bikeMounted=false; player.visible=true; riderBlend=0;
     const a=bike.rotation.y;
-    player.position.set(bike.position.x+Math.sin(a)*1.1,0,bike.position.z+Math.cos(a)*1.1);
+    player.position.set(bike.position.x+Math.cos(a)*1.0,0,bike.position.z-Math.sin(a)*1.0);   // zsiadasz z boku – rower jest twardy
     toast('Zsiadłeś z roweru');
   }
 
@@ -3571,9 +3747,20 @@
   hat.add(brim, top); hat.position.set(0, 1.58, 0); hat.visible = false;
   hat.children.forEach(m => m.castShadow = true);
   upper.add(hat);
+  // Czapka z daszkiem (przedmiot do założenia) + stan „co mam na głowie”
+  const capG = buildCapGroup(0xc62828); capG.position.set(0, 1.40, -0.01); capG.visible = false;
+  capG.traverse(o => { if(o.isMesh) o.castShadow = true; });
+  upper.add(capG);
+  let worn = null;                                                // {id:'hat'|'cap', color} albo null
+  const isWorn = s => !!(worn && s && s.id === worn.id && s.color === worn.color);
+  function setWorn(w){
+    worn = w ? {id:w.id, color:w.color} : null;
+    if(w){ const c = w.color !== undefined ? w.color : HEAD_DEF[w.id].def; (w.id === 'cap' ? capG.userData.mat : hm).color.setHex(c); }
+    hat.visible = !!w && w.id === 'hat'; capG.visible = !!w && w.id === 'cap';
+  }
 
   // Dom gracza (budowa)
-  const homeWallMat = new THREE.MeshLambertMaterial({color:0xe8d9c4});
+  const homeWallMat = new THREE.MeshPhongMaterial({color:0xe8d9c4, shininess:8, specular:0x151515});   // Phong: światło lampy liczone per piksel
   const OUTLET_LOCAL = {x:0.6, z:-3.6};                         // gniazdko na tylnej ścianie domu (współrzędne lokalne)
   const RENT_PRICE = 30;                                        // czynsz: monet za dobę gry
   const BUY_PRICE = 750, SELL_PRICE = 600, MAX_PREPAID_DAYS = 7;   // sprzedaż domu = 80% ceny kupna                                        // zakup domu na stałe (bez czynszu)
@@ -3592,13 +3779,13 @@
     let homeCharger=null, chargerLed=null, homePhone=null, phoneScreenMat=null;
     const {x:X,z:Z,w,h,d}=HOME, t=.28, gap=1.4, doorH=2.2;   // otwór dopasowany do drzwi
     const grp=new THREE.Group(); grp.position.set(X,0,Z); grp.rotation.y=HOME.rot; scene.add(grp);
-    const mat=c=>new THREE.MeshLambertMaterial({color:c});
+    const mat=c=>new THREE.MeshPhongMaterial({color:c, shininess:8, specular:0x151515});
     const put=(geo,m,px,py,pz)=>{const o=new THREE.Mesh(geo,m);o.position.set(px,py,pz);o.castShadow=o.receiveShadow=true;grp.add(o);return o;};
-    const wall=(bw,bh,bd,px,py,pz,collide=true)=>{if(collide)WALLS.push(homeRect(px,pz,bw,bd));return put(new THREE.BoxGeometry(bw,bh,bd),homeWallMat,px,py,pz);};
+    const wall=(bw,bh,bd,px,py,pz,collide=true)=>{if(collide)WALLS.push(homeRect(px,pz,bw,bd));return put(new THREE.BoxGeometry(bw,bh,bd,Math.min(10,Math.max(1,Math.ceil(bw))),Math.min(4,Math.max(1,Math.ceil(bh))),Math.min(10,Math.max(1,Math.ceil(bd)))),homeWallMat,px,py,pz);};
     wall(w,h,t,0,h/2,-d/2+t/2); wall(t,h,d,-w/2+t/2,h/2,0); wall(t,h,d,w/2-t/2,h/2,0);
     const seg=(w-gap)/2; wall(seg,h,t,-(gap/2+seg/2),h/2,d/2-t/2); wall(seg,h,t,(gap/2+seg/2),h/2,d/2-t/2); wall(gap,h-doorH,t,0,doorH+(h-doorH)/2,d/2-t/2,false);
     homeExterior.push(put(new THREE.BoxGeometry(w+.5,.35,d+.5),mat(0x69452f),0,h+.17,0));
-    const floor=put(new THREE.BoxGeometry(w-t,.12,d-t),mat(0xb98d61),0,.02,0);
+    const floor=put(new THREE.BoxGeometry(w-t,.12,d-t,Math.ceil(w-t),1,Math.ceil(d-t)),mat(0xb98d61),0,.02,0);   // gęsta siatka – światło lampy (Lambert = per wierzchołek) widać na podłodze
     // Ościeżnica (bez szpar wokół otworu) i otwarte drzwi odchylone do wnętrza
     const frameM=mat(0x4a2e1a), fz=d/2-t/2, fd=t+.06;
     put(new THREE.BoxGeometry(.08,doorH,fd),frameM,-gap/2+.04,doorH/2,fz);
@@ -4251,8 +4438,9 @@
     }
   }
 
-  // ===== Auto gracza (kupione w salonie za 300 monet): W/S gaz i hamulec / wsteczny, A/D skręt, Spacja – ręczny, F – wsiądź / wysiądź =====
+  // ===== Auto gracza (kupione w salonie za 300 monet): W/S gaz i hamulec / wsteczny, A/D skręt, Spacja – hamulec, B – hamulec ręczny, F – wsiądź / wysiądź =====
   let hasCar = false, carDriving = false, carV = 0, carHeading = 0;
+  let handbrake = true, hbHintT = 0;                                   // hamulec ręczny (B): zaciągnięty = auto stoi, zwolniony = stacza się z pochyłości
   let carFuel = 100, fuelLowWarned = false, fuelEmptyWarned = false;   // paliwo auta w % (pełny bak po zakupie)
   let steerLvl = 0;                                                    // poziom ulepszenia skrętu u mechanika (0–3)
   const pcar = buildCarModel(PLAYER_CAR_COLOR);
@@ -4285,7 +4473,7 @@
     g.visible = false; pcar.root.add(g);
     pcar.interior = g; pcar.steer = steer;
   })();
-  function placeCar(x, z, h){ hasCar = true; carHeading = h; carV = 0; const tt = carTilt(x, z, h); carPitch = tt.pitch; pcar.group.position.set(x, tt.y + 0.02, z); pcar.group.rotation.y = h; pcar.group.rotation.x = carPitch; pcar.group.visible = true; }
+  function placeCar(x, z, h){ hasCar = true; handbrake = true; carHeading = h; carV = 0; const tt = carTilt(x, z, h); carPitch = tt.pitch; pcar.group.position.set(x, tt.y + 0.02, z); pcar.group.rotation.y = h; pcar.group.rotation.x = carPitch; pcar.group.visible = true; }
   // Kierunkowskazy gracza: Z – lewy, C – prawy, X – awaryjne. Skręt wyłącza się sam po wykonaniu manewru (jak w prawdziwym aucie).
   let pSig = 0, pHazard = false, pSigStart = 0, pSigTurned = false;
   function setPlayerSignal(v){ pSig = (pSig === v) ? 0 : v; pSigStart = carHeading; pSigTurned = false; }
@@ -4294,6 +4482,7 @@
     if(e.code === 'KeyZ') setPlayerSignal(-1);
     else if(e.code === 'KeyC') setPlayerSignal(1);
     else if(e.code === 'KeyX') pHazard = !pHazard;
+    else if(e.code === 'KeyB'){ handbrake = !handbrake; toast(handbrake ? 'Hamulec ręczny zaciągnięty 🅿️' : 'Hamulec ręczny zwolniony'); }
   });
   // ===== Klakson: syntezator Web Audio (bez plików) – gracz trzyma H, a auta ruchu trąbią, gdy zastawisz im drogę =====
   let audioCtx = null;
@@ -4413,7 +4602,7 @@
     if(bikeMounted) dismountBike();
     carDriving = true; carV = 0; player.visible = false; vy = 0;
     player.position.set(pcar.group.position.x, 0, pcar.group.position.z);
-    toast('Jedziesz autem 🚗  W/S – gaz i hamulec, A/D – skręt, Spacja – ręczny, Z / C – kierunkowskazy, X – awaryjne, H – klakson, Shift – wysiądź');
+    toast('Jedziesz autem 🚗  W/S – gaz i hamulec, A/D – skręt, Spacja – hamulec, B – hamulec ręczny, Z / C – kierunkowskazy, X – awaryjne, H – klakson, Shift – wysiądź');
   }
   function exitCar(){
     if(!carDriving) return;
@@ -4421,15 +4610,20 @@
     const side = 2.4, c = Math.cos(carHeading), sn = Math.sin(carHeading);          // wysiadasz z lewej strony auta
     player.position.set(pcar.group.position.x + c*side, 0, pcar.group.position.z - sn*side);
     facing = carHeading; player.rotation.y = facing; vy = 0;
-    toast('Wysiadłeś z auta');
+    toast(handbrake ? 'Wysiadłeś z auta' : 'Wysiadłeś z auta – hamulec ręczny nie jest zaciągnięty! ⚠️ Auto może się stoczyć');
   }
   function driveCar(ix, iz, dt){
     const MAXF = 20, MAXR = 6;
+    if(handbrake){                                                                   // zaciągnięty ręczny blokuje tylne koła – gaz nic nie daje
+      if(Math.abs(iz) > 0.05 && performance.now() - hbHintT > 2500){ hbHintT = performance.now(); toast('Zwolnij hamulec ręczny – B 🅿️'); }
+      iz = 0;
+    }
     if(carFuel <= 0) iz = 0;                                                         // bez paliwa silnik nie reaguje na gaz (hamować i toczyć się można)
     if(iz > 0.05) carV += (carV < 0 ? 26 : 10)*iz*dt;
     else if(iz < -0.05) carV -= (carV > 0 ? 26 : 8)*(-iz)*dt;
     else { const f = 6*dt; carV = Math.abs(carV) <= f ? 0 : carV - Math.sign(carV)*f; }
     if(keys.Space){ const f = 30*dt; carV = Math.abs(carV) <= f ? 0 : carV - Math.sign(carV)*f; }
+    if(handbrake){ const f = 18*dt; carV = Math.abs(carV) <= f ? 0 : carV - Math.sign(carV)*f; }   // ręczny też wyhamowuje jadące auto
     carV = Math.max(-MAXR, Math.min(MAXF, carV));
     const grip = Math.min(1, Math.abs(carV)/4);                                      // w miejscu nie da się skręcać
     carHeading -= ix * 1.9*(1 + 0.3*steerLvl)/(1 + Math.abs(carV)/(22 + 10*steerLvl)) * grip * Math.sign(carV) * dt;   // ulepszenia: ostrzejszy skręt także przy dużej prędkości
@@ -4443,12 +4637,40 @@
     if(carFuel > 25) fuelLowWarned = false;
     if(carFuel > 0) fuelEmptyWarned = false;
   }
+  // ===== Staczanie: zaparkowane auto bez zaciągniętego ręcznego rusza w dół pochyłości (grawitacja wzdłuż osi auta) =====
+  function rollBlocked(x, z, h){                                                     // czy auto (przód, środek, tył) uderzyłoby w przeszkodę
+    const sn = Math.sin(h), cs = Math.cos(h);
+    for(const k of [-1.6, 0, 1.6]){
+      const px = x + sn*k, pz = z + cs*k;
+      for(const t of treeColl){ if(Math.abs(px - t.x) < 3 && Math.abs(pz - t.z) < 3 && Math.hypot(px - t.x, pz - t.z) < t.r + 1.0) return true; }
+      for(const b of BUILDINGS){ if(!b.open && Math.abs(px - b.x) < b.w/2 + 1.0 && Math.abs(pz - b.z) < b.d/2 + 1.0) return true; }
+      for(const w of WALLS){ if(w.enter === undefined && Math.abs(px - w.x) < w.w/2 + 1.0 && Math.abs(pz - w.z) < w.d/2 + 1.0) return true; }
+    }
+    for(const o of trafficCars.concat(pksBuses, [BUS])){ if(o.active && o.group.visible && Math.hypot(o.group.position.x - x, o.group.position.z - z) < 3.4) return true; }
+    return false;
+  }
+  function updateCarRoll(dt){
+    if(!hasCar || carDriving || !pcar.group.visible) return;
+    if(handbrake){ carV = 0; return; }
+    const p = pcar.group.position, L = 2.0, sn = Math.sin(carHeading), cs = Math.cos(carHeading);
+    const slope = (terrainH(p.x + sn*L, p.z + cs*L) - terrainH(p.x - sn*L, p.z - cs*L))/(2*L);   // >0: przód wyżej niż tył
+    carV -= slope*9.8*0.9*dt;                                                                   // składowa grawitacji wzdłuż auta
+    const fr = 0.35*dt; carV = Math.abs(carV) <= fr ? 0 : carV - Math.sign(carV)*fr;            // opory toczenia – na prawie płaskim terenie stoi
+    carV = Math.max(-12, Math.min(12, carV*(1 - 0.04*dt)));
+    if(Math.abs(carV) < 0.005) return;
+    const nx = p.x + sn*carV*dt, nz = p.z + cs*carV*dt;
+    if(rollBlocked(nx, nz, carHeading)){ carV = 0; return; }                                    // uderzyło w przeszkodę – staje
+    const tt = carTilt(nx, nz, carHeading); carPitch += (tt.pitch - carPitch)*Math.min(1, dt*8);
+    p.set(nx, tt.y + 0.02, nz); pcar.group.rotation.x = carPitch;
+    pcar.wheels.forEach(w => { w.rotation.z -= carV*dt/0.36; });
+  }
   // ===== Paliwo: wskaźnik w aucie, zużycie i tankowanie na stacji (F przy dystrybutorze) =====
   const FUEL_IDLE = 0.008, FUEL_PER_M = 0.02, FUEL_THROTTLE = 0.03;                   // % baku: na sekundę, na metr, na sekundę pełnego gazu
   const FUEL_PRICE = 0.2;                                                            // monet za 1% baku (pełny bak = 20 🪙)
   const fuelEl = document.createElement('div'); fuelEl.id = 'fuelGauge';
   fuelEl.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);display:none;align-items:center;gap:8px;background:rgba(0,0,0,.55);color:#fff;padding:8px 14px;border-radius:10px;font:bold 13px system-ui,sans-serif;pointer-events:none;z-index:9';
   fuelEl.innerHTML = '<span>⛽</span><span style="opacity:.7">E</span><div style="width:150px;height:12px;border-radius:6px;background:rgba(255,255,255,.22);overflow:hidden"><div id="fuelFill" style="height:100%;width:100%;background:#66bb6a"></div></div><span style="opacity:.7">F</span><span id="fuelVal" style="min-width:38px;text-align:right">100%</span>';
+  const hbEl = document.createElement('span'); hbEl.style.cssText = 'margin-left:6px;padding:2px 8px;border-radius:6px;font-size:12px'; fuelEl.appendChild(hbEl);   // wskaźnik hamulca ręcznego
   document.body.appendChild(fuelEl);
   const fuelFill = fuelEl.querySelector('#fuelFill'), fuelVal = fuelEl.querySelector('#fuelVal');
   let fuelVisible = false;
@@ -4459,6 +4681,7 @@
     fuelFill.style.width = carFuel + '%';
     fuelFill.style.background = carFuel < 15 ? '#ef5350' : carFuel < 30 ? '#ffa726' : '#66bb6a';
     fuelVal.textContent = Math.round(carFuel) + '%';
+    hbEl.textContent = handbrake ? '🅿️ Ręczny (B)' : 'Ręczny: luz (B)'; hbEl.style.background = handbrake ? '#c62828' : 'rgba(255,255,255,.18)';
     fuelEl.style.opacity = carFuel < 15 && Math.sin(performance.now()/180) > 0 ? 0.55 : 1;   // miganie przy rezerwie
   }
   function pumpDist(){ let bd = 99; for(const q of STATION_PUMPS) bd = Math.min(bd, Math.hypot(player.position.x - q.x, player.position.z - q.z)); return bd; }
@@ -4492,7 +4715,7 @@
     if(paintUiOpen) closePaintUI(false);
     steerLvl = (c && c.has) ? Math.max(0, Math.min(MECH_PRICES.length, (+c.s) | 0)) : 0;
     carFuel = (c && c.has && c.f !== undefined && isFinite(+c.f)) ? Math.max(0, Math.min(100, +c.f)) : 100; fuelLowWarned = fuelEmptyWarned = false;   // stary zapis bez paliwa → pełny bak
-    if(c && c.has && isFinite(+c.x) && isFinite(+c.z)){ placeCar(+c.x, +c.z, +c.r || 0); pcar.bodyMat.color.setHex(isFinite(+c.c) ? (+c.c & 0xffffff) : PLAYER_CAR_COLOR); }
+    if(c && c.has && isFinite(+c.x) && isFinite(+c.z)){ placeCar(+c.x, +c.z, +c.r || 0); pcar.bodyMat.color.setHex(isFinite(+c.c) ? (+c.c & 0xffffff) : PLAYER_CAR_COLOR); handbrake = c.hb === undefined ? true : !!(+c.hb); }
     else { hasCar = false; pcar.group.visible = false; pcar.bodyMat.color.setHex(PLAYER_CAR_COLOR); }
   }
   function spawnTrafficCar(car){
@@ -4533,6 +4756,7 @@
       if(BUS.active){ const bp = BUS.group.position, bcx = Math.cos(BUS.heading), bsz = Math.sin(BUS.heading); for(const k of [-3.5, 0, 3.5]) if(check(bp.x + bcx*k, bp.z + bsz*k, 8, 2.6)) return true; }   // autobus (długi): sprawdź tył, środek i przód
       for(const o of pksBuses){ const bcx = Math.cos(o.heading), bsz = Math.sin(o.heading); for(const k of [-3.5, 0, 3.5]) if(check(o.group.position.x + bcx*k, o.group.position.z + bsz*k, 8, 2.6)) return true; }   // autobusy PKS
       if(hasCar && !carDriving && pcar.group.visible && check(pcar.group.position.x, pcar.group.position.z, 8, 2.3)) return true;   // zaparkowane auto gracza
+      if(bike.visible){ const bsn = Math.sin(bike.rotation.y), bcs = Math.cos(bike.rotation.y); for(const k of [-0.9, 0, 0.9]) if(check(bike.position.x + bsn*k, bike.position.z + bcs*k, 8, 1.6)) return true; }   // rower (stojący lub jadący): przód, środek i tył
     }
     return check(player.position.x, player.position.z, 8, 2.0);                // gracz na jezdni – auto zwalnia i staje
   }
@@ -4673,6 +4897,7 @@
     mrect(80,ROAD_Z-11,RB.x-14,ROAD_Z+11,'#c4c1b5'); mrect(RB.x-11,RB.z-12,RB.x+11,-52,'#c4c1b5');
     mrect(80,ROAD_Z-ROAD_W/2,RB.x-12,ROAD_Z+ROAD_W/2,'#454b50'); mrect(RB.x-ROAD_W/2,RB.z-12,RB.x+ROAD_W/2,-52,'#454b50');
     mrect(SUPER.x-SUPER.w/2,-52,SUPER.x+SUPER.w/2,-64,'#454b50');
+    mrect(GORN_X-GORN_EDGE,GORN_START,GORN_X+GORN_EDGE,GORN_END,'#c4c1b5'); mrect(GORN_X-GORN_W/2,GORN_START,GORN_X+GORN_W/2,GORN_END,'#454b50'); mrect(MINE.x-31.5,MINE.z-11.4,MINE.x,MINE.z+11.4,'#7a746c'); mrect(MINE.x-MINE.depth,MINE.z-1.8,MINE.x,MINE.z+1.8,'#25221f'); mrect(MINE.x-31,MINE.z-6.5,MINE.x-MINE.depth,MINE.z+6.5,'#3a3631'); mrect(MINE.x,MINE.z-4.5,GORN_X-GORN_EDGE,MINE.z+4.5,'#8a8170');   // ulica Górnicza i kopalnia
     mrect(POP_X-POP_EDGE,SIDE_ROAD_START,POP_X+POP_EDGE,POP_END,'#c4c1b5'); mrect(POP_X-ROAD_W/2,SIDE_ROAD_START,POP_X+ROAD_W/2,POP_END,'#454b50');   // ulica Poprzeczna
     { // wzgórze: obraz policzony raz (jaśniejsza zieleń = wyżej), rysowany w skali mapy
       if(!window.__hillMapImg){
@@ -4705,7 +4930,7 @@
       ctx.fillRect(Math.min(q.x,r.x),r.y,Math.abs(r.x-q.x),q.y-r.y);ctx.strokeRect(Math.min(q.x,r.x),r.y,Math.abs(r.x-q.x),q.y-r.y);
     }
     // Podpisy najważniejszych miejsc
-    const labels=[['Real Shop',SHOP.x,SHOP.z],['Restauracja',REST.x,REST.z],['Bank',BANK.x,BANK.z],['Mebelek',FURN.x,FURN.z],...HOMES.map(H=>[H.owned?H.label+' (twój)':H.label,H.x,H.z]),['Supermarket Pandy (8–22)',SUPER.x,SUPER.z],['Sklep AGD',AGD.x,AGD.z],['Ubrania',CLOTH.x,CLOTH.z],['Salon samochodowy',CAR.x,CAR.z],['Lakiernik',PAINT.x,PAINT.z],['Mechanik',MECH.x,MECH.z],['Stacja paliw',STATION.x,STATION.z],['PKS',PKS_BLD.x,PKS_BLD.z],...BUS_STOPS.map(b=>['Przystanek',b.x,b.z])];
+    const labels=[['Real Shop',SHOP.x,SHOP.z],['Restauracja',REST.x,REST.z],['Bank',BANK.x,BANK.z],['Mebelek',FURN.x,FURN.z],...HOMES.map(H=>[H.owned?H.label+' (twój)':H.label,H.x,H.z]),['Supermarket Pandy (8–22)',SUPER.x,SUPER.z],['Sklep AGD',AGD.x,AGD.z],['Kopalnia ⛏️',MINE.x-9,MINE.z],['Ubrania',CLOTH.x,CLOTH.z],['Salon samochodowy',CAR.x,CAR.z],['Lakiernik',PAINT.x,PAINT.z],['Mechanik',MECH.x,MECH.z],['Stacja paliw',STATION.x,STATION.z],['PKS',PKS_BLD.x,PKS_BLD.z],...BUS_STOPS.map(b=>['Przystanek',b.x,b.z])];
     const scaleUI=Math.max(.62,Math.min(1.35,w/660)), scale=scaleUI*(view?1.4/k:1);
     ctx.font=`bold ${12*scale}px system-ui`;ctx.textAlign='center';ctx.textBaseline='middle';
     for(const [name,x,z] of labels){const q=pt(x,z);ctx.fillStyle='#fff';ctx.shadowColor='#18232c';ctx.shadowBlur=4;ctx.fillText(name,q.x,q.y-10*scale);}
@@ -4715,6 +4940,7 @@
     let q=pt(-47,ROAD_Z+1);ctx.fillText('DŁUGA',q.x,q.y);
     q=pt(4,40);ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-Math.PI/2);ctx.fillText('KRÓTKA',0,0);ctx.restore();
     q=pt(POP_X+1,30);ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-Math.PI/2);ctx.fillText('POPRZECZNA',0,0);ctx.restore();
+    q=pt(GORN_X+1,-52);ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-Math.PI/2);ctx.fillText('GÓRNICZA',0,0);ctx.restore();
     q=pt(RB.x+1,45);ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-Math.PI/2);ctx.fillText('SPOŁECZNA',0,0);ctx.restore();
     q=pt(22,150);ctx.fillText('GÓRNA',q.x,q.y);                                   // odcinek Społecznej na zachód przy stacji paliw
     // Upper: punkt odbioru (A) lub celu (B) aktywnego kursu
@@ -4854,7 +5080,8 @@
     coin:{n:'Moneta', i:'🪙', color:0xffc107},
     key:{n:'Klucz', i:'🔑', color:0xb0bec5},
     wood:{n:'Drewno', i:'🪵', color:0x8d5a2b},
-    hat:{n:'Czapka', i:'🎩', color:0x222222, use:'Załóż / zdejmij'},
+    hat:{n:'Kapelusz', i:'🎩', color:0x222222, use:'Załóż / zdejmij'},
+    cap:{n:'Czapka z daszkiem', i:'🧢', color:0xc62828, use:'Załóż / zdejmij'},
     phone:{n:'Telefon', i:'📱', color:0x2b2b30, use:'Otwórz'},
     charger:{n:'Ładowarka', i:'🔌', color:0xf2f2f2, use:'Podłącz do gniazdka'},
     computer:{n:'Komputer', i:'🖥️', color:0x343a40, use:'Ustaw na biurku'},
@@ -4873,7 +5100,9 @@
     toaster:{n:'Toster', i:'🥪', color:0x9aa5ae},
     blender:{n:'Blender', i:'🍹', color:0x2b2f35},
     microwave:{n:'Mikrofalówka', i:'🍲', color:0xc3ccd3},
-    vacuum:{n:'Odkurzacz', i:'🧹', color:0xd9412f}
+    vacuum:{n:'Odkurzacz', i:'🧹', color:0xd9412f},
+    pickaxe:{n:'Kilof', i:'⛏️', color:0x8d6e63},
+    stone:{n:'Kamień', i:'🪨', color:0x8a8a8a}
   };
   const inv = new Array(20).fill(null);
   const $ = id => document.getElementById(id);
@@ -4918,7 +5147,7 @@
   function closeWardrobe(){ $('wardrobe').style.display='none'; }
   $('wardrobeClose').onclick = closeWardrobe;
   $('fridgeClose').onclick=closeFridge;
-  let sel = -1, hatOn = false;
+  let sel = -1;
   const gridEl = $('grid'), invEl = $('inv'), infoEl = $('info'), useBtn = $('useBtn'), dropBtn = $('dropBtn');
 
   // Zamienia emoji 🪙 w komunikatach na grafikę monety (ta sama co w sklepie)
@@ -4927,13 +5156,16 @@
     const t = $('toast'); t.innerHTML = coinHTML(msg); t.style.opacity = 1;
     clearTimeout(toast.h); toast.h = setTimeout(() => t.style.opacity = 0, 1800);
   }
-  function addItem(id){
-    const s = inv.find(x => x && x.id === id);
+  function addItem(id, color){
+    color = ((id === 'hat' || id === 'cap') && typeof color === 'number') ? color : undefined;   // kolor mają tylko nakrycia głowy
+    const s = inv.find(x => x && x.id === id && x.color === color);
     if(s){ s.count++; return true; }
     const k = inv.indexOf(null);
     if(k < 0) return false;
-    inv[k] = {id, count:1}; return true;
+    inv[k] = color === undefined ? {id, count:1} : {id, count:1, color}; return true;
   }
+  const hex6 = c => (c >>> 0).toString(16).padStart(6, '0');
+  const colorDot = s => s && s.color !== undefined ? `<span class="cdot" style="background:#${hex6(s.color)}"></span>` : '';
   const DESK_SLOTS = 10, OVEN_SLOTS = 8;
   const BIG = {desk:{slots:DESK_SLOTS, part:'deskpart'}, oven:{slots:OVEN_SLOTS, part:'ovenpart'}};   // przedmioty zajmujące wiele slotów
   const freeSlots = () => inv.filter(x => !x).length;
@@ -4952,7 +5184,7 @@
     if(BIG[s.id]){ inv.forEach((q,i) => { if(q && q.main === k) inv[i] = null; }); inv[k] = null; return; }
     if(--s.count <= 0){
       inv[k] = null;
-      if(s.id === 'hat'){ hatOn = false; hat.visible = false; }
+      if(isWorn(s)) setWorn(null);
       if(s.id === 'phone') closePhone();
     }
   }
@@ -4961,11 +5193,11 @@
   const trunk = new Array(TRUNK_SLOTS).fill(null);
   const trunkEl = document.getElementById('trunk');
   const trunkOpen = () => trunkEl.style.display === 'block';
-  function trunkAdd(id, n){
-    const t = trunk.find(x => x && x.id === id);
+  function trunkAdd(id, n, color){
+    const t = trunk.find(x => x && x.id === id && x.color === color);
     if(t){ t.count += n; return true; }
     const k = trunk.indexOf(null); if(k < 0) return false;
-    trunk[k] = {id, count:n}; return true;
+    trunk[k] = color === undefined ? {id, count:n} : {id, count:n, color}; return true;
   }
   const trunkFree = () => trunk.filter(x => !x).length;
   function trunkAddBig(id){                              // duży przedmiot: slot główny + części (tak jak w ekwipunku)
@@ -4975,21 +5207,22 @@
     for(let i = 1; i < B.slots; i++) trunk[free[i]] = {id:B.part, count:1, main:free[0]};
     return true;
   }
-  function trunkSlotEl(s, onClick){
+  function trunkSlotEl(s, onClick, inInv){
     const d = document.createElement('div'); d.className = 'slot' + (s && (s.id === 'deskpart' || s.id === 'ovenpart') ? ' part' : '');
     if(s){
       if(s.id === 'coin') d.innerHTML = '<i class="coin inventory-coin" aria-label="Monety"></i>'; else d.textContent = ITEMS[s.id].i;
-      d.title = ITEMS[s.id].n + (s.count > 1 ? ' ×' + s.count : '');
+      d.title = ITEMS[s.id].n + (s.color !== undefined ? ' #' + hex6(s.color).toUpperCase() : '') + (s.count > 1 ? ' ×' + s.count : '');
       if(s.count > 1) d.insertAdjacentHTML('beforeend', `<span class="n">${s.count}</span>`);
-      if(s.id === 'hat' && hatOn) d.insertAdjacentHTML('beforeend', '<span class="eq">✓</span>');
+      if(inInv && isWorn(s)) d.insertAdjacentHTML('beforeend', '<span class="eq">✓</span>');
+      d.insertAdjacentHTML('beforeend', colorDot(s));
     }
     d.onclick = onClick; return d;
   }
   function renderTrunk(){
     const tg = document.getElementById('trunkGrid'), ig = document.getElementById('trunkInvGrid');
     tg.innerHTML = ''; ig.innerHTML = '';
-    trunk.forEach((s, k) => tg.appendChild(trunkSlotEl(s, () => trunkTake(k))));
-    inv.forEach((s, k) => ig.appendChild(trunkSlotEl(s, () => trunkPut(k))));
+    trunk.forEach((s, k) => tg.appendChild(trunkSlotEl(s, () => trunkTake(k), false)));
+    inv.forEach((s, k) => ig.appendChild(trunkSlotEl(s, () => trunkPut(k), true)));
     document.getElementById('trunkCount').textContent = `(${trunk.filter(x => x).length}/${TRUNK_SLOTS})`;
   }
   function trunkPut(k){                                  // ekwipunek → bagażnik
@@ -5002,8 +5235,8 @@
       trunkAddBig(s.id); removeOne(k); renderTrunk(); renderInv();
       toast(`Schowano do bagażnika: ${ITEMS[s.id].i} ${ITEMS[s.id].n}`); return;
     }
-    if(!trunkAdd(s.id, s.count)){ toast('Bagażnik pełny 🧳'); return; }
-    if(s.id === 'hat' && hatOn){ hatOn = false; hat.visible = false; }
+    if(!trunkAdd(s.id, s.count, s.color)){ toast('Bagażnik pełny 🧳'); return; }
+    if(isWorn(s)) setWorn(null);
     if(s.id === 'phone') closePhone();
     inv[k] = null; renderTrunk(); renderInv();
     toast(`Schowano do bagażnika: ${ITEMS[s.id].i} ${ITEMS[s.id].n}${s.count > 1 ? ' ×' + s.count : ''}`);
@@ -5017,8 +5250,8 @@
       addBig(s.id); trunk.forEach((q,i) => { if(q && q.main === k) trunk[i] = null; }); trunk[k] = null;
       renderTrunk(); renderInv(); toast(`Wyjęto z bagażnika: ${ITEMS[s.id].i} ${ITEMS[s.id].n}`); return;
     }
-    if(!(inv.some(x => x && x.id === s.id) || inv.indexOf(null) >= 0)){ toast('Ekwipunek pełny – zrób miejsce'); return; }
-    for(let i = 0; i < s.count; i++) addItem(s.id);
+    if(!canAddItem(s.id, s.color)){ toast('Ekwipunek pełny – zrób miejsce'); return; }
+    for(let i = 0; i < s.count; i++) addItem(s.id, s.color);
     trunk[k] = null; renderTrunk(); renderInv();
     toast(`Wyjęto z bagażnika: ${ITEMS[s.id].i} ${ITEMS[s.id].n}${s.count > 1 ? ' ×' + s.count : ''}`);
   }
@@ -5050,13 +5283,14 @@
           d.textContent = ITEMS[s.id].i;
         }
         if(s.count > 1) d.insertAdjacentHTML('beforeend', `<span class="n">${s.count}</span>`);
-        if(s.id === 'hat' && hatOn) d.insertAdjacentHTML('beforeend', '<span class="eq">✓</span>');
+        if(isWorn(s)) d.insertAdjacentHTML('beforeend', '<span class="eq">✓</span>');
+        d.insertAdjacentHTML('beforeend', colorDot(s));
       }
       d.onclick = () => { sel = (s && s.main !== undefined) ? s.main : k; renderInv(); };
       gridEl.appendChild(d);
     });
     const s = inv[sel];
-    infoEl.textContent = s ? (BIG[s.id] ? `${ITEMS[s.id].n} – zajmuje ${BIG[s.id].slots} slotów` : `${ITEMS[s.id].n} ×${s.count}`) : 'Wybierz przedmiot';
+    infoEl.textContent = s ? (BIG[s.id] ? `${ITEMS[s.id].n} – zajmuje ${BIG[s.id].slots} slotów` : `${ITEMS[s.id].n}${s.color !== undefined ? ' #' + hex6(s.color).toUpperCase() : ''} ×${s.count}`) : 'Wybierz przedmiot';
     useBtn.disabled = !(s && ITEMS[s.id].use);
     useBtn.textContent = s && ITEMS[s.id].use ? ITEMS[s.id].use : 'Użyj';
     dropBtn.disabled = !s;
@@ -5072,7 +5306,7 @@
     else if(s.id === 'phone'){ openPhone(); }
     else if(s.id === 'charger'){ if(homeInside && nearOutlet() < 2.2) plugCharger(); else toast('Podłącz ładowarkę do gniazdka w swoim domu 🏠'); }
     else if(s.id === 'desk' || s.id === 'chair' || s.id === 'wardrobe' || s.id === 'computer' || s.id === 'lamp' || s.id === 'oven'){ startPlacement(sel); }
-    else if(s.id === 'hat'){ hatOn = !hatOn; hat.visible = hatOn; toast(hatOn ? 'Założono czapkę' : 'Zdjęto czapkę'); }
+    else if(s.id === 'hat' || s.id === 'cap'){ if(isWorn(s)){ setWorn(null); toast('Zdjęto: ' + ITEMS[s.id].n); } else { setWorn({id:s.id, color:s.color}); toast('Założono: ' + ITEMS[s.id].n); } }
     renderInv();
   };
   dropBtn.onclick = () => {
@@ -5084,9 +5318,9 @@
     if(s.id === 'wardrobe'){ toast('Szafy nie wyrzucisz – ustaw ją w swoim domu 🏠'); return; }
     if(s.id === 'lamp'){ toast('Lampy nie wyrzucisz – zamontuj ją na suficie w swoim domu 🏠'); return; }
     if(s.id === 'computer'){ toast('Komputer ustawisz bezpośrednio na biurku 🖥️'); return; }
-    const id = s.id; removeOne(sel);
+    const id = s.id, dcol = s.color; removeOne(sel);
     const a = player.rotation.y;
-    spawnItem(id, player.position.x + Math.sin(a)*1.8, player.position.z + Math.cos(a)*1.8, 2);
+    spawnItem(id, player.position.x + Math.sin(a)*1.8, player.position.z + Math.cos(a)*1.8, 2, dcol);
     renderInv();
   };
   function toggleInv(){ invEl.style.display = invEl.style.display === 'block' ? 'none' : 'block'; renderInv(); }
@@ -5114,6 +5348,78 @@
     renderInv(); renderShop(); toast('+100 monet 🪙 (test)');
     $('testCoinsBtn').blur();
   };
+  // Menu gracza (kółko z awatarem pod przyciskiem testowym) – na razie pusty szkielet na przyszłe opcje
+  (function(){
+    const btn = $('avatarBtn'), menu = $('playerMenu');
+    const open = () => menu.style.display === 'block';
+    const close = () => { menu.style.display = 'none'; btn.blur(); };
+    btn.addEventListener('pointerdown', e => e.stopPropagation());        // klik w awatar nie przechwytuje kursora
+    btn.onclick = () => {
+      if(isDead || isPaused) return;
+      if(open()){ close(); return; }
+      refreshPortrait(true);
+      menu.style.display = 'block';                                         // najpierw okno (uiBlocking), potem zwolnienie kursora
+      if(document.pointerLockElement) document.exitPointerLock();
+    };
+    $('playerMenuClose').onclick = close;
+
+    // ===== Żywy portret: renderujemy klon prawdziwego modelu gracza, więc awatar odzwierciedla czapkę, plecak, kolory ubrań itd. =====
+    let pr = null, prScene = null, prCam = null, prClone = null, prSig = '';
+    const cvs = [$('avatarCanvas'), $('pmCanvas')];
+    function initPortrait(){
+      try{
+        pr = new THREE.WebGLRenderer({antialias:true, alpha:true, preserveDrawingBuffer:true});
+        pr.setSize(256, 256, false); pr.setClearColor(0x000000, 0);
+        prScene = new THREE.Scene();
+        prScene.add(new THREE.AmbientLight(0xffffff, 0.75));
+        const dl = new THREE.DirectionalLight(0xfff2d8, 0.85); dl.position.set(1.5, 2.5, 3); prScene.add(dl);
+        prCam = new THREE.OrthographicCamera(-0.95, 0.95, 2.75, 0.85, 0.1, 20);   // kadr: głowa, czapka i tułów
+        prCam.position.set(0, 0, 5); prCam.lookAt(0, 0, 0);
+      }catch(err){ pr = null; }
+    }
+    function playerSignature(){
+      let s = '';
+      player.traverse(o => { s += o.visible ? '1' : '0'; if(o.material && o.material.color) s += o.material.color.getHex().toString(16); });
+      return s;
+    }
+    function rebuildClone(){
+      if(prClone) prScene.remove(prClone);
+      const bi = player.children.indexOf(body), ui = body.children.indexOf(upper);
+      prClone = player.clone(true);
+      prClone.position.set(0, 0, 0); prClone.rotation.set(0, 0, 0); prClone.scale.set(1, 1, 1); prClone.visible = true;
+      const rm = [];
+      prClone.traverse(o => { if(o.isLight || o.isSprite || o.isPoints || o.isLine) rm.push(o); });
+      rm.forEach(o => o.parent && o.parent.remove(o));
+      prClone.children.forEach((c, i) => { if(i !== bi) c.visible = false; });   // tylko postać – bez roweru i innych dodatków
+      const cb = prClone.children[bi];
+      if(cb){
+        cb.position.set(0, 0, 0); cb.rotation.set(0, 0, 0);
+        cb.traverse(o => { if(o.isGroup){ o.rotation.set(0, 0, 0); } });          // zerujemy animację chodu / pochylenie na rowerze
+        const cu = cb.children[ui]; if(cu) cu.position.set(0, 0.8, 0);
+      }
+      prScene.add(prClone);
+    }
+    function drawPortrait(){
+      if(!pr) return;
+      pr.render(prScene, prCam);
+      cvs.forEach(cv => {
+        const g = cv.getContext('2d'); g.clearRect(0, 0, cv.width, cv.height);
+        const gr = g.createRadialGradient(cv.width/2, cv.height*0.4, 10, cv.width/2, cv.height/2, cv.width*0.75);
+        gr.addColorStop(0, '#cfe8ff'); gr.addColorStop(1, '#6fa8e0');
+        g.fillStyle = gr; g.fillRect(0, 0, cv.width, cv.height);
+        g.drawImage(pr.domElement, 0, 0, cv.width, cv.height);
+      });
+    }
+    function refreshPortrait(force){
+      if(!pr && !prScene) initPortrait();
+      if(!pr) return;
+      const sig = playerSignature();
+      if(force || sig !== prSig){ prSig = sig; rebuildClone(); drawPortrait(); }
+    }
+    setInterval(() => { if(!document.hidden && !isDead) refreshPortrait(false); }, 400);
+    setTimeout(() => refreshPortrait(true), 300);
+    addEventListener('keydown', e => { if(e.code === 'Escape' && open()){ close(); e.stopImmediatePropagation(); } }, true);
+  })();
   function openShop(){ shopEl.style.display = 'block'; promptEl.style.display = 'none'; renderShop(); }
   function closeShop(){ shopEl.style.display = 'none'; }
   $('shopClose').onclick = closeShop;
@@ -5414,7 +5720,7 @@
     }
     if(e.code === 'KeyG' && homeInside && !sitting && !placing){ const pc = nearDesk('chair') || nearDesk('wardrobe') || nearDesk('oven') || nearLamp(); if(pc) pickupDesk(pc); }
     if(e.code === 'KeyP') phoneEl.style.display === 'flex' ? closePhone() : openPhone();
-    if(e.code === 'Escape'){ closeShop(); closePhone(); closeDialog(); closeFridge(); closeWardrobe(); cancelPlacement(); closePaintUI(true); }
+    if(e.code === 'Escape'){ closeShop(); closePhone(); closeDialog(); closeFridge(); closeWardrobe(); cancelPlacement(); closePaintUI(true); closeHeadUI(true); }
   });
 
   // NPC kucharz i praca dostawcy
@@ -5508,6 +5814,210 @@
     for(let i=0;i<4;i++) addItem('coin');
     job.carrying = false; job.order = null; job.delivered++;
     renderInv(); renderShop(); toast('Dostarczono! +4 🪙');
+  }
+
+  // ===== Kopalnia: górnik Staszek (praca + kilof) i teren do kopania za końcem sztolni =====
+  // Podłoga jaskini (14×13 m) to gładki teren (siatka wysokości, oczko 0,2 m). Kopiesz dokładnie tam, gdzie celujesz (środek ekranu):
+  // lewy przycisk myszy (lub F) = jedno uderzenie kilofa = jeden okrągły dołek w miejscu trafienia. Żadnych bloków ani kwadratów.
+  const MD = {x1: MINE.x - MINE.depth, nx: 14, nz: 13, L: 8}, MD_Z0 = MINE.z - 13/2;
+  const MINER = {x: MINE.x + 3.2, z: MINE.z + 3};
+  const S = 0.2, NX = 70, NZ = 65, W = NZ + 1;                                  // oczko siatki i liczba oczek pola
+  const SCOOP_R = 0.45, DIG = 0.25, MAXD = 7.75, DIRT_D = 2, REACH = 2.4, SWING_T = 0.3;   // promień dołka, głębokość jednego uderzenia, max głębokość, ziemia do 2 m
+  const STONE_CHANCE = 0.5, STONES_PER_COIN = 8;                                // szansa na kamień przy uderzeniu w kamień
+  const mining = {t:0, ax:0, az:0};                                             // t – czas animacji zamachu
+  const mineNodeH = new Float32Array((NX+1)*(NZ+1)), mineNoise = new Float32Array((NX+1)*(NZ+1));   // wysokość terenu w oczkach
+  const mineYEl = document.createElement('div');                                // wskaźnik wysokości Y (widoczny w kopalni)
+  mineYEl.style.cssText = 'position:fixed;left:12px;bottom:162px;color:#fff;background:rgba(0,0,0,.45);padding:6px 12px;border-radius:8px;font-size:14px;line-height:1.4;pointer-events:none;display:none;z-index:8';
+  document.body.appendChild(mineYEl);
+  let mineMesh = null, mineMark = null, mineAway = 0, mineLast = null, mineAimC = null;
+  const hasPick = () => inv.some(s => s && s.id === 'pickaxe');
+  const stoneCount = () => { const s = inv.find(q => q && q.id === 'stone'); return s ? s.count : 0; };
+  const minerDist = () => Math.hypot(player.position.x - MINER.x, player.position.z - MINER.z);
+  const _c1 = new THREE.Color(), _c2 = new THREE.Color(), _ray = new THREE.Raycaster(), _v2 = new THREE.Vector2(0, 0), _zAx = new THREE.Vector3(0, 0, 1);
+  function setNode(k, h){                          // ustaw wysokość i kolor oczka (ziemia → kamień)
+    mineNodeH[k] = h; const n = mineNoise[k];
+    mineMesh.geometry.attributes.position.setY(k, h);
+    const t = Math.min(1, Math.max(0, (-h - 1.8)/0.4));
+    _c1.setHSL(0.075, 0.5, 0.5 + n*0.12); _c2.setHSL(0.08, 0.04, 0.62 + n*0.28); _c1.lerp(_c2, t);
+    mineMesh.geometry.attributes.color.setXYZ(k, _c1.r, _c1.g, _c1.b);
+  }
+  function refreshMesh(){ const g = mineMesh.geometry; g.attributes.position.needsUpdate = true; g.attributes.color.needsUpdate = true; g.computeVertexNormals(); }
+  function mineGround(x, z){                       // dokładnie ta sama interpolacja trójkątów co w siatce
+    const fi = (MD.x1 - x)/S, fj = (z - MD_Z0)/S;
+    if(fi < 0 || fj < 0 || fi > NX || fj > NZ) return null;
+    const i = Math.min(Math.floor(fi), NX-1), j = Math.min(Math.floor(fj), NZ-1), u = fi - i, v = fj - j;
+    const ha = mineNodeH[i*W + j], hb = mineNodeH[(i+1)*W + j], hc = mineNodeH[i*W + j+1], hd = mineNodeH[(i+1)*W + j+1];
+    return u + v <= 1 ? ha + u*(hb - ha) + v*(hc - ha) : hd + (1-u)*(hc - hd) + (1-v)*(hb - hd);
+  }
+  function mineAim(){                              // punkt terenu, w który celujesz (środek ekranu), w zasięgu ręki
+    if(!mineMesh) return null;
+    camera.updateMatrixWorld(); _ray.setFromCamera(_v2, camera); _ray.far = 14;
+    const hit = _ray.intersectObject(mineMesh, false)[0]; if(!hit) return null;
+    const p = hit.point, pl = player.position, d = Math.hypot(p.x - pl.x, p.z - pl.z);
+    if(d > REACH || d < 0.4 || p.y < pl.y - 1.6 || p.y > pl.y + 1.3) return null;
+    const fi = (MD.x1 - p.x)/S, fj = (p.z - MD_Z0)/S;
+    if(fi < 4 || fj < 4 || fi > NX - 4 || fj > NZ - 4) return null;             // pas przy ścianach jaskini zostaje nietknięty
+    return {x:p.x, y:p.y, z:p.z, fi, fj, n:hit.face.normal.clone()};
+  }
+  const mineLabel = (txt, w, y, fill, big) => {
+    const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64; const g = cv.getContext('2d');
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    if(big){ g.fillStyle = fill; g.strokeStyle = '#000'; g.lineWidth = 6; g.font = 'bold 60px sans-serif'; g.strokeText(txt, 128, 34); g.fillText(txt, 128, 34); }
+    else { g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0,8,256,48); g.fillStyle = fill; g.font = 'bold 28px sans-serif'; g.fillText(txt, 128, 33); }
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv), transparent:true}));
+    sp.scale.set(w, w/4, 1); sp.position.set(MINER.x, y, MINER.z); scene.add(sp); return sp;
+  };
+  const minerNpc = new THREE.Group(), minerMark = mineLabel('!', 1.0, 3.25, '#ffd54a', true);
+  mineLabel('Staszek • górnik', 1.7, 2.85, '#fff');
+  const mineLight = new THREE.PointLight(0xffb55a, 1.0, 17);
+  (function buildDig(){
+    const nb = (w,h,d,c,x,y,z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), new THREE.MeshLambertMaterial({color:c})); m.position.set(x,y,z); m.castShadow = true; minerNpc.add(m); };
+    nb(0.7,0.9,0.4,0x5b6b80,0,1.25,0); nb(0.74,0.6,0.44,0xff7a1a,0,1.3,0); nb(0.76,0.07,0.46,0xdfe6ea,0,1.2,0);
+    nb(0.5,0.5,0.5,0xd8a47f,0,1.95,0); nb(0.56,0.2,0.56,0xffcc00,0,2.27,0); nb(0.6,0.05,0.66,0xffcc00,0,2.17,0.04);
+    nb(0.4,0.16,0.04,0x9e9e9e,0,1.78,0.26); nb(0.08,0.08,0.02,0,-0.12,2.0,0.26); nb(0.08,0.08,0.02,0,0.12,2.0,0.26);
+    nb(0.25,0.8,0.25,0x5b6b80,-0.48,1.25,0); nb(0.25,0.8,0.25,0x5b6b80,0.48,1.25,0); nb(0.25,0.8,0.25,0x333333,-0.18,0.4,0); nb(0.25,0.8,0.25,0x333333,0.18,0.4,0);
+    nb(0.07,1.2,0.07,0x6b4a2a,0.62,1.0,0.25); nb(0.07,0.07,0.6,0x9aa5ae,0.62,1.62,0.25);
+    minerNpc.position.set(MINER.x, 0, MINER.z); minerNpc.rotation.y = Math.PI/2; scene.add(minerNpc);
+    WALLS.push({x:MINER.x, z:MINER.z, w:0.8, d:0.8});
+    // tekstura szumu kamienia/ziemi (kolor dochodzi z koloru instancji)
+    const cv = document.createElement('canvas'); cv.width = cv.height = 64; const g = cv.getContext('2d');
+    g.fillStyle = '#9a9a9a'; g.fillRect(0,0,64,64);
+    for(let i = 0; i < 160; i++){ const v = 90 + Math.random()*110|0; g.fillStyle = `rgb(${v},${v},${v-4})`; g.fillRect(Math.random()*64|0, Math.random()*64|0, 2+Math.random()*4|0, 2+Math.random()*3|0); }
+    const tex = new THREE.CanvasTexture(cv); tex.magFilter = THREE.NearestFilter;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    const nn = (NX+1)*(NZ+1), P = new Float32Array(nn*3), U = new Float32Array(nn*2), IDX = [];
+    for(let i = 0; i <= NX; i++) for(let j = 0; j <= NZ; j++){
+      const k = i*W + j; P[k*3] = MD.x1 - i*S; P[k*3+2] = MD_Z0 + j*S; U[k*2] = i*S; U[k*2+1] = j*S; mineNoise[k] = Math.random();
+    }
+    for(let i = 0; i < NX; i++) for(let j = 0; j < NZ; j++){
+      const a = i*W + j, b = (i+1)*W + j, c = a + 1, d = b + 1; IDX.push(a, b, c, b, d, c);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(P, 3)); geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(nn*3), 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(U, 2)); geo.setIndex(IDX);
+    geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(MD.x1 - MD.nx/2, -1, MINE.z), 14);                       // stałe ramki (teren się obniża)
+    geo.boundingBox = new THREE.Box3(new THREE.Vector3(MD.x1 - MD.nx - 1, -6, MD_Z0 - 1), new THREE.Vector3(MD.x1 + 1, 1, MD_Z0 + MD.nz + 1));
+    mineMesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({map:tex, vertexColors:true}));
+    mineMesh.frustumCulled = false; mineMesh.receiveShadow = true; scene.add(mineMesh);
+    for(let k = 0; k < nn; k++) setNode(k, 0);
+    refreshMesh();
+    mineMark = new THREE.Mesh(new THREE.RingGeometry(SCOOP_R*0.82, SCOOP_R, 40), new THREE.MeshBasicMaterial({color:0xffd54a, transparent:true, opacity:0.75, depthWrite:false, side:THREE.DoubleSide}));
+    mineMark.visible = false; scene.add(mineMark);                                  // okrąg pokazujący, gdzie uderzy kilof
+    MINE_GROUND = mineGround;
+    // dziura w płaszczyźnie terenu nad polem (prostokąt = przecięcie 4 półprzestrzeni), dno z litej skały, kamienne ściany jaskini
+    const hole = [[-1,0,0,MD.x1-MD.nx],[1,0,0,-MD.x1],[0,0,-1,MD_Z0],[0,0,1,-(MD_Z0+MD.nz)]].map(a => new THREE.Plane(new THREE.Vector3(a[0],a[1],a[2]), a[3]));
+    renderer.localClippingEnabled = true; ground.material.clippingPlanes = hole; ground.material.clipIntersection = true;
+    const fl = new THREE.Mesh(new THREE.BoxGeometry(MD.nx, 0.06, MD.nz), new THREE.MeshLambertMaterial({color:0x2c2a27}));
+    fl.position.set(MD.x1 - MD.nx/2, -MD.L - 0.03, MINE.z); scene.add(fl);
+    const wm = new THREE.MeshLambertMaterial({color:0x4a4540}), cx = MD.x1 - MD.nx/2, cz = MINE.z;
+    [[1,3.2,MD.nz+2,MD.x1-MD.nx-0.5,cz],[MD.nx+2,3.2,1,cx,MD_Z0-0.5],[MD.nx+2,3.2,1,cx,MD_Z0+MD.nz+0.5],[0.5,3.2,4.9,MD.x1+0.25,cz-4.55],[0.5,3.2,4.9,MD.x1+0.25,cz+4.55]].forEach(([w,h,d,x,z]) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(w,h+MD.L,d), wm); m.position.set(x, (h-MD.L)/2, z); scene.add(m);   // ściany sięgają od dna dołu w górę
+      if(x < MD.x1) WALLS.push({x, z, w, d});                                      // ściany wschodnie już mają kolizję (bok sztolni)
+    });
+    mineLight.position.set(MD.x1 - 5.5, 2.6, MINE.z); scene.add(mineLight);        // światło tworzone raz, przed pierwszym renderem
+  })();
+  function stopMining(){ mining.t = 0; }
+  const mineBusy = () => isDead || isPaused || computerUiOpen || fullMapOpen || carDriving || bikeMounted || sitting || busRide || isSleeping || placing || dlgEl.style.display === 'flex' || !hasPick();
+  function climbOut(){ player.position.set(MD.x1 + 1.5, 0, MINE.z); vy = 0; toast('Wspiąłeś się na górę 🪢'); }
+  function digOnce(){                              // jedno kliknięcie = jeden dołek dokładnie tam, gdzie celujesz
+    if(mining.t > 0 || mineBusy()) return;
+    const a = mineAim(); if(!a) return;
+    if(stats.energy < 4){ toast('Brak sił – odpocznij ⚡'); return; }
+    const stone = a.y < -DIRT_D;
+    if(stone && !stoneCount() && !inv.includes(null)){ toast('Ekwipunek pełny!'); return; }
+    addStats(-0.04, -0.15);
+    const i0 = Math.round(a.fi), j0 = Math.round(a.fj), rr = Math.ceil(SCOOP_R/S) + 1;
+    for(let i = i0 - rr; i <= i0 + rr; i++) for(let j = j0 - rr; j <= j0 + rr; j++){
+      if(i < 1 || j < 1 || i >= NX || j >= NZ) continue;
+      const r = Math.hypot((i - a.fi)*S, (j - a.fj)*S); if(r >= SCOOP_R) continue;
+      const f = 1 - r*r/(SCOOP_R*SCOOP_R), k = i*W + j;
+      setNode(k, Math.max(-MAXD, mineNodeH[k] - DIG*f*f));                         // gładki, okrągły dołek
+    }
+    refreshMesh();
+    mining.t = SWING_T; mining.ax = a.x; mining.az = a.z;
+    if(stone && Math.random() < STONE_CHANCE){
+      const q = inv.find(x => x && x.id === 'stone');
+      if(q) q.count++; else inv[inv.indexOf(null)] = {id:'stone', count:1};
+      renderInv(); toast(`🪨 +1 kamień (razem ${stoneCount()})`);
+    }
+  }
+  function mineAction(){
+    if(minerDist() < 3.4) return {text:'F – porozmawiaj z górnikiem ⛏️', run:openMinerTalk};
+    if(mineAimC) return {text:'LPM / F – kop kilofem ⛏️', run:digOnce};
+    const px = player.position.x;
+    if(player.position.y < -1.2 && px < MD.x1 && px > MD.x1 - MD.nx) return {text:'F – wydostań się z dołu 🪢', run:climbOut};   // zabezpieczenie, gdyby dół był za głęboki
+    return null;
+  }
+  renderer.domElement.addEventListener('pointerdown', e => { if(e.pointerType === 'mouse' && e.button === 0) digOnce(); });   // lewy przycisk myszy
+    function updateMine(dt, time){
+    { const ix = player.position.x, iz = player.position.z;                         // wewnątrz kopalni (sztolnia + pole kopania) – bez widocznej tekstury skał z zewnątrz
+      const inside = ix < MINE.x - 0.5 && ix > MD.x1 - MD.nx - 2 && Math.abs(iz - MINE.z) < 7.5;
+      if(inside !== mineRocksHidden){ mineRocksHidden = inside; MINE_ROCKS.forEach(r => r.visible = !inside); }
+      const showY = ix < MINE.x + 1 && ix > MD.x1 - MD.nx - 2 && Math.abs(iz - MINE.z) < 8;   // info o poziomie Y
+      if(showY){
+        const y = player.position.y, d = -y, layer = d < 0.3 ? 'poziom terenu' : d < DIRT_D ? 'warstwa ziemi' : 'warstwa kamienia';
+        mineYEl.innerHTML = `⛏️ Y: <b>${(Math.abs(y) < 0.05 ? 0 : y).toFixed(1)} m</b><br><span style="font-size:12px;opacity:.85">${layer} · dno: −${MD.L} m</span>`;
+        mineYEl.style.display = 'block';
+      } else if(mineYEl.style.display !== 'none') mineYEl.style.display = 'none'; }
+    const dx = player.position.x - MINER.x, dz = player.position.z - MINER.z;
+    const tgt = Math.hypot(dx, dz) < 7 ? Math.atan2(dx, dz) : Math.PI/2;
+    minerNpc.rotation.y += Math.atan2(Math.sin(tgt - minerNpc.rotation.y), Math.cos(tgt - minerNpc.rotation.y))*Math.min(1, dt*5);
+    minerMark.visible = !hasPick(); minerMark.position.y = 3.25 + Math.sin(time*3)*0.07;
+    if(mining.t > 0) mining.t = Math.max(0, mining.t - dt);
+    // gdy nie ma cię przy polu przez 2 min, teren odrasta (nie dzieje się to, gdy jesteś w dole)
+    const away = player.position.x > MD.x1 + 1.5 || player.position.x < MD.x1 - MD.nx - 2 || Math.abs(player.position.z - MINE.z) > 9;
+    mineAway = away ? mineAway + dt : 0;
+    if(mineAway > 120){
+      if(mineNodeH.some(v => v !== 0)){ for(let k = 0; k < mineNodeH.length; k++) setNode(k, 0); refreshMesh(); }
+      mineAway = 0;
+    }
+    // limit „schodka”: nie wejdziesz na teren wyższy niż ~0,6 m ponad twoimi stopami (z dołu trzeba wyskoczyć)
+    const px = player.position.x, pz = player.position.z, py = player.position.y;
+    if(!carDriving && !bikeMounted && !busRide && mineLast){
+      const g = mineGround(px, pz);
+      if(g !== null && py < g - 0.6){
+        const gx = mineGround(mineLast.x, pz), gz = mineGround(px, mineLast.z);
+        if(gx === null || py >= gx - 0.6) player.position.x = mineLast.x;
+        else if(gz === null || py >= gz - 0.6) player.position.z = mineLast.z;
+        else { player.position.x = mineLast.x; player.position.z = mineLast.z; }
+      }
+    }
+    mineLast = mineLast || {x:0, z:0}; mineLast.x = player.position.x; mineLast.z = player.position.z;
+    // okrąg w miejscu celowania
+    const near = px < MD.x1 + 3 && px > MD.x1 - MD.nx - 3 && Math.abs(pz - MINE.z) < 9;
+    mineAimC = near && !mineBusy() ? mineAim() : null;
+    mineMark.visible = !!mineAimC;
+    if(mineAimC){ mineMark.position.set(mineAimC.x, mineAimC.y, mineAimC.z).addScaledVector(mineAimC.n, 0.03); mineMark.quaternion.setFromUnitVectors(_zAx, mineAimC.n); }
+  }
+  const pickGroup = new THREE.Group(); armR.add(pickGroup); pickGroup.visible = false;
+  box(0.07,0.07,0.9,0x6b4a2a,0,-0.78,0.35,pickGroup); box(0.07,0.6,0.09,0x9aa5ae,0,-0.78,0.78,pickGroup);   // kilof w ręce gracza
+  function mineAnimate(time){
+    const px = player.position.x, inMine = px < MINE.x + 1.2 && px > MD.x1 - MD.nx - 1 && Math.abs(player.position.z - MINE.z) < 8;
+    pickGroup.visible = hasPick() && (mining.t > 0 || inMine) && !bikeMounted && !carDriving && !sitting && !busRide;
+    if(mining.t > 0){
+      facing = Math.atan2(mining.ax - px, mining.az - player.position.z); player.rotation.y = facing;
+      armR.rotation.x = -1.45 - 0.95*Math.sin((1 - mining.t/SWING_T)*Math.PI); armL.rotation.x = -0.5;   // jeden zamach = jedno uderzenie
+    } else if(pickGroup.visible) armR.rotation.x = -0.35;
+  }
+  function takePickaxe(){ if(!addItem('pickaxe')){ toast('Ekwipunek pełny!'); return; } closeDialog(); renderInv(); toast('Dostałeś kilof ⛏️ – w głębi sztolni celuj w ziemię i klikaj lewym przyciskiem myszy'); }
+  function returnPickaxe(){ const k = inv.findIndex(s => s && s.id === 'pickaxe'); if(k >= 0) inv[k] = null; stopMining(); closeDialog(); renderInv(); toast('Oddałeś kilof'); }
+  function sellStones(){
+    const k = inv.findIndex(s => s && s.id === 'stone'), n = k < 0 ? 0 : inv[k].count, c = Math.floor(n/STONES_PER_COIN);
+    if(c < 1){ toast(`Potrzeba ${STONES_PER_COIN} kamieni na 1 monetę`); return; }
+    inv[k].count -= c*STONES_PER_COIN; if(inv[k].count <= 0) inv[k] = null;
+    let rest = 0; for(let i = 0; i < c; i++) if(!addItem('coin')) rest++;
+    for(let i = 0; i < Math.min(rest, 40); i++) spawnItem('coin', player.position.x + (Math.random()-.5)*2, player.position.z + (Math.random()-.5)*2, 0.5);
+    renderInv(); renderShop(); toast(`Sprzedano kamień: +${c} 🪙`); openMinerTalk();
+  }
+  function openMinerTalk(){
+    const who = '⛏️ Staszek, brygadzista', n = stoneCount(), c = Math.floor(n/STONES_PER_COIN);
+    if(!hasPick()){
+      say(`Cześć! Brakuje mi ludzi do kopania. Dam ci kilof – za darmo. Za końcem sztolni możesz kopać prosto w podłogę: najpierw ziemia, głębiej kamień. Celuj w ziemię i kliknij lewym przyciskiem myszy – jedno kliknięcie to jeden mały dołek. Kamień skupuję: ${STONES_PER_COIN} sztuk za 1 🪙. Kopanie męczy, pilnuj energii!`,
+        [{label:'Przyjmuję pracę – daj kilof', fn:takePickaxe}, {label:'Nie, dziękuję', fn:closeDialog}], who, 'miner');
+    } else {
+      say(`Dobrze ci idzie! Masz ${n} kamieni. ${STONES_PER_COIN} kamieni = 1 🪙. Stań przy ziemi, wyceluj w nią środkiem ekranu i kliknij lewym przyciskiem myszy (albo F) – jedno kliknięcie to jeden dołek dokładnie tam, gdzie patrzysz. Nie kop zbyt głębokich dołów, bo trudno z nich wyjść.`,
+        [{label:`Sprzedaj kamień (${c} 🪙)`, fn:sellStones}, {label:'Oddaj kilof (zrezygnuj)', fn:returnPickaxe}, {label:'OK', fn:closeDialog}], who, 'miner');
+    }
   }
 
   // ===== Upper (aplikacja w telefonie): praca kierowcy – przewozisz pasażerów swoim autem, zarobek zależy od długości trasy =====
@@ -5745,7 +6255,7 @@
     return null;
   }
   function findAction(){
-    if(paintUiOpen) return null;
+    if(paintUiOpen || headUiKind) return null;
     if(shopEl.style.display === 'block' || dlgEl.style.display === 'flex' || $('fridge').style.display === 'block' || $('wardrobe').style.display === 'block' || trunkOpen() || ovenOpen()) return null;
     if(placing) return null;
     if(busRide){                                                                  // pasażer autobusu: wysiadka tylko przy otwartych drzwiach
@@ -5760,10 +6270,11 @@
         if(d < bestPc){ bestPc = d; pcDesk = pd; }
       }
       if(pcDesk) return {text:computerUiOpen ? 'F – zamknij komputer' : 'F – włącz komputer 🖥️', run:turnOnComputer};
-      return {text:'F – wstań z krzesła', run:standUp};
+      return {text:sitting.kind === 'bench' ? 'F – wstań z ławki' : 'F – wstań z krzesła', run:standUp};
     }
     if(carDriving) return {text:'Shift – wysiądź z auta 🚗', run:()=>{}};
     { const ba = busBoardAction(); if(ba) return ba; }                           // F przy otwartych drzwiach autobusu
+    if(!bikeMounted && !homeInside){ let bb = null, bd = 1.7; for(const b of BENCH_SEATS){ const d = Math.hypot(player.position.x - b.x, player.position.z - b.z); if(d < bd){ bd = d; bb = b; } } if(bb) return {text:'F – usiądź na ławce 🪑', run:() => sitOn(bb.pd)}; }   // ławka na przystanku
     { const fa = fuelAction(); if(fa) return fa; }                              // dystrybutor ma pierwszeństwo przed „wsiądź do auta”
     if(trunkNearRear() && !bikeMounted) return {text:'F – otwórz bagażnik 🧳', run:openTrunk};
     if(hasCar && Math.hypot(player.position.x-pcar.group.position.x, player.position.z-pcar.group.position.z) < 3.6 && !bikeMounted) return {text:'F – wsiądź do auta 🚗', run:enterCar};
@@ -5814,6 +6325,8 @@
       const pdk = nearDesk(); if(pdk && pdk.computer) return {text:'F – podnieś komputer 🖥️', run:() => pickupComputer(pdk)};
       if(pdk) return {text: pdk.kind === 'chair' ? 'F – podnieś krzesło' : 'F – podnieś biurko', run:() => pickupDesk(pdk)};
     }
+    { const na = nbrAction(); if(na) return na; }
+    { const ma = mineAction(); if(ma) return ma; }
     if(restInside && npcDist() < 3.4) return {text:'F – porozmawiaj z kucharzem', run:openDialog};
     if(shopInside && shopNpcDist() < 3.4) return {text:'F – porozmawiaj ze sprzedawczynią', run:openShopTalk};
     if(bankInside && bankNpcDist() < 3.4) return {text:'F – porozmawiaj z bankierem', run:openBankTalk};
@@ -5843,16 +6356,193 @@
     if(txt !== jobTxt){ jobTxt = txt; $('job').style.display = txt ? 'block' : 'none'; $('jobInfo').innerHTML = txt; }
   }
 
+  // ===== Henryk – sąsiad z domu nr 7 =====
+  // Mieszka w domu nr 7 (nie da się do niego wejść). Wg zegara gry wychodzi na zakupy do Real Shop i na spacery po chodniku,
+  // a gdy jest w domu – można zapukać (F). Przy wyjściu z domu / na chodniku można z nim porozmawiać (F).
+  const nbH7 = HOUSES.find(h => h.no === 7);
+  const NB_DOOR = {x:nbH7.dx, z:nbH7.dz - 0.55};
+  const NB_LANE = -6.5;                                   // pas chodnika, którym chodzi (chodnik: z -8,85 … -5,85)
+  const NB_TRIPS = [
+    {id:'shop',  from:8.5,  to:11,   goal:{x:SHOP.x, z:NB_LANE}, enter:{x:SHOP.x, z:SHOP.z - SHOP.d/2 - 0.1}, stay:18, bag:true,  what:'idę na zakupy do Real Shop'},
+    {id:'walk1', from:12.5, to:15,   goal:{x:-16, z:NB_LANE}, stay:10, what:'wyszedłem na spacer'},
+    {id:'walk2', from:17.5, to:19.5, goal:{x:8,   z:NB_LANE}, stay:10, what:'wyszedłem na wieczorny spacer'}
+  ];
+  const NB = {state:'home', trip:null, route:[], trail:[], pi:0, wait:0, done:{}, bag:false, apples:2, chats:0, chatDay:-1, giftDay:-1, tip:0, ph:0, baseYaw:0};
+  const nbr = new THREE.Group(), nbParts = {};
+  (function(){
+    const box = (w,h,d,c,x,y,z,parent) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), new THREE.MeshLambertMaterial({color:c})); m.position.set(x,y,z); m.castShadow = true; (parent||nbr).add(m); return m; };
+    const limb = (w,h,d,c,x,y) => { const p = new THREE.Group(); p.position.set(x,y,0); box(w,h,d,c,0,-h/2,0,p); nbr.add(p); return p; };
+    box(0.7,0.9,0.4,0x5b7b9a,0,1.25,0);                   // sweter
+    box(0.5,0.5,0.5,0xe3b07e,0,1.95,0);                   // głowa
+    box(0.52,0.14,0.52,0xd6d6d6,0,2.2,-0.02);             // siwe włosy
+    box(0.56,0.08,0.5,0x6d4c41,0,2.31,0.02);              // kaszkiet
+    box(0.4,0.04,0.2,0x6d4c41,0,2.25,0.3);                // daszek
+    box(0.3,0.06,0.02,0xbdbdbd,0,1.82,0.26);              // siwe wąsy
+    box(0.08,0.08,0.02,0x000000,-0.12,2.0,0.26); box(0.08,0.08,0.02,0x000000,0.12,2.0,0.26);
+    nbParts.armL = limb(0.25,0.8,0.25,0x5b7b9a,-0.48,1.65);
+    nbParts.armR = limb(0.25,0.8,0.25,0x5b7b9a, 0.48,1.65);
+    nbParts.legL = limb(0.25,0.8,0.25,0x3b3b3b,-0.18,0.8);
+    nbParts.legR = limb(0.25,0.8,0.25,0x3b3b3b, 0.18,0.8);
+    nbParts.bag = box(0.34,0.4,0.18,0x8bc34a,0,-0.85,0.12,nbParts.armR); nbParts.bag.visible = false;   // torba z zakupami
+  })();
+  nbr.visible = false; scene.add(nbr);
+  const nbLabel = (function(){
+    const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+    const g = c.getContext('2d'); g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0,8,256,48); g.fillStyle = '#fff'; g.font = 'bold 28px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('Henryk • sąsiad', 128, 33);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true}));
+    sp.scale.set(1.7, 0.42, 1); sp.visible = false; scene.add(sp); return sp;
+  })();
+  const nbHour = () => ((START_HOUR/24 + gameElapsed/DAY_SECONDS) % 1) * 24;
+  const nbDay  = () => Math.floor(START_HOUR/24 + gameElapsed/DAY_SECONDS);
+  const nbrDist = () => Math.hypot(player.position.x - nbr.position.x, player.position.z - nbr.position.z);
+  const nbTurn = (yaw, dt, k) => { nbr.rotation.y += Math.atan2(Math.sin(yaw - nbr.rotation.y), Math.cos(yaw - nbr.rotation.y)) * Math.min(1, dt*k); };
+  const nbFacePlayer = dt => nbTurn(Math.atan2(player.position.x - nbr.position.x, player.position.z - nbr.position.z), dt, 6);
+  function nbShow(v){ nbr.visible = v; nbLabel.visible = v; }
+  function nbPlace(p){ nbr.position.set(p.x, 0, p.z); }
+  function nbStep(dt, target){                            // idzie do punktu; true = dotarł
+    const dx = target.x - nbr.position.x, dz = target.z - nbr.position.z, d = Math.hypot(dx, dz), sp = 2.1*dt;
+    if(d <= sp){ nbr.position.x = target.x; nbr.position.z = target.z; return true; }
+    nbr.position.x += dx/d*sp; nbr.position.z += dz/d*sp;
+    nbTurn(Math.atan2(dx, dz), dt, 8);
+    for(const t of treeColl){                             // omija słupki i latarnie
+      const ox = nbr.position.x - t.x, oz = nbr.position.z - t.z;
+      if(Math.abs(ox) > 2 || Math.abs(oz) > 2) continue;
+      const dd = Math.hypot(ox, oz), min = t.r + 0.4;
+      if(dd < min && dd > 0.0001){ nbr.position.x = t.x + ox/dd*min; nbr.position.z = t.z + oz/dd*min; }
+    }
+    NB.moving = true; return false;
+  }
+  function nbStart(t){
+    NB.trip = t; NB.done[nbDay() + ':' + t.id] = true; NB.bag = false;
+    nbPlace(NB_DOOR); nbr.rotation.y = Math.PI; nbShow(true);                    // wychodzi z drzwi (twarzą do ulicy)
+    NB.route = [{x:NB_DOOR.x, z:NB_LANE}, t.goal].concat(t.enter ? [t.enter] : []);
+    NB.trail = [{x:NB_DOOR.x, z:NB_DOOR.z}]; NB.pi = 0; NB.state = 'out';
+  }
+  function nbBack(){ NB.route = NB.trail.slice().reverse(); NB.pi = 0; NB.state = 'back'; }
+  function updateNeighbor(dt, time){
+    const hour = nbHour(), day = nbDay();
+    const talking = dlgEl.style.display === 'flex' && dlgWho === 'nbr';
+    NB.moving = false;
+    const late = hour >= 20.7 || hour < 6;
+    switch(NB.state){
+      case 'home':
+        if(!late) for(const t of NB_TRIPS){ if(!NB.done[day + ':' + t.id] && hour >= t.from && hour < t.to){ nbStart(t); break; } }
+        break;
+      case 'door':                                        // otworzył na pukanie; po rozmowie wraca do środka
+        nbFacePlayer(dt);
+        if(talking) NB.wait = 2.5; else if((NB.wait -= dt) <= 0){ nbShow(false); NB.state = 'home'; }
+        break;
+      case 'out':
+        if(late){ nbBack(); break; }
+        if(talking){ nbFacePlayer(dt); break; }
+        if(nbStep(dt, NB.route[NB.pi])){
+          NB.trail.push(NB.route[NB.pi]); NB.pi++;
+          if(NB.pi >= NB.route.length){
+            NB.wait = NB.trip.stay; NB.baseYaw = nbr.rotation.y;
+            if(NB.trip.enter){ nbShow(false); NB.state = 'inside'; } else NB.state = 'idle';
+          }
+        }
+        break;
+      case 'idle':                                        // stoi i rozgląda się
+        if(talking) nbFacePlayer(dt); else { nbTurn(NB.baseYaw + Math.sin(time*0.8)*0.9, dt, 3); NB.wait -= dt; }
+        if(NB.wait <= 0 || late) nbBack();
+        break;
+      case 'inside':                                      // w sklepie
+        if((NB.wait -= dt) <= 0){ NB.bag = !!NB.trip.bag; nbShow(true); nbBack(); }
+        break;
+      case 'back':
+        if(talking){ nbFacePlayer(dt); break; }
+        if(nbStep(dt, NB.route[NB.pi])){
+          NB.pi++;
+          if(NB.pi >= NB.route.length){
+            nbShow(false); NB.state = 'home';
+            if(NB.bag){ NB.apples = Math.min(4, NB.apples + 2); NB.bag = false; }
+          }
+        }
+        break;
+    }
+    // animacja chodu + pozycja podpisu
+    if(NB.moving) NB.ph += dt*8;
+    const sw = NB.moving ? Math.sin(NB.ph) : 0, k = Math.min(1, dt*10);
+    nbParts.legL.rotation.x += (sw*0.7 - nbParts.legL.rotation.x)*k;
+    nbParts.legR.rotation.x += (-sw*0.7 - nbParts.legR.rotation.x)*k;
+    nbParts.armL.rotation.x += (-sw*0.5 - nbParts.armL.rotation.x)*k;
+    nbParts.armR.rotation.x += ((NB.bag ? -0.25 : sw*0.5) - nbParts.armR.rotation.x)*k;
+    nbParts.bag.visible = NB.bag;
+    if(nbr.visible) nbLabel.position.set(nbr.position.x, 2.85, nbr.position.z);
+  }
+  // --- rozmowa ---
+  const nbCanTalk = () => nbr.visible && nbrDist() < 3.2;
+  const nbOutdoors = () => !homeInside && !restInside && !shopInside && !bankInside && !furnInside && !agdInside && !mechInside && !paintInside && !carInside && !clothInside;
+  function nbrAction(){
+    if(!nbOutdoors()) return null;
+    if(nbCanTalk()) return {text:'F – porozmawiaj z Henrykiem 👋', run:() => openNbrTalk(false)};
+    if(NB.state === 'home' && Math.hypot(player.position.x - nbH7.dx, player.position.z - nbH7.dz) < 2.4) return {text:'F – zapukaj do domu nr 7 🚪', run:knockNbr};
+    return null;
+  }
+  function knockNbr(){
+    const h = nbHour();
+    if(h < 7 || h >= 21){ toast('Pukasz… nikt nie otwiera. Pewnie już śpi 😴'); return; }
+    nbPlace(NB_DOOR); nbShow(true); nbr.rotation.y = Math.PI; NB.state = 'door'; NB.wait = 2.5; NB.moving = false;
+    toast('Pukasz do drzwi… 🚪');
+    openNbrTalk(true);
+  }
+  function nbMenu(text){
+    const day = nbDay(), btns = [
+      {label:'Jak się masz?', fn:() => nbMenu(nbHowAreYou())},
+      {label:'Co słychać w okolicy?', fn:() => nbMenu(nbNews())}
+    ];
+    if(NB.chats >= 3 && NB.apples > 0 && NB.giftDay !== day) btns.push({label:'🍎 Poproś o jabłko', fn:nbGift});
+    btns.push({label:'Do widzenia', fn:closeDialog});
+    say(text, btns, '🧓 Henryk, sąsiad (dom nr 7)', 'nbr');
+  }
+  function nbHowAreYou(){
+    const h = nbHour();
+    const pool = h < 12 ? ['Świetnie, kawa wypita, można żyć!', 'Rano człowiek ma najwięcej sił. A ty jak się trzymasz?']
+      : h < 18 ? ['Nie narzekam. Po obiedzie dobrze się chodzi.', 'Dobrze, dziękuję. Dzień zleciał jakoś szybko.']
+      : ['Zmęczony, ale zadowolony. Wieczór to najlepsza pora dnia.', 'Powoli myślę o kolacji i łóżku.'];
+    return pool[Math.floor(Math.random()*pool.length)];
+  }
+  function nbNews(){
+    const tips = [
+      'W sklepie „Real Shop” kupisz telefon za 5 monet, a rower za 25. Rower to wygoda, polecam 🚲',
+      'Marek, kucharz, szuka dostawców. Płaci 4 monety za każde dostarczone zamówienie. Ja mam już nogi nie te, ale tobie się przyda.',
+      'W banku założysz konto za darmo – dostaniesz numer rachunku i saldo w aplikacji w telefonie.',
+      'Dbaj o siebie: jedz i śpij na czas. Ja zawsze mam w domu coś w lodówce.',
+      'Supermarket jest otwarty od ósmej do dwudziestej drugiej, więc zakupy lepiej robić w dzień.'
+    ];
+    return tips[NB.tip++ % tips.length];
+  }
+  function nbGift(){
+    if(!addItem('apple')){ toast('Ekwipunek pełny!'); return; }
+    NB.apples--; NB.giftDay = nbDay(); renderInv();
+    toast('Henryk dał ci jabłko 🍎');
+    nbMenu('Masz, poczęstuj się. Prosto z mojej torby – tylko nie mów nikomu, że rozdaję! 😄');
+  }
+  function openNbrTalk(atDoor){
+    const h = nbHour(), day = nbDay(), hello = h < 18 ? 'Dzień dobry!' : 'Dobry wieczór!';
+    const first = NB.chats === 0;
+    if(NB.chatDay !== day){ NB.chatDay = day; NB.chats++; }
+    let act = '';
+    if(atDoor || NB.state === 'door') act = 'Akurat byłem w domu.';
+    else if(NB.state === 'out') act = NB.trip && NB.trip.what ? `Właśnie ${NB.trip.what}.` : '';
+    else if(NB.state === 'idle') act = 'Postanowiłem zaczerpnąć trochę świeżego powietrza.';
+    else if(NB.state === 'back') act = NB.bag ? 'Wracam ze sklepu – kupiłem trochę zapasów.' : 'Wracam już do domu.';
+    nbMenu(first ? `${hello} Jestem Henryk, mieszkam pod siódemką – to ten dom z numerem nad drzwiami. ${act} Ty chyba tu nowy?`
+                 : `${hello} Miło cię widzieć! ${act}`);
+  }
+
   // Przedmioty leżące w świecie
   const worldItems = [];
-  function spawnItem(id, x, z, cool){
-    const def = ITEMS[id], m = new THREE.MeshLambertMaterial({color:def.color});
+  function spawnItem(id, x, z, cool, color){
+    const def = ITEMS[id], ccol = color !== undefined ? color : def.color, m = new THREE.MeshLambertMaterial({color:ccol});
     let mesh;
     if(id === 'apple') mesh = new THREE.Mesh(new THREE.SphereGeometry(0.22,12,10), m);
     else if(id === 'coin') { mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.25,0.05,16), m); mesh.rotation.x = Math.PI/2; }
     else if(id === 'key') mesh = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.1,0.1), m);
     else if(id === 'wood') mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.6,8), m);
     else if(id === 'phone') mesh = new THREE.Mesh(new THREE.BoxGeometry(0.25,0.45,0.04), m);
+    else if(id === 'cap'){ mesh = buildCapGroup(ccol); mesh.scale.setScalar(1.1); }
     else { mesh = new THREE.Group(); const b = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.04,12), m), t = new THREE.Mesh(new THREE.CylinderGeometry(0.17,0.19,0.25,12), m); t.position.y = 0.14; mesh.add(b, t); }
     const holder = new THREE.Group(); holder.add(mesh);
     // jasna poświata pod przedmiotem
@@ -5862,7 +6552,7 @@
     holder.position.set(x, 0.6, z);
     mesh.castShadow = true;
     scene.add(holder);
-    worldItems.push({id, holder, mesh, cool: cool||0, ph: Math.random()*6});
+    worldItems.push({id, color, holder, mesh, cool: cool||0, ph: Math.random()*6});
   }
   // Kapelusze nie leżą już na mapie – kupisz je w sklepie z ubraniami przy ulicy Społecznej.
   function updateItems(dt, time){
@@ -5873,7 +6563,7 @@
       if(w.cool > 0){ w.cool -= dt; continue; }
       const dx = player.position.x - w.holder.position.x, dz = player.position.z - w.holder.position.z;
       if(dx*dx + dz*dz < 1.6 && player.position.y < 1.2){
-        if(addItem(w.id)){
+        if(addItem(w.id, w.color)){
           scene.remove(w.holder); worldItems.splice(i,1);
           toast(`Podniesiono: ${ITEMS[w.id].i} ${ITEMS[w.id].n}`);
           if(invEl.style.display === 'block') renderInv();
@@ -5954,7 +6644,7 @@
     cloudMat.color.copy(PAL.cloudNight).lerp(PAL.cloudDay, day).lerp(PAL.cloudDusk, dusk*0.4);
     // wnętrza i okna
     restLight.intensity = shopLight.intensity = bankLight.intensity = furnLight.intensity = clothLight.intensity = carLight.intensity = paintLight.intensity = mechLight.intensity = 1.0*night;
-    lampPool.forEach(l => l.intensity = l.userData.used ? 0.55 + 0.65*night : 0);   // lampy w domu
+    lampPool.forEach(l => l.intensity = l.userData.used ? 1.25 + 0.75*night : 0);   // lampy w domu
     updateStreetLamps(night, p);   // lampy uliczne
     glowMats.forEach(m => m.emissive.setRGB(1, 0.78, 0.4).multiplyScalar(night*0.85));
 
@@ -6054,7 +6744,7 @@
   // Kursor znika i kamera podąża za myszką; gdy otwarte jest jakieś okno (sklep, ekwipunek, telefon...), kursor wraca
   function uiBlocking(){
     if(isDead || isPaused || computerUiOpen || fullMapOpen || placing) return true;
-    return ['shop','dlg','phone','fridge','wardrobe','trunk','ovenUI','inv','placeUI','paintUI'].some(id => {
+    return ['shop','dlg','phone','fridge','wardrobe','trunk','ovenUI','inv','placeUI','paintUI','headUI','playerMenu'].some(id => {
       const e = document.getElementById(id);
       return e && getComputedStyle(e).display !== 'none';
     });
@@ -6136,7 +6826,7 @@
   }
   // Rozgrzewka shaderów: kompilacja z odkrytymi ukrytymi obiektami, żeby nie było przycinki przy pierwszym pokazaniu
   (function prewarm(){
-    const hid=[...HOMES.flatMap(H=>[H.charger,H.phone]),hat,bike].filter(o=>o&&!o.visible);
+    const hid=[...HOMES.flatMap(H=>[H.charger,H.phone]),hat,capG,bike].filter(o=>o&&!o.visible);
     hid.forEach(o=>o.visible=true);
     try{ renderer.compile(scene,camera); }catch(e){}
     hid.forEach(o=>o.visible=false);
@@ -6301,20 +6991,22 @@
     else if(isSleeping && homeIn){ setActiveHome(homeIn); const p = homeW(0, HOME.d/2 - 0.9); x = p.x; z = p.z; }
     return {x:+x.toFixed(2), z:+z.toFixed(2), f:+facing.toFixed(2), yaw:+yaw.toFixed(2)};
   }
+  function svSlot(s){ return s ? Object.assign({id:s.id, count:s.count}, s.main != null ? {main:s.main} : {}, s.color !== undefined ? {col:s.color} : {}) : null; }
+  function svColOf(s){ return (s.id === 'hat' || s.id === 'cap') && s.col != null && isFinite(+s.col) ? {color:Math.max(0, Math.min(0xffffff, +s.col | 0))} : {}; }
   function svSnapshot(){
     return {
       v: SAVE_VER,
       coins: coins(),
-      inv: JSON.stringify(inv.map(s => s ? (s.main != null ? {id:s.id, count:s.count, main:s.main} : {id:s.id, count:s.count}) : null)),
+      inv: JSON.stringify(inv.map(svSlot)),
       hunger: +stats.hunger.toFixed(1),
       energy: +stats.energy.toFixed(1),
       elapsed: Math.round(gameElapsed),
       bank: JSON.stringify({opened:!!bank.opened, balance:bank.balance|0, number:String(bank.number||''), tx:(bank.tx||[]).slice(-40)}),
-      trunk: JSON.stringify(trunk.map(s => s ? (s.main != null ? {id:s.id, count:s.count, main:s.main} : {id:s.id, count:s.count}) : null)),
+      trunk: JSON.stringify(trunk.map(svSlot)),
       fridge: JSON.stringify(fridgeStock),
       homes: JSON.stringify(HOMES.map(H => ({id:H.id, rented:!!H.rented, owned:!!H.owned, paid:H.owned ? 0 : Math.round(H.paidUntil||0), open:!!(H.door && H.door.open)}))),
       furn: JSON.stringify(placedDesks.slice(0,40).map(pd => ({k:pd.kind||'desk', x:+pd.wall.x.toFixed(2), z:+pd.wall.z.toFixed(2), r:svRot4(pd.mesh.rotation.y), c:pd.computer ? (Math.round(pd.computer.rotation.y/Math.PI) & 1) : -1, p:pd.pizza ? +pd.pizza.t.toFixed(1) : -1}))),
-      car: JSON.stringify(hasCar ? {has:true, x:+pcar.group.position.x.toFixed(2), z:+pcar.group.position.z.toFixed(2), r:+carHeading.toFixed(3), c:pcar.bodyMat.color.getHex(), s:steerLvl, f:+carFuel.toFixed(1)} : {has:false}),
+      car: JSON.stringify(hasCar ? {has:true, x:+pcar.group.position.x.toFixed(2), z:+pcar.group.position.z.toFixed(2), r:+carHeading.toFixed(3), c:pcar.bodyMat.color.getHex(), s:steerLvl, f:+carFuel.toFixed(1), hb:handbrake ? 1 : 0} : {has:false}),
       upper: JSON.stringify({h:upperApp.hired?1:0, n:upperApp.done|0, e:upperApp.earned|0}),
       phone: JSON.stringify({plug:!!chargerPlugged, home:chargerHome ? chargerHome.id : '', dock:!!phoneDocked, bat:+(+phoneBattery).toFixed(1)}),
       pos: JSON.stringify(svPos())
@@ -6400,7 +7092,7 @@
       const arr = JSON.parse(d.inv || '[]');
       for(let i = 0; i < inv.length; i++){
         const s = arr[i];
-        inv[i] = (s && ITEMS[s.id]) ? Object.assign({id:s.id, count:Math.max(1, s.count|0)}, s.main != null ? {main:s.main|0} : {}) : null;
+        inv[i] = (s && ITEMS[s.id]) ? Object.assign({id:s.id, count:Math.max(1, s.count|0)}, s.main != null ? {main:s.main|0} : {}, svColOf(s)) : null;
       }
       const cl = (v, def) => isFinite(+v) ? Math.min(100, Math.max(0, +v)) : def;
       stats.hunger = Math.max(1, cl(d.hunger, 100)); stats.energy = Math.max(1, cl(d.energy, 100));
@@ -6410,7 +7102,7 @@
         const t = JSON.parse(d.trunk || '[]');
         for(let i = 0; i < TRUNK_SLOTS; i++){
           const q = t[i];
-          trunk[i] = (q && ITEMS[q.id] && q.id !== 'order') ? Object.assign({id:q.id, count:Math.max(1, q.count|0)}, q.main != null ? {main:q.main|0} : {}) : null;
+          trunk[i] = (q && ITEMS[q.id] && q.id !== 'order') ? Object.assign({id:q.id, count:Math.max(1, q.count|0)}, q.main != null ? {main:q.main|0} : {}, svColOf(q)) : null;
         }
         for(let i = 0; i < TRUNK_SLOTS; i++){                  // duży przedmiot musi mieć komplet części, a część – swój przedmiot
           const q = trunk[i]; if(!q) continue;
@@ -6635,6 +7327,19 @@
           if(pen < best){ best = pen; bax = ax*(dist < 0 ? -1 : 1); baz = az*(dist < 0 ? -1 : 1); }
         }
         if(hit){ carV *= 0.5; player.position.x += bax*best; player.position.z += baz*best; }
+      } else if(bikeMounted){
+        // rower (prostokąt 2,7 × 0,6 m wzdłuż ramy: koła na ±0,88 + promień 0,48) kontra auto ruchu – SAT, wypchnięcie najmniejszą penetracją
+        const bfx = Math.sin(facing), bfz = Math.cos(facing), BHL = 1.35, BHW = 0.3;
+        const axes = [[bfx,bfz],[bfz,-bfx],[tfx,tfz],[-tfz,tfx]];
+        let best = Infinity, bax = 0, baz = 0, hit = true;
+        for(const [ax, az] of axes){
+          const rB = BHL*Math.abs(bfx*ax + bfz*az) + BHW*Math.abs(bfz*ax - bfx*az);
+          const rT = vhl*Math.abs(tfx*ax + tfz*az) + vhw*Math.abs(-tfz*ax + tfx*az);
+          const dist = dx*ax + dz*az, pen = rB + rT - Math.abs(dist);
+          if(pen <= 0){ hit = false; break; }
+          if(pen < best){ best = pen; bax = ax*(dist < 0 ? -1 : 1); baz = az*(dist < 0 ? -1 : 1); }
+        }
+        if(hit){ player.position.x += bax*best; player.position.z += baz*best; }
       } else {
         // pieszy (koło r = 0,35) kontra prostokąt auta
         const R = 0.35, hl = vhl, hw = vhw;
@@ -6681,6 +7386,7 @@
     updateHomeInterior();
     updateHomeDoor(dt);
     updateTraffic(dt);
+    updateCarRoll(dt);
     updateBus(dt);
     updatePksBuses(dt);
     if(busRide) busCarry(mx, mz, speed, dt);                                     // gracz jedzie razem z autobusem
@@ -6688,6 +7394,8 @@
     updateUpper(dt, gameElapsed);
     updatePlayerSignals(typeof drvX === 'number' ? drvX : 0);
     updateJob(dt, gameElapsed);
+    updateMine(dt, gameElapsed);
+    updateNeighbor(dt, gameElapsed);
     updateShopInterior(dt, gameElapsed);
     updateBankInterior(dt, gameElapsed);
     updateFurnInterior(dt, gameElapsed);
@@ -6715,10 +7423,16 @@
       }
     }
     if(bikeMounted){
+      { const BL = 0.88, bsn = Math.sin(facing), bcs = Math.cos(facing), bx = player.position.x, bz = player.position.z;   // przechył wg nachylenia terenu pod kołami (jak w aucie)
+        const tp = -Math.atan2(terrainH(bx + bsn*BL, bz + bcs*BL) - terrainH(bx - bsn*BL, bz - bcs*BL), 2*BL);
+        bikePitch += (tp - bikePitch)*Math.min(1, dt*8); }
       bike.position.set(player.position.x,terrainH(player.position.x,player.position.z),player.position.z);
-      bike.rotation.y=facing;
+      bike.rotation.y=facing; bike.rotation.x = bikePitch;
+      player.rotation.order = 'YXZ'; player.rotation.x = bikePitch;                       // rowerzysta przechyla się razem z rowerem
       bikeWheels.forEach(w=>{w.rotation.x += len*dt*speed*1.8;});
-    }
+    } else if(player.rotation.x !== 0) player.rotation.x = 0;                              // po zsiadnięciu postać znów stoi pionowo
+    { const bOn = bike.visible && !bikeMounted, ba = bike.rotation.y;                      // twardy zaparkowany rower (w czasie jazdy kolizja wyłączona)
+      BIKE_COLL.forEach(c => { if(bOn){ c.x = bike.position.x + Math.sin(ba)*c.o; c.z = bike.position.z + Math.cos(ba)*c.o; } else { c.x = 1e5; c.z = 1e5; } }); }
 
     // skok
     const gy = groundAt(player.position.x, player.position.z, player.position.y);
@@ -6754,6 +7468,7 @@
       legL.rotation.x = sw; legR.rotation.x = -sw;
       armL.rotation.x = -sw; armR.rotation.x = sw;
     }
+    mineAnimate(gameElapsed);
 
     // głód i energia
     stats.hunger = Math.max(0, stats.hunger - dt*(0.12 + (running && moving ? 0.05 : 0)));

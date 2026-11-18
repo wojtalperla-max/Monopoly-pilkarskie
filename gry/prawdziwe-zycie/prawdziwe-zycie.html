@@ -27,7 +27,7 @@ if(!ok){try{Object.defineProperty(window,n,{value:mem(),configurable:true})}catc
 </script>
 </head>
 <body>
-<div id="hud"><b>Real life</b><br>WASD / strzałki – ruch<br>Shift – bieg / wstawanie ze snu / zsiadanie z roweru, Spacja – skok<br>V – kamera pierwszoosobowa / trzecioosobowa<br>Q / E lub przeciągnięcie myszą – obrót kamery<br>Kółko – zoom, I – ekwipunek, M – mapa<br>F – interakcja / rower, P – telefon<br>W aucie: Z / C – kierunkowskaz lewy / prawy, X – awaryjne, H – klakson (przytrzymaj)</div>
+<div id="hud"><b>Real life</b><br>WASD / strzałki – ruch<br>Shift – bieg / wstawanie ze snu / zsiadanie z roweru, Spacja – skok<br>V – kamera pierwszoosobowa / trzecioosobowa<br>Q / E lub przeciągnięcie myszą – obrót kamery<br>Kółko – zoom, I – ekwipunek, M – mapa<br>F – interakcja / rower / kopanie kilofem (kopalnia), P – telefon<br>W aucie: Z / C – kierunkowskaz lewy / prawy, X – awaryjne, B – hamulec ręczny, H – klakson (przytrzymaj)</div>
 <div id="stats">
   <div class="stat" id="stHunger"><span class="ic">🍖</span><div class="bar"><div class="fill" id="hungerFill"></div></div><span class="val" id="hungerVal">100</span></div>
   <div class="stat" id="stEnergy"><span class="ic">⚡</span><div class="bar"><div class="fill" id="energyFill"></div></div><span class="val" id="energyVal">100</span></div>
@@ -56,6 +56,13 @@ if(!ok){try{Object.defineProperty(window,n,{value:mem(),configurable:true})}catc
 <div id="clock"></div>
 <button id="pauseBtn" type="button">⏸ Pauza</button>
 <button id="testCoinsBtn" type="button" title="Przycisk testowy">🧪 +100 monet</button>
+<button id="avatarBtn" type="button" title="Menu gracza" aria-label="Menu gracza"><svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true"><rect width="64" height="64" fill="#9ed0ff"/><rect x="10" y="46" width="44" height="22" rx="4" fill="#2d6cdf"/><rect x="22" y="40" width="20" height="8" fill="#e5b36a"/><rect x="17" y="14" width="30" height="30" rx="2" fill="#f1c27d"/><rect x="16" y="11" width="32" height="9" fill="#4a2c12"/><rect x="24" y="28" width="5" height="5" fill="#000"/><rect x="35" y="28" width="5" height="5" fill="#000"/><rect x="27" y="37" width="10" height="2" fill="#a0603a"/></svg><canvas id="avatarCanvas" width="256" height="256"></canvas></button>
+<div id="playerMenu">
+  <div id="pmAvatar"><svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true"><rect width="64" height="64" fill="#9ed0ff"/><rect x="10" y="46" width="44" height="22" rx="4" fill="#2d6cdf"/><rect x="22" y="40" width="20" height="8" fill="#e5b36a"/><rect x="17" y="14" width="30" height="30" rx="2" fill="#f1c27d"/><rect x="16" y="11" width="32" height="9" fill="#4a2c12"/><rect x="24" y="28" width="5" height="5" fill="#000"/><rect x="35" y="28" width="5" height="5" fill="#000"/><rect x="27" y="37" width="10" height="2" fill="#a0603a"/></svg><canvas id="pmCanvas" width="256" height="256"></canvas></div>
+  <h3>👤 Menu gracza</h3>
+  <p>Tu wkrótce pojawią się opcje postaci.</p>
+  <button id="playerMenuClose" type="button">Zamknij (Esc)</button>
+</div>
 <div id="deathScreen"><h1>Koniec gry, umarłeś!</h1><div id="deathCause"></div><button id="deathBtn" type="button">Zagraj od nowa</button></div>
 <div id="pauseScreen">
   <div id="pauseCard">
