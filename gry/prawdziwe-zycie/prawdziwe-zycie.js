@@ -791,6 +791,43 @@
     restWallMat.depthWrite = true;
   }
 
+  // ===== Wielki transparent urodzinowy nad Długą, tuż przed rondem przy Pandy (czytelny dla jadących od strony Długiej, z tyłu też) =====
+  (function buildBirthdayBanner(){
+    const BX = RB.x - 20, BW = 17, BH = 2.8, BY = 8.2;               // x przed tarczą ronda (jej brzeg to RB.x-14), szerokość, wysokość i środek wysokości transparentu
+    const lamb = c => new THREE.MeshLambertMaterial({color:c});
+    const TXT = 'WSZYSTKIEGO NAJLEPSZEGO GABRYŚ!';
+    const cv = document.createElement('canvas'); cv.width = 2048; cv.height = Math.round(2048*BH/BW);
+    const g = cv.getContext('2d'), cw = cv.width, ch = cv.height;
+    const grad = g.createLinearGradient(0,0,cw,0);
+    grad.addColorStop(0,'#d81b60'); grad.addColorStop(.5,'#7b1fa2'); grad.addColorStop(1,'#1565c0');
+    g.fillStyle = grad; g.fillRect(0,0,cw,ch);
+    g.strokeStyle = '#ffd54f'; g.lineWidth = 14; g.strokeRect(10,10,cw-20,ch-20);
+    g.strokeStyle = '#ffffff'; g.lineWidth = 4; g.strokeRect(30,30,cw-60,ch-60);
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    let fs = 130; g.font = 'bold ' + fs + 'px sans-serif';
+    while(g.measureText(TXT).width > cw - 330 && fs > 40){ fs -= 4; g.font = 'bold ' + fs + 'px sans-serif'; }
+    g.lineWidth = 12; g.strokeStyle = 'rgba(0,0,0,.45)'; g.strokeText(TXT, cw/2, ch/2 + 6);
+    g.fillStyle = '#fff176'; g.fillText(TXT, cw/2, ch/2 + 6);
+    g.font = '110px sans-serif'; g.fillText('🎉', 110, ch/2 + 6); g.fillText('🎂', cw - 110, ch/2 + 6);
+    const tx = new THREE.CanvasTexture(cv); tx.anisotropy = 8;
+    const mat = new THREE.MeshBasicMaterial({map:tx});
+    [[-Math.PI/2, -0.12], [Math.PI/2, 0.12]].forEach(([ry, dx]) => {   // dwie płaszczyzny – tekst czytelny z obu stron
+      const p = new THREE.Mesh(new THREE.PlaneGeometry(BW, BH), mat);
+      p.position.set(BX + dx, BY, ROAD_Z); p.rotation.y = ry; street.add(p);
+    });
+    const back = new THREE.Mesh(new THREE.BoxGeometry(0.18, BH + 0.3, BW + 0.3), lamb(0x222222));   // ramka/podkład między stronami
+    back.position.set(BX, BY, ROAD_Z); street.add(back);
+    // dwa słupy po bokach jezdni (na chodnikach) + belka nad transparentem
+    const postH = BY + BH/2 + 0.6;
+    [-1,1].forEach(sd => {
+      const pz = ROAD_Z + sd*(BW/2 + 0.5);   // słupy poza krawędzią transparentu – nie zasłaniają napisu
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.4, postH, 0.4), lamb(0x55585c));
+      post.position.set(BX, postH/2, pz); post.castShadow = true; street.add(post); solidPole(BX, pz);
+    });
+    const beam = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, BW + 1.4), lamb(0x55585c));
+    beam.position.set(BX, postH - 0.15, ROAD_Z); street.add(beam);
+  })();
+
   // Supermarket Pandy (z wnętrzem, do którego można wejść)
   const supWallMat = new THREE.MeshLambertMaterial({color:0xdcd6c8});
   const supExterior = [];
