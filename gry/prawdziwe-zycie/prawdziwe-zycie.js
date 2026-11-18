@@ -85,6 +85,7 @@
 
   // Ulica główna (biegnie wzdłuż osi X, przed postacią)
   const ROAD_Z = -14, ROAD_W = 10, SIDEWALK_W = 3, TILE = 8, ROAD_LEN = 160;
+  const WR = {x:-80, z:ROAD_Z, rOut:14, rIn:5.5};            // zachodnie rondo na końcu Długiej (jedyny wlot od wschodu)
   const SIGN_COLL = [];                                   // kolizje słupków znaków drogowych i tabliczek z nazwami ulic (okręgi jak pnie drzew)
   const solidPole = (x, z) => SIGN_COLL.push({x, z, r:0.32});
   const rc = document.createElement('canvas'); rc.width = 256; rc.height = 320;
@@ -132,7 +133,7 @@
       const segmentLen = (ROAD_LEN - junctionHalfWidth*2) / 2;
       [-1, 1].forEach(direction => {
         // wschodni odcinek (od x=8,15 do 80) jest przerwany na wlocie ulicy Poprzecznej
-        const pieces = direction === -1 ? [[-(junctionHalfWidth + segmentLen), -junctionHalfWidth]]
+        const pieces = direction === -1 ? [[WR.x + WR.rOut, -junctionHalfWidth]]
           : [[junctionHalfWidth, POP_X - POP_EDGE], [POP_X + POP_EDGE, junctionHalfWidth + segmentLen]];
         pieces.forEach(([x0, x1]) => {
           const sidewalk = new THREE.Mesh(
@@ -145,9 +146,9 @@
       });
     } else {
       const sidewalk = new THREE.Mesh(
-        new THREE.BoxGeometry(ROAD_LEN, 0.2, SIDEWALK_W), walkMat
+        new THREE.BoxGeometry(ROAD_LEN/2 - (WR.x + WR.rOut), 0.2, SIDEWALK_W), walkMat   // południowy chodnik: od brzegu zachodniego ronda do x=80
       );
-      sidewalk.position.set(0, 0.1, z);
+      sidewalk.position.set(((WR.x + WR.rOut) + ROAD_LEN/2)/2, 0.1, z);
       sidewalk.receiveShadow = true;
       street.add(sidewalk);
     }
@@ -438,12 +439,16 @@
   }
   const HILL_REACH = HILL.flatHalf + HILL.fadeHalf;
   const STATION = {x:67, z:170, w:34, d:22, blend:12, y:HILL.h + 0.2};   // stacja paliw: płaska platforma (w – wzdłuż X, d – wzdłuż Z) na poziomie chodnika Społecznej
-  function terrainH(x, z){                                            // wysokość terenu (0 na całej reszcie mapy) z platformą stacji
-    const h = hillH(x, z);
-    const ex = Math.abs(x - STATION.x) - STATION.w/2, ez = Math.abs(z - STATION.z) - STATION.d/2;
-    if(ex >= STATION.blend || ez >= STATION.blend) return h;
-    const t = 1 - sstep(Math.hypot(Math.max(0, ex), Math.max(0, ez))/STATION.blend);
-    return h + (STATION.y - h)*t;
+  // PKS (dworzec autobusowy): płaski plac za stacją paliw, na tym samym poziomie co stacja. Dojazd: w lewo ze Społecznej (jadąc na zachód) w osi x = jx.
+  const PKS = {x:17, z:178, w:62, d:30, blend:12, y:HILL.h + 0.2, jx:38, zq:177.5};   // plac x -14…48, z 163…193; zq – oś pasa ze stanowiskami
+  function platBlend(h, x, z, P){                                     // wtopienie płaskiej platformy P w teren o wysokości h
+    const ex = Math.abs(x - P.x) - P.w/2, ez = Math.abs(z - P.z) - P.d/2;
+    if(ex >= P.blend || ez >= P.blend) return h;
+    const t = 1 - sstep(Math.hypot(Math.max(0, ex), Math.max(0, ez))/P.blend);
+    return h + (P.y - h)*t;
+  }
+  function terrainH(x, z){                                            // wysokość terenu (0 na całej reszcie mapy) z platformami stacji i PKS
+    return platBlend(platBlend(hillH(x, z), x, z, STATION), x, z, PKS);
   }
   function hillH(x, z){                                               // wysokość samego wzgórza
     if(z <= HILL.zMin || z > SPOL_TURN_Z + HILL_REACH || x < SPOL_WEST_END - HILL_REACH || x > RB.x + HILL_REACH) return 0;
@@ -452,10 +457,10 @@
     if(side <= 0) return 0;
     return HILL.h * sstep((n.qz - HILL.zStart)/(HILL.zTop - HILL.zStart)) * side;
   }
-  const HILL_BOX = {minX: SPOL_WEST_END - HILL_REACH, maxX: RB.x + HILL_REACH, minZ: HILL.zMin, maxZ: Math.max(SPOL_TURN_Z + HILL_REACH, STATION.z + STATION.d/2 + STATION.blend)};
+  const HILL_BOX = {minX: SPOL_WEST_END - HILL_REACH, maxX: RB.x + HILL_REACH, minZ: HILL.zMin, maxZ: Math.max(SPOL_TURN_Z + HILL_REACH, STATION.z + STATION.d/2 + STATION.blend, PKS.z + PKS.d/2 + PKS.blend)};
   // Zasięg świata widoczny na mapie. Mapa sama dobiera skalę tak, by zmieścić WSZYSTKIE zarejestrowane prostokąty –
   // gdy dodasz nowy teren, wywołaj registerMapExtent(minX, minZ, maxX, maxZ), a mapa się oddali.
-  const MAP_EXTENTS = [{minX:-92, maxX:152, minZ:-94, maxZ:92}];
+  const MAP_EXTENTS = [{minX:-96, maxX:152, minZ:-94, maxZ:92}];
   const registerMapExtent = (minX, minZ, maxX, maxZ) => MAP_EXTENTS.push({minX, maxX, minZ, maxZ});
   registerMapExtent(HILL_BOX.minX, HILL_BOX.minZ, HILL_BOX.maxX, HILL_BOX.maxZ);
   const onHill = (x, z, m) => z > HILL.zMin - m && pathNearest(x, z).d < HILL_REACH + m;
@@ -467,6 +472,7 @@
   const ROUND_COLL = [];                                            // kolizje wyspy środkowej (okręgi, jak pnie drzew)
   const NEW_STREET_EDGE = ROAD_W/2 + SIDEWALK_GAP + SIDEWALK_W;
   const onNewStreets = (x, z, m) =>
+    Math.hypot(x - WR.x, z - WR.z) < WR.rOut + 3 + m ||                                         // zachodnie rondo z chodnikiem
     Math.hypot(x - RB.x, z - RB.z) < RB.rOut + 3 + m ||                                         // rondo z chodnikiem
     (x > 78 - m && x < RB.x && Math.abs(z - ROAD_Z) < NEW_STREET_EDGE + m) ||                   // przedłużenie Długiej
     (Math.abs(x - RB.x) < NEW_STREET_EDGE + m && z < RB.z && z > SUPER.z + SUPER.d/2 - m) ||    // zjazd do supermarketu
@@ -475,9 +481,31 @@
     (Math.abs(x - RB.x) < 22 + m && z > RB.z + 8 - m && z < 90 + m) ||                          // ulica Społeczna z domami i sklepem odzieżowym
     (Math.abs(x - POP_X) < POP_EDGE + m && z > SIDE_ROAD_START - m && z < POP_END + m) ||       // ulica Poprzeczna
     onHill(x, z, m) ||                                                                          // wzgórze za Społeczną
+    (Math.abs(x - PKS.x) < PKS.w/2 + PKS.blend + m && Math.abs(z - PKS.z) < PKS.d/2 + PKS.blend + m) ||   // plac PKS
     (Math.abs(x - CAR.x) < CAR.d/2 + 2 + m && Math.abs(z - CAR.z) < CAR.w/2 + 2 + m) ||        // salon samochodowy
     (Math.abs(x - MECH.x) < MECH.d/2 + 4 + m && Math.abs(z - MECH.z) < MECH.w/2 + 2 + m) ||    // mechanik
     (Math.abs(x - PAINT.x) < PAINT.d/2 + 2 + m && Math.abs(z - PAINT.z) < PAINT.w/2 + 2 + m);  // lakiernik                            // ulica Społeczna z domami i sklepem odzieżowym
+  (function buildWestRoundabout(){   // rondo na końcu Długiej (x=-80, z=-15): tarcza asfaltu, wyspa z drzewem, wlot tylko od wschodu
+    const lamb = c => new THREE.MeshLambertMaterial({color:c});
+    const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+    const g2 = cv.getContext('2d'); g2.fillStyle = '#3b3b40'; g2.fillRect(0,0,256,256);
+    for(let i=0;i<2500;i++){ const v = 40 + Math.random()*35; g2.fillStyle = `rgb(${v},${v},${v+4})`; g2.fillRect(Math.random()*256, Math.random()*256, 2, 2); }
+    const tex = new THREE.CanvasTexture(cv); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(WR.rOut*2/TILE, WR.rOut*2/TILE); tex.anisotropy = 8;
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(WR.rOut, 72), new THREE.MeshLambertMaterial({map:tex}));
+    disc.rotation.x = -Math.PI/2; disc.position.set(WR.x, 0.03, WR.z); disc.receiveShadow = true; street.add(disc);
+    const gap = 0.47, edgeMat = new THREE.MeshBasicMaterial({color:0xe8e8e8});      // biała krawędź z przerwą przy wlocie od wschodu
+    const arc = new THREE.Mesh(new THREE.RingGeometry(WR.rOut-0.55, WR.rOut-0.4, 64, 1, gap, Math.PI*2 - 2*gap), edgeMat);
+    arc.rotation.x = -Math.PI/2; arc.position.set(WR.x, 0.04, WR.z); street.add(arc);
+    const curb = new THREE.Mesh(new THREE.CylinderGeometry(WR.rIn+0.3, WR.rIn+0.3, 0.2, 48), lamb(0xb8b8b0));
+    curb.position.set(WR.x, 0.1, WR.z); curb.receiveShadow = true; street.add(curb);
+    const grass = new THREE.Mesh(new THREE.CylinderGeometry(WR.rIn, WR.rIn, 0.26, 48), lamb(0x5f9a4a));
+    grass.position.set(WR.x, 0.13, WR.z); grass.receiveShadow = true; street.add(grass);
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.4, 3, 8), lamb(0x6b4423));
+    trunk.position.set(WR.x, 1.76, WR.z); trunk.castShadow = true; street.add(trunk);
+    const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(2.3, 1), new THREE.MeshLambertMaterial({color:0x3f8f3a, flatShading:true}));
+    crown.position.set(WR.x, 4.6, WR.z); crown.castShadow = true; street.add(crown);
+    for(let i=0;i<36;i++){ const a = i/36*Math.PI*2; ROUND_COLL.push({x: WR.x + Math.cos(a)*5.0, z: WR.z + Math.sin(a)*5.0, r: 0.4}); }   // wyspa jest przeszkodą
+  })();
   (function buildRoundabout(){
     const lamb = c => new THREE.MeshLambertMaterial({color:c});
     const asphaltTex = len => { const t = roadTex.clone(); t.needsUpdate = true; t.repeat.set(len/TILE, 1); return t; };
@@ -599,10 +627,16 @@
     // jezdnia: wstęga wzdłuż osi, tekstura biegnie wzdłuż ulicy jak na reszcie dróg
     const tex = roadTex.clone(); tex.needsUpdate = true; tex.repeat.set(1, 1);
     const P = [], U = [], I = [];
+    const RCOLS = 6;                                                   // punkty na szerokości jezdni: wysokość liczona osobno dla każdego (teren przy stacji/PKS unosi się też w poprzek ulicy, inaczej trawa przebija przez asfalt)
     S.forEach((q, i) => {
-      const y = terrainH(q.x, q.z) + 0.04, u = q.len/TILE, a = off(q, -ROAD_W/2), b = off(q, ROAD_W/2);
-      P.push(a[0], y, a[1],  b[0], y, b[1]); U.push(u, 0,  u, 1);
-      if(i < S.length-1){ const k = i*2; I.push(k, k+1, k+2,  k+1, k+3, k+2); }
+      const u = q.len/TILE;
+      for(let j=0;j<RCOLS;j++){
+        const v = j/(RCOLS-1), c = off(q, -ROAD_W/2 + v*ROAD_W);
+        P.push(c[0], terrainH(c[0], c[1]) + 0.05, c[1]); U.push(u, v);
+      }
+      if(i < S.length-1){
+        for(let j=0;j<RCOLS-1;j++){ const a = i*RCOLS + j, b = a + 1, c = a + RCOLS, d = c + 1; I.push(a, b, c,  b, d, c); }
+      }
     });
     const rg = new THREE.BufferGeometry();
     rg.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
@@ -617,7 +651,9 @@
         const a = off(q, sd*SIDEWALK_OFFSET - SIDEWALK_W/2), b = off(q, sd*SIDEWALK_OFFSET + SIDEWALK_W/2);
         const h = terrainH((a[0]+b[0])/2, (a[1]+b[1])/2), t = h + 0.2, bt = h - 0.3;
         Q.push(a[0],t,a[1], b[0],t,b[1], a[0],bt,a[1], b[0],bt,b[1]);
-        if(i < S.length-1){ const k = i*4, n = k + 4;
+        const nq = S[Math.min(S.length-1, i+1)], mx = (q.x + nq.x)/2, mz = (q.z + nq.z)/2;
+        const atStationGate = sd === 1 && Math.abs(mz - SPOL_TURN_Z) < 1 && [STATION.x - 9, STATION.x + 9].some(gx => Math.abs(mx - gx) < 4);   // brak chodnika na wjeździe i wyjeździe ze stacji paliw
+        if(i < S.length-1 && !atStationGate){ const k = i*4, n = k + 4;
           J.push(k,k+1,n,  k+1,n+1,n);
           J.push(k,n,k+2,  n,n+2,k+2);
           J.push(k+1,k+3,n+1,  n+1,k+3,n+3);
@@ -2074,7 +2110,7 @@
     box(0.3, 0.18, D, concrete, -(W/2 - 0.15), 0.07, 0, false);
     box(0.3, 0.18, D, concrete,  (W/2 - 0.15), 0.07, 0, false);
     [-9, 9].forEach(x => box(7, 0.4, 4.3, lamb(0x3b3b40), x, -0.17, -13.1, false));            // wjazd/wyjazd przez chodnik
-    box(W - 15, 0.18, 0.3, concrete, 0, 0.07, -D/2 + 0.15, false);
+    [[-W/2, -12.5], [-5.5, 5.5], [12.5, W/2]].forEach(([x0, x1]) => box(x1 - x0, 0.18, 0.3, concrete, (x0 + x1)/2, 0.07, -D/2 + 0.15, false));   // krawężnik z przerwami na wjazd i wyjazd
 
     // wiata nad dystrybutorami
     const CZ = -2;
@@ -2139,12 +2175,131 @@
     });
   })();
 
+  // ===== PKS (dworzec autobusowy): skręt w lewo ze Społecznej tuż za stacją paliw (jadąc na zachód), plac na wzgórzu i 3 stanowiska =====
+  const PKS_JX = PKS.jx, PKS_ZQ = PKS.zq;                              // oś drogi dojazdowej, oś pasa ze stanowiskami
+  const PKS_BAYS = [31, 19, 7].map(x => ({x, z:PKS_ZQ}));              // stanowiska 1–3 (środek autobusu, przód na wschód); 1 = przód kolejki
+  const PKS_BLD = {x:19, z:188.75, w:32, d:5.5, h:3.8};                // budynek dworca
+  BUILDINGS.push({x:PKS_BLD.x, z:PKS_BLD.z, w:PKS_BLD.w, d:PKS_BLD.d, open:true});
+  (function buildPKS(){
+    const B = 0.02;
+    const grp = new THREE.Group(); grp.position.set(0, PKS.y, 0); scene.add(grp);                 // x, z – świata; y – względem poziomu placu
+    const lamb = c => new THREE.MeshLambertMaterial({color:c});
+    const put = (m, px, py, pz) => { m.position.set(px,py,pz); m.castShadow = m.receiveShadow = true; grp.add(m); return m; };
+    const box = (bw,bh,bd,mat,px,py,pz,collide) => { if(collide) WALLS.push({x:px, z:pz, w:bw, d:bd}); return put(new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), mat), px, py, pz); };
+    const plane = (pw,ph,mat,px,py,pz) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(pw,ph), mat); m.position.set(px,py,pz); m.rotation.y = Math.PI; grp.add(m); return m; };   // zwrócona w stronę -z (północ)
+    const flat = (pw,pd,mat,px,py,pz) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(pw,pd), mat); m.rotation.x = -Math.PI/2; m.position.set(px,py,pz); m.receiveShadow = true; grp.add(m); return m; };
+    const textMat = (text, cw, ch, bg, fg) => {
+      const c = document.createElement('canvas'); c.width = cw; c.height = ch; const g = c.getContext('2d');
+      g.fillStyle = bg; g.fillRect(0,0,cw,ch); g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
+      let fs = Math.floor(ch*0.62); g.font = `bold ${fs}px sans-serif`;
+      while(g.measureText(text).width > cw*0.92 && fs > 12){ fs -= 2; g.font = `bold ${fs}px sans-serif`; }
+      g.fillText(text, cw/2, ch/2 + 2); return new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c)});
+    };
+    const red = lamb(0xb71c1c), white = lamb(0xf4f4f4), dark = lamb(0x37474f), concrete = lamb(0xbdbdb5), asphalt = lamb(0x3b3b40), wallM = lamb(0xe4ddcd);
+    const glass = new THREE.MeshLambertMaterial({color:0x7fb8d8, transparent:true, opacity:0.85});
+    const lampM = new THREE.MeshBasicMaterial({color:0xfff4cc});
+
+    // --- droga dojazdowa: skręt w lewo ze Społecznej (z = 155 to południowa krawędź jezdni), wstęga podąża za terenem; przejazd przez chodnik Społecznej lekko wyniesiony ---
+    {
+      const zs = [155, 155.35, 158.05, 158.35, 164], off = [0.04, 0.26, 0.26, 0.04, 0.04];
+      const P = [], U = [], I = [];
+      zs.forEach((z, i) => {
+        const y = terrainH(PKS_JX, z) + off[i], u = (z - 155)/TILE;
+        P.push(PKS_JX - ROAD_W/2, y, z,  PKS_JX + ROAD_W/2, y, z); U.push(u, 0,  u, 1);
+        if(i < zs.length-1){ const k = i*2; I.push(k, k+1, k+2,  k+1, k+3, k+2); }
+      });
+      const rg = new THREE.BufferGeometry();
+      rg.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+      rg.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+      rg.setIndex(I); rg.computeVertexNormals();
+      const tex = roadTex.clone(); tex.needsUpdate = true; tex.repeat.set(1, 1);
+      const rm = new THREE.Mesh(rg, new THREE.MeshLambertMaterial({map:tex, side:THREE.DoubleSide})); rm.receiveShadow = true; street.add(rm);
+      [-1, 1].forEach(sd => {                                                                      // chodniki po obu stronach drogi dojazdowej
+        const cx = PKS_JX + sd*SIDEWALK_OFFSET, h = terrainH(cx, 161);
+        const sw = new THREE.Mesh(new THREE.BoxGeometry(SIDEWALK_W, 0.5, 164 - 158.15), walkMat);
+        sw.position.set(cx, h - 0.05, (158.15 + 164)/2); sw.receiveShadow = true; street.add(sw);
+      });
+      {   // drogowskaz „PKS” przy skręcie – czytelny dla jadących Społeczną na zachód (stoi na południowym chodniku Społecznej)
+        const cv = document.createElement('canvas'); cv.width = 256; cv.height = 128;
+        const g3 = cv.getContext('2d'); g3.fillStyle = '#174b78'; g3.fillRect(0,0,256,128);
+        g3.strokeStyle = '#fff'; g3.lineWidth = 7; g3.strokeRect(5,5,246,118);
+        g3.fillStyle = '#fff'; g3.beginPath(); g3.moveTo(26,64); g3.lineTo(70,32); g3.lineTo(70,50); g3.lineTo(96,50); g3.lineTo(96,78); g3.lineTo(70,78); g3.lineTo(70,96); g3.closePath(); g3.fill();
+        g3.font = 'bold 62px sans-serif'; g3.textAlign = 'center'; g3.textBaseline = 'middle'; g3.fillText('PKS', 172, 66);
+        const tx = new THREE.CanvasTexture(cv); tx.anisotropy = 8;
+        const sx = 48.2, sz = 156.9, sh = terrainH(sx, sz);
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 3.2, 10), new THREE.MeshLambertMaterial({color:0x55585c}));
+        pole.position.set(sx, sh + 1.7, sz); pole.castShadow = true; street.add(pole); solidPole(sx, sz);
+        const face = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.95), new THREE.MeshBasicMaterial({map:tx}));
+        face.position.set(sx + 0.1, sh + 2.8, sz); face.rotation.y = Math.PI/2; street.add(face);   // zwrócony na wschód
+      }
+      {   // tabliczka „GÓRNA” – nazwa odcinka Społecznej biegnącego na zachód przy stacji paliw (północny chodnik, jak znaki DŁUGA / KRÓTKA)
+        const cv = document.createElement('canvas'); cv.width = 512; cv.height = 128;
+        const g4 = cv.getContext('2d'); g4.fillStyle = '#174b78'; g4.fillRect(0,0,512,128);
+        g4.strokeStyle = '#ffffff'; g4.lineWidth = 9; g4.strokeRect(6,6,500,116);
+        g4.fillStyle = '#ffffff'; g4.font = 'bold 68px sans-serif'; g4.textAlign = 'center'; g4.textBaseline = 'middle'; g4.fillText('GÓRNA', 256, 66);
+        const tx = new THREE.CanvasTexture(cv); tx.anisotropy = 8;
+        const gx = 62, gz = 143.5, gh = terrainH(gx, gz);
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 3.2, 10), new THREE.MeshLambertMaterial({color:0x55585c}));
+        pole.position.set(gx, gh + 1.6, gz); pole.castShadow = true; street.add(pole); solidPole(gx, gz);
+        [1, -1].forEach(side => {                                        // dwie tabliczki plecami do siebie, napis czytelny z obu stron
+          const face = new THREE.Mesh(new THREE.PlaneGeometry(2.55, 0.64), new THREE.MeshBasicMaterial({map:tx, side:THREE.FrontSide}));
+          face.position.set(gx, gh + 2.65, gz + side*0.11);
+          if(side < 0) face.rotation.y = Math.PI;
+          street.add(face);
+        });
+      }
+    }
+
+    // --- plac: asfalt, krawężniki (od północy z przerwą na wjazd), oznaczenia stanowisk ---
+    const YX0 = -12, YX1 = 47, YZ0 = 164, YZ1 = 192;
+    flat(YX1 - YX0, YZ1 - YZ0, asphalt, (YX0 + YX1)/2, B, (YZ0 + YZ1)/2);
+    box(YX1 - YX0, 0.18, 0.3, concrete, (YX0 + YX1)/2, B + 0.07, YZ1 - 0.15, false);
+    box(0.3, 0.18, YZ1 - YZ0, concrete, YX0 + 0.15, B + 0.07, (YZ0 + YZ1)/2, false);
+    box(0.3, 0.18, YZ1 - YZ0, concrete, YX1 - 0.15, B + 0.07, (YZ0 + YZ1)/2, false);
+    const nx1 = PKS_JX - ROAD_W/2 - SIDEWALK_GAP - SIDEWALK_W, nx2 = PKS_JX + ROAD_W/2 + SIDEWALK_GAP + SIDEWALK_W;
+    box(nx1 - YX0, 0.18, 0.3, concrete, (YX0 + nx1)/2, B + 0.07, YZ0 + 0.15, false);
+    box(YX1 - nx2, 0.18, 0.3, concrete, (nx2 + YX1)/2, B + 0.07, YZ0 + 0.15, false);
+    [25, 13, 1].forEach(x => box(0.14, 0.02, 3.4, lamb(0xe8e8e8), x, B + 0.02, PKS_ZQ, false));  // linie między stanowiskami
+
+    // --- peron (wyspa od strony drzwi autobusów) z wiatą ---
+    box(42, 0.2, 6.7, concrete, 18, B + 0.1, 182.65, false);
+    box(42.4, 0.25, 6.4, white, 18, 3.9, 182.85, false);
+    box(42.6, 0.4, 0.2, red, 18, 3.75, 179.65, false);
+    [-2, 10, 22, 34].forEach(x => { box(0.4, 3.8, 0.4, white, x, B + 1.9, 180.4, true); box(0.42, 0.4, 0.42, red, x, B + 0.4, 180.4, false); });
+    [0, 12, 24, 36].forEach(x => put(new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.06, 0.6), lampM), x, 3.74, 182.8));
+    PKS_BAYS.forEach((bay, i) => plane(1.9, 0.5, textMat('STANOWISKO ' + (i + 1), 512, 128, '#1565c0', '#ffffff'), bay.x, 3.45, 179.5));
+    [7, 31].forEach(x => box(2.4, 0.5, 0.5, lamb(0x8d6e63), x, B + 0.45, 184.7, true));          // ławki pod ścianą dworca
+
+    // --- budynek dworca ---
+    const BX = PKS_BLD.x, BZ = PKS_BLD.z, BW = PKS_BLD.w, BD = PKS_BLD.d, BH = PKS_BLD.h, FZ = BZ - BD/2;   // FZ = front (z = 186)
+    box(BW, BH, BD, wallM, BX, B + BH/2, BZ, true);
+    box(BW + 0.8, 0.3, BD + 1.0, red, BX, B + BH + 0.15, BZ - 0.2, false);
+    [8, 13, 25, 30].forEach(x => plane(3.6, 1.8, glass, x, B + 1.7, FZ - 0.03));
+    plane(2.2, 2.6, dark, BX, B + 1.3, FZ - 0.04); plane(1.8, 2.3, glass, BX, B + 1.2, FZ - 0.05);   // drzwi
+    plane(14, 0.7, textMat('DWORZEC AUTOBUSOWY', 1024, 64, '#b71c1c', '#ffffff'), BX, B + 3.3, FZ - 0.04);
+    box(7, 1.5, 0.3, red, BX, B + BH + 1.1, FZ + 0.3, false);                                      // duży szyld „PKS” na dachu
+    plane(6.6, 1.3, textMat('PKS', 384, 96, '#b71c1c', '#ffffff'), BX, B + BH + 1.1, FZ + 0.3 - 0.16);
+    {   // tablica z rozkładem jazdy obok drzwi
+      const tc = document.createElement('canvas'); tc.width = 256; tc.height = 180; const tg = tc.getContext('2d');
+      tg.fillStyle = '#fff'; tg.fillRect(0,0,256,180); tg.fillStyle = '#b71c1c'; tg.fillRect(0,0,256,44);
+      tg.fillStyle = '#fff'; tg.font = 'bold 26px sans-serif'; tg.textAlign = 'center'; tg.textBaseline = 'middle'; tg.fillText('ROZKŁAD JAZDY', 128, 24);
+      tg.fillStyle = '#263238'; tg.font = 'bold 22px sans-serif'; tg.fillText('Linia 1', 128, 66);
+      tg.font = '18px sans-serif'; tg.fillText('PKS → Górna → Społeczna', 128, 94); tg.fillText('→ Pasaż → Długa → PKS', 128, 118);
+      tg.font = '15px sans-serif'; tg.fillText('Kursy jeden po drugim', 128, 142); tg.fillText('Stanowiska 1–3', 128, 162);
+      plane(2.0, 1.4, new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(tc)}), 21.7, B + 1.6, FZ - 0.045);
+    }
+  })();
+
   // ===== Przystanki autobusowe: (1) Długa, między domami nr 2 i 3; (2) między sklepem AGD a supermarketem Pandy =====
   const BUS_STOPS = [
     {name:'DŁUGA',       x:-33.25, z:-25.7, slab:3.55},    // domy 2 (x -46…-38) i 3 (x -28,5…-19,5): środek przerwy; płyta sięga chodnika (z = -22,15)
-    {name:'PANDY • AGD', x:105.5,  z:-65.5, slab:1.5},     // przerwa AGD (do x=103) – Pandy (od x=108); płyta kończy się na linii frontów (z = -64)
-    {name:'DOM G • UBRANIA', x:141.9, z:44.25, slab:3.8, rot:-Math.PI/2},   // Społeczna, wschodnia strona: przerwa między Domem G (z do 37,5) a Ubraniami (od z=51); front na zachód do chodnika (x=138,15)
-    {name:'STACJA PALIW', x:91, z:162, slab:3.8, rot:Math.PI}                // obok stacji (od wschodu), na płaskim grzbiecie wzgórza; front na północ do chodnika (z=158,15)
+    {name:'PASAŻ', x:105.5,  z:-65.5, slab:1.5},     // przerwa AGD (do x=103) – Pandy (od x=108); płyta kończy się na linii frontów (z = -64)
+    {name:'SPOŁECZNA', x:141.9, z:44.25, slab:3.8, rot:-Math.PI/2},   // Społeczna, wschodnia strona: przerwa między Domem G (z do 37,5) a Ubraniami (od z=51); front na zachód do chodnika (x=138,15)
+    {name:'GÓRNA', x:91, z:162, slab:3.8, rot:Math.PI},                // obok stacji (od wschodu), na płaskim grzbiecie wzgórza; front na północ do chodnika (z=158,15)
+    // ===== Przystanki równoległe – po przeciwnej stronie ulicy (ta sama nazwa) =====
+    {name:'DŁUGA',     x:-65,   z:-2.35, slab:3.5, rot:Math.PI},             // południowa strona Długiej, za domem nr 7 (x -59…-51) – pusty odcinek na zachód od niego; front na północ do chodnika (z = -5,85)
+    {name:'SPOŁECZNA', x:118.05, z:42.5, slab:3.8, rot:Math.PI/2},           // zachodnia strona Społecznej, w przerwie między Domem D (z do 37,5) a Domem E (od z=47,5); front na wschód do chodnika (x = 121,85)
+    {name:'GÓRNA',     x:91,    z:138.05, slab:3.8}                       // północna strona Górnej, naprzeciwko przystanku przy stacji; front na południe do chodnika (z = 141,85)
   ];
   BUS_STOPS.forEach(bs => {
     const rot = bs.rot || 0, cr = Math.cos(rot), sr = Math.sin(rot), quarter = Math.abs(sr) > 0.5;
@@ -2442,7 +2597,7 @@
     computerUiOpen = false;
     if(computerBootTimer){ clearTimeout(computerBootTimer); computerBootTimer = null; }
     computerUI.classList.remove('show'); computerUI.setAttribute('aria-hidden','true');
-    computerBoot.style.display = 'flex'; computerDesktop.classList.remove('active'); pcInternetWindow.classList.remove('open'); try{ pcSixWindow.classList.remove('open'); pcSixFrame.removeAttribute('srcdoc'); }catch(e){} try{ pepStop(); pcPepperWindow.classList.remove('open'); }catch(e){} try{ closeFiles(); }catch(e){}
+    computerBoot.style.display = 'flex'; computerDesktop.classList.remove('active'); pcInternetWindow.classList.remove('open'); try{ pcSixWindow.classList.remove('open'); pcSixFrame.removeAttribute('srcdoc'); }catch(e){} try{ pepStop(); pcPepperWindow.classList.remove('open'); }catch(e){} try{ closeFiles(); }catch(e){} try{ scCloseWin(); }catch(e){}
   }
   function turnOnComputer(){
     if(!sitting) return;
@@ -2467,7 +2622,6 @@
   let shortcutInstalling = false;
   pcShortcutDesktopIcon.style.display = shortcutInstalled ? 'flex' : 'none';
   if(shortcutInstalled){ pcInstallStatus.textContent = 'ShortCut jest już zainstalowany.'; pcInstallShortcutBtn.textContent = 'Zainstalowano'; pcInstallShortcutBtn.disabled = true; }
-  pcShortcutDesktopIcon.addEventListener('click',()=>toast('Uruchomiono ShortCut ✂️'));
   pcInstallShortcutBtn.addEventListener('click',()=>{
     if(shortcutInstalled || shortcutInstalling) return;
     shortcutInstalling = true; pcInstallShortcutBtn.disabled = true; pcInstallShortcutBtn.textContent = 'Instalowanie…';
@@ -2567,6 +2721,13 @@
       tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error);
     })).catch(()=>{ pcFilesMem.push(rec); });
   }
+  function pcFilesSaveNamed(blob, dur, name, desk){
+    const rec = {id:Date.now(), name:name, dur:dur, size:blob.size, blob:blob, desk:!!desk};
+    return pcFilesOpenDb().then(db=>new Promise((res,rej)=>{
+      const tx = db.transaction('videos','readwrite'); tx.objectStore('videos').put(rec);
+      tx.oncomplete = () => res(); tx.onerror = () => rej(tx.error);
+    })).catch(()=>{ pcFilesMem.push(rec); });
+  }
   function pcFilesDelete(id){
     return pcFilesOpenDb().then(db=>new Promise((res,rej)=>{
       const tx = db.transaction('videos','readwrite'); tx.objectStore('videos').delete(id);
@@ -2595,7 +2756,7 @@
           pcFilesBack.style.display = 'inline-block'; pcFilesTitle.textContent = '▶ ' + r.name;
           pcFilesVideo.play().catch(()=>{});
         });
-        row.querySelector('.del').addEventListener('click',()=>{ pcFilesDelete(r.id).then(pcFilesRender); });
+        row.querySelector('.del').addEventListener('click',()=>{ pcFilesDelete(r.id).then(()=>{ pcFilesRender(); scDeskRefresh(); }); });
         pcFilesList.appendChild(row);
       });
     });
@@ -2606,6 +2767,290 @@
   document.getElementById('pcFilesClose').addEventListener('click', closeFiles);
   pcFilesBack.addEventListener('click', ()=>{ pcFilesStopPlayer(); pcFilesRender(); });
   document.getElementById('pcPower').addEventListener('click', closeFiles);
+  /* ===== ShortCut – edytor wideo: pliki komputera → oś czasu → cięcie → render na pulpit ===== */
+  const scWin = document.getElementById('pcShortcutWindow');
+  const scVideo = document.getElementById('scVideo'), scEmpty = document.getElementById('scEmpty');
+  const scBinList = document.getElementById('scBinList'), scTrack = document.getElementById('scTrack');
+  const scRuler = document.getElementById('scRuler'), scInner = document.getElementById('scInner');
+  const scScroll = document.getElementById('scScroll'), scPlayhead = document.getElementById('scPlayhead');
+  const scTimeEl = document.getElementById('scTime'), scMsgEl = document.getElementById('scMsg');
+  const scPlayBtn = document.getElementById('scPlay'), scModal = document.getElementById('scModal'), scDialog = document.getElementById('scDialog');
+  const sc = {clips:[], sel:null, t:0, playing:false, pps:70, urls:{}, cur:null, raf:0, rendering:false, cancel:false, nextId:1};
+  let scMsgTimer = null;
+  const scMsg = (t) => { scMsgEl.textContent = t; clearTimeout(scMsgTimer); scMsgTimer = setTimeout(()=>{ scMsgEl.textContent = ''; }, 3500); };
+  const scLen = c => c.out - c.in;
+  const scTotal = () => sc.clips.reduce((a,c)=>a + scLen(c), 0);
+  const scLayout = () => { let t = 0; sc.clips.forEach(c => { c.start = t; t += scLen(c); }); };
+  const scFmt = t => { t = Math.max(0, t); return Math.floor(t/60) + ':' + (t%60).toFixed(1).padStart(4,'0'); };
+  const scFmtDur = t => { t = Math.round(t); return String(Math.floor(t/60)).padStart(2,'0') + ':' + String(t%60).padStart(2,'0'); };
+  const scParseDur = s => { const m = /^(\d+):(\d+)/.exec(s || ''); return m ? (+m[1])*60 + (+m[2]) : 5; };
+  const scSel = () => sc.clips.find(c => c.id === sc.sel) || null;
+  function scProbe(url, fb){                                              // długość pliku (nagrania z przeglądarki często nie mają jej w nagłówku)
+    return new Promise(res => {
+      const v = document.createElement('video'); v.preload = 'metadata'; v.muted = true; let done = false;
+      const fin = d => { if(done) return; done = true; v.removeAttribute('src'); try{ v.load(); }catch(e){} res(isFinite(d) && d > 0 ? d : fb); };
+      v.onloadedmetadata = () => { if(isFinite(v.duration) && v.duration > 0) fin(v.duration); else v.currentTime = 1e7; };
+      v.ondurationchange = v.ontimeupdate = () => { if(isFinite(v.duration) && v.duration > 0) fin(v.duration); };
+      v.onerror = () => fin(fb); setTimeout(() => fin(fb), 4000); v.src = url;
+    });
+  }
+  function scClipAt(t){
+    const n = sc.clips.length; if(!n) return null;
+    for(const c of sc.clips) if(t >= c.start && t < c.start + scLen(c)) return c;
+    return sc.clips[n-1];
+  }
+  function scSeekVideo(time){
+    if(scVideo.readyState >= 1) { try{ scVideo.currentTime = time; }catch(e){} }
+    else scVideo.addEventListener('loadedmetadata', () => { try{ scVideo.currentTime = time; }catch(e){} }, {once:true});
+  }
+  function scShow(t){                                                     // ustawia kursor w czasie t i pokazuje właściwą klatkę
+    scLayout(); const tot = scTotal(); t = Math.max(0, Math.min(t, tot)); sc.t = t;
+    const c = scClipAt(t); sc.cur = c;
+    scVideo.style.display = c ? 'block' : 'none'; scEmpty.style.display = c ? 'none' : 'block';
+    if(c){
+      if(scVideo.getAttribute('data-src') !== c.src){ scVideo.setAttribute('data-src', c.src); scVideo.src = c.src; }
+      scSeekVideo(c.in + Math.min(scLen(c), t - c.start));
+    } else { scVideo.removeAttribute('src'); scVideo.removeAttribute('data-src'); }
+    scUpdateUi();
+  }
+  function scUpdateUi(){
+    const pps = sc.pps;
+    scPlayhead.style.left = (sc.t*pps) + 'px';
+    scTimeEl.textContent = scFmt(sc.t) + ' / ' + scFmt(scTotal());
+    scPlayBtn.textContent = sc.playing ? '⏸' : '▶';
+  }
+  function scPause(){ sc.playing = false; cancelAnimationFrame(sc.raf); try{ scVideo.pause(); }catch(e){} scUpdateUi(); }
+  function scPlay(){
+    if(!sc.clips.length){ scMsg('Dodaj film na linię czasu'); return; }
+    if(sc.t >= scTotal() - 0.05) scShow(0);
+    sc.playing = true; scVideo.play().catch(()=>{}); scLoop(); scUpdateUi();
+  }
+  function scLoop(){
+    if(!sc.playing) return;
+    const c = sc.cur;
+    if(c){
+      sc.t = c.start + Math.max(0, Math.min(scLen(c), scVideo.currentTime - c.in));
+      if(scVideo.currentTime >= c.out - 0.04 || scVideo.ended){
+        const nx = sc.clips[sc.clips.indexOf(c) + 1];
+        if(nx){ scShow(nx.start); scVideo.play().catch(()=>{}); }
+        else { sc.t = scTotal(); scPause(); scRender_(); return; }
+      }
+    }
+    scUpdateUi();
+    const sl = scScroll;                                                  // kursor nie ucieka poza widok
+    const px = sc.t*sc.pps; if(px > sl.scrollLeft + sl.clientWidth - 30) sl.scrollLeft = px - 60;
+    sc.raf = requestAnimationFrame(scLoop);
+  }
+  function scRender_(){                                                   // rysuje linię czasu (linijka, klipy, kursor)
+    scLayout(); const pps = sc.pps, tot = scTotal();
+    scInner.style.width = Math.max(scScroll.clientWidth, (tot + 6)*pps + 40) + 'px';
+    const step = pps >= 120 ? 1 : pps >= 60 ? 2 : pps >= 30 ? 5 : 10;
+    scRuler.innerHTML = '';
+    for(let s = 0; s*pps < parseFloat(scInner.style.width); s += step){
+      const k = document.createElement('div'); k.className = 'scTick'; k.style.left = (s*pps) + 'px';
+      k.textContent = Math.floor(s/60) + ':' + String(s%60).padStart(2,'0'); scRuler.appendChild(k);
+    }
+    scTrack.innerHTML = '';
+    sc.clips.forEach(c => {
+      const el = document.createElement('div'); el.className = 'scClip' + (c.id === sc.sel ? ' sel' : '');
+      el.style.left = (c.start*pps) + 'px'; el.style.width = Math.max(14, scLen(c)*pps) + 'px';
+      el.innerHTML = '<div class="scH l"></div><div class="scH r"></div><div class="nm"></div><div class="du"></div>';
+      el.querySelector('.nm').textContent = '🎞️ ' + c.name; el.querySelector('.du').textContent = scFmt(scLen(c)) + ' s';
+      scTrack.appendChild(el);
+      el.querySelector('.scH.l').addEventListener('pointerdown', e => scTrimStart(e, c, el, 'l'));
+      el.querySelector('.scH.r').addEventListener('pointerdown', e => scTrimStart(e, c, el, 'r'));
+      el.addEventListener('pointerdown', e => { if(!e.target.classList.contains('scH')) scClipDrag(e, c, el); });
+    });
+    scUpdateUi();
+  }
+  function scTrimStart(e, c, el, side){                                   // przeciąganie uchwytu: przycinanie początku / końca klipu
+    e.stopPropagation(); e.preventDefault(); sc.sel = c.id; scPause();
+    const h = e.currentTarget, x0 = e.clientX, in0 = c.in, out0 = c.out;
+    try{ h.setPointerCapture(e.pointerId); }catch(err){}
+    const mv = ev => {
+      const d = (ev.clientX - x0)/sc.pps;
+      if(side === 'l') c.in = Math.max(0, Math.min(out0 - 0.2, in0 + d)); else c.out = Math.max(in0 + 0.2, Math.min(c.src_dur, out0 + d));
+      el.style.width = Math.max(14, scLen(c)*sc.pps) + 'px'; el.querySelector('.du').textContent = scFmt(scLen(c)) + ' s';
+    };
+    const up = () => { h.removeEventListener('pointermove', mv); h.removeEventListener('pointerup', up); h.removeEventListener('pointercancel', up); scRender_(); scShow(Math.min(sc.t, scTotal())); };
+    h.addEventListener('pointermove', mv); h.addEventListener('pointerup', up); h.addEventListener('pointercancel', up);
+  }
+  function scClipDrag(e, c, el){                                          // klik = zaznacz i ustaw kursor; przeciągnięcie = zmiana kolejności
+    e.preventDefault(); const x0 = e.clientX, left0 = c.start*sc.pps; let moved = false;
+    sc.sel = c.id; scTrack.querySelectorAll('.scClip').forEach(n => n.classList.toggle('sel', n === el));
+    try{ el.setPointerCapture(e.pointerId); }catch(err){}
+    const clickT = (e.clientX - el.getBoundingClientRect().left)/sc.pps + c.start;
+    const mv = ev => { const dx = ev.clientX - x0; if(Math.abs(dx) > 5) moved = true; if(moved){ el.style.left = Math.max(0, left0 + dx) + 'px'; el.style.zIndex = 3; el.style.opacity = .85; } };
+    const up = ev => {
+      el.removeEventListener('pointermove', mv); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
+      if(moved){
+        const centre = parseFloat(el.style.left) + el.offsetWidth/2;
+        const others = sc.clips.filter(o => o !== c);
+        let idx = 0; others.forEach(o => { if((o.start + scLen(o)/2)*sc.pps < centre) idx++; });
+        sc.clips = others; sc.clips.splice(idx, 0, c); scPause(); scRender_(); scShow(c.start);
+      } else { scPause(); scShow(clickT); }
+    };
+    el.addEventListener('pointermove', mv); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+  }
+  async function scAddFile(r){
+    if(sc.rendering) return;
+    if(!sc.urls[r.id]) sc.urls[r.id] = URL.createObjectURL(r.blob);
+    scMsg('Wczytywanie…');
+    const dur = await scProbe(sc.urls[r.id], scParseDur(r.dur));
+    const c = {id:sc.nextId++, fid:r.id, name:r.name, src:sc.urls[r.id], src_dur:dur, in:0, out:dur, start:0};
+    sc.clips.push(c); sc.sel = c.id; scPause(); scLayout(); scRender_(); scShow(c.start); scMsg('Dodano: ' + r.name);
+    scScroll.scrollLeft = Math.max(0, c.start*sc.pps - 20);
+  }
+  function scBinRender(){
+    pcFilesAll().then(items => {
+      scBinList.innerHTML = '';
+      if(!items.length){ scBinList.innerHTML = '<div class="scNone">Brak plików. Nagraj coś w programie Pepper 🔴 – pojawi się tutaj.</div>'; return; }
+      items.forEach(r => {
+        const row = document.createElement('div'); row.className = 'scFile';
+        row.innerHTML = '<div class="ic">🎞️</div><div class="nm"><b></b><small></small></div><button type="button" title="Dodaj na linię czasu">＋</button>';
+        row.querySelector('b').textContent = r.name; row.querySelector('small').textContent = r.dur + ' · ' + (r.size/1048576).toFixed(1) + ' MB';
+        row.querySelector('button').addEventListener('click', () => scAddFile(r));
+        scBinList.appendChild(row);
+      });
+    });
+  }
+  function scSplit(){
+    const c = scClipAt(sc.t); if(!c) return;
+    const local = sc.t - c.start;
+    if(local < 0.15 || local > scLen(c) - 0.15){ scMsg('Ustaw kursor wewnątrz klipu, aby go podzielić'); return; }
+    scPause();
+    const cut = c.in + local, b = {id:sc.nextId++, fid:c.fid, name:c.name, src:c.src, src_dur:c.src_dur, in:cut, out:c.out, start:0};
+    c.out = cut; sc.clips.splice(sc.clips.indexOf(c) + 1, 0, b); sc.sel = b.id;
+    const t = sc.t; scRender_(); scShow(t); scMsg('Klip podzielony ✂');
+  }
+  function scDelete(){
+    const c = scSel(); if(!c){ scMsg('Zaznacz klip, który chcesz usunąć'); return; }
+    scPause(); sc.clips = sc.clips.filter(o => o !== c); sc.sel = null; scRender_(); scShow(Math.min(sc.t, scTotal())); scMsg('Klip usunięty');
+  }
+  function scMove(dir){
+    const c = scSel(); if(!c){ scMsg('Zaznacz klip'); return; }
+    const i = sc.clips.indexOf(c), j = i + dir; if(j < 0 || j >= sc.clips.length) return;
+    sc.clips[i] = sc.clips[j]; sc.clips[j] = c; scPause(); scRender_(); scShow(c.start);
+  }
+  function scClear(){
+    if(sc.rendering) return; scPause(); sc.clips = []; sc.sel = null; sc.t = 0; sc.cur = null;
+    Object.values(sc.urls).forEach(u => URL.revokeObjectURL(u)); sc.urls = {};
+    scVideo.removeAttribute('src'); scVideo.removeAttribute('data-src'); scShow(0); scRender_(); scMsg('Nowy projekt');
+  }
+  /* --- eksport: render w czasie rzeczywistym do pliku, który ląduje na pulpicie --- */
+  function scDialogShow(html){ scDialog.innerHTML = html; scModal.classList.add('show'); }
+  function scDialogHide(){ scModal.classList.remove('show'); scDialog.innerHTML = ''; }
+  function scExportDialog(){
+    if(sc.rendering) return;
+    if(!sc.clips.length){ scMsg('Najpierw dodaj film na linię czasu'); return; }
+    scPause(); const tot = scTotal();
+    scDialogShow('<h3>⬆ Eksportuj film</h3><label for="scName">Nazwa filmu</label><input id="scName" type="text" maxlength="40" value="Mój film" autocomplete="off">'
+      + '<div class="scNote">Długość: ' + scFmt(tot) + ' s. Renderowanie trwa tyle co film. Gotowy plik pojawi się na pulpicie komputera.</div>'
+      + '<div class="scBtns"><button id="scDlgCancel" type="button">Anuluj</button><button id="scDlgGo" type="button" class="scPrimary">🎬 Renderuj</button></div>');
+    const inp = document.getElementById('scName'); inp.focus(); inp.select();
+    const go = () => { const nm = inp.value.trim(); if(!nm){ inp.focus(); return; } scStartRender(nm); };
+    inp.addEventListener('keydown', e => { e.stopPropagation(); if(e.code === 'Enter') go(); else if(e.code === 'Escape') scDialogHide(); });
+    document.getElementById('scDlgCancel').addEventListener('click', scDialogHide);
+    document.getElementById('scDlgGo').addEventListener('click', go);
+  }
+  async function scStartRender(name){
+    if(typeof MediaRecorder === 'undefined'){ scDialogShow('<h3>Błąd</h3><div class="scNote">Ta przeglądarka nie obsługuje renderowania.</div><div class="scBtns"><button id="scOk" type="button">OK</button></div>'); document.getElementById('scOk').addEventListener('click', scDialogHide); return; }
+    sc.rendering = true; sc.cancel = false;
+    const clips = sc.clips.map(c => Object.assign({}, c)), tot = clips.reduce((a,c) => a + scLen(c), 0);
+    scDialogShow('<h3>🎬 Renderowanie „' + name.replace(/[<>&]/g,'') + '”…</h3><div class="scProg"><div id="scProgBar"></div></div><div class="scNote" id="scProgTxt">0%</div><div class="scBtns"><button id="scRenderCancel" type="button">Anuluj</button></div>');
+    const bar = document.getElementById('scProgBar'), txt = document.getElementById('scProgTxt');
+    document.getElementById('scRenderCancel').addEventListener('click', () => { sc.cancel = true; });
+    const rv = document.createElement('video'); rv.muted = true; rv.playsInline = true; rv.preload = 'auto';
+    const load = c => new Promise(res => { rv.onloadedmetadata = () => res(); rv.onerror = () => res(); rv.src = c.src; setTimeout(res, 5000); });
+    const seek = t => new Promise(res => { rv.onseeked = () => { rv.onseeked = null; res(); }; try{ rv.currentTime = t; }catch(e){ res(); } setTimeout(res, 2500); });
+    let lastSrc = null, rec = null, iv = null;
+    try{
+      await load(clips[0]); lastSrc = clips[0].src;
+      let W = rv.videoWidth || 1280, H = rv.videoHeight || 720; const k = Math.min(1, 1280/W); W = Math.round(W*k/2)*2; H = Math.round(H*k/2)*2;
+      const cv = document.createElement('canvas'); cv.width = W; cv.height = H; const g = cv.getContext('2d');
+      const draw = () => { g.fillStyle = '#000'; g.fillRect(0,0,W,H); const vw = rv.videoWidth, vh = rv.videoHeight; if(!vw || !vh) return; const s = Math.min(W/vw, H/vh); try{ g.drawImage(rv, (W - vw*s)/2, (H - vh*s)/2, vw*s, vh*s); }catch(e){} };
+      const mime = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].find(t => MediaRecorder.isTypeSupported(t));
+      const chunks = []; rec = mime ? new MediaRecorder(cv.captureStream(30), {mimeType:mime}) : new MediaRecorder(cv.captureStream(30));
+      rec.ondataavailable = e => { if(e.data && e.data.size) chunks.push(e.data); };
+      const stopped = new Promise(res => { rec.onstop = res; });
+      await seek(clips[0].in); draw(); rec.start(500);
+      let done = 0;
+      for(const c of clips){
+        if(sc.cancel) break;
+        if(c.src !== lastSrc){ await load(c); lastSrc = c.src; }
+        await seek(c.in); draw(); rv.play().catch(()=>{});
+        const began = Date.now();
+        await new Promise(res => {
+          iv = setInterval(() => {
+            draw(); const lt = Math.max(0, rv.currentTime - c.in), p = Math.min(1, (done + lt)/tot);
+            bar.style.width = (p*100) + '%'; txt.textContent = Math.round(p*100) + '%';
+            if(sc.cancel || rv.currentTime >= c.out - 0.04 || rv.ended || Date.now() - began > scLen(c)*1000 + 8000){ clearInterval(iv); iv = null; rv.pause(); res(); }
+          }, 33);
+        });
+        done += scLen(c);
+      }
+      draw(); await new Promise(r => setTimeout(r, 250)); if(rec.state !== 'inactive') rec.stop(); await stopped;
+      if(sc.cancel || !chunks.length){ sc.rendering = false; scDialogHide(); scMsg(sc.cancel ? 'Renderowanie anulowane' : 'Renderowanie nie powiodło się'); return; }
+      await pcFilesSaveNamed(new Blob(chunks, {type:'video/webm'}), scFmtDur(tot), name, true);
+      scDeskRefresh(); sc.rendering = false;
+      scDialogShow('<h3>✅ Gotowe!</h3><div class="scNote">Film „<b></b>” został wyrenderowany i czeka na pulpicie komputera.</div><div class="scBtns"><button id="scOk" type="button" class="scPrimary">OK</button></div>');
+      scDialog.querySelector('b').textContent = name; document.getElementById('scOk').addEventListener('click', scDialogHide);
+    }catch(err){
+      if(iv) clearInterval(iv); try{ if(rec && rec.state !== 'inactive') rec.stop(); }catch(e){}
+      sc.rendering = false; scDialogShow('<h3>Błąd</h3><div class="scNote">Nie udało się wyrenderować filmu.</div><div class="scBtns"><button id="scOk" type="button">OK</button></div>'); document.getElementById('scOk').addEventListener('click', scDialogHide);
+    }
+  }
+  /* --- pulpit: wyrenderowane filmy jako ikony --- */
+  function pcFilesPlay(r){
+    openFiles(); pcFilesUrl = URL.createObjectURL(r.blob); pcFilesVideo.src = pcFilesUrl;
+    pcFilesList.style.display = 'none'; pcFilesPlayer.style.display = 'flex';
+    pcFilesBack.style.display = 'inline-block'; pcFilesTitle.textContent = '▶ ' + r.name; pcFilesVideo.play().catch(()=>{});
+  }
+  function scDeskRefresh(){
+    pcFilesAll().then(items => {
+      const box = document.getElementById('pcIcons');
+      box.querySelectorAll('.pcDeskVid').forEach(n => n.remove());
+      items.filter(r => r.desk).reverse().forEach(r => {
+        const b = document.createElement('button'); b.type = 'button'; b.className = 'pcIcon pcDeskVid'; b.title = r.name + ' (' + r.dur + ')';
+        b.innerHTML = '<span>🎞️</span><em style="font-style:normal;max-width:76px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></em>';
+        b.querySelector('em').textContent = r.name; b.addEventListener('click', () => pcFilesPlay(r)); box.appendChild(b);
+      });
+    }).catch(()=>{});
+  }
+  function scOpenWin(){
+    scWin.classList.add('open'); scWin.setAttribute('aria-hidden','false'); scBinRender(); scRender_(); scShow(sc.t);
+  }
+  function scCloseWin(){
+    if(sc.rendering) sc.cancel = true;
+    scPause(); scDialogHide(); scWin.classList.remove('open'); scWin.setAttribute('aria-hidden','true');
+  }
+  pcShortcutDesktopIcon.addEventListener('click', scOpenWin);
+  document.getElementById('scClose').addEventListener('click', scCloseWin);
+  document.getElementById('pcPower').addEventListener('click', scCloseWin);
+  document.getElementById('scPlay').addEventListener('click', () => { sc.playing ? scPause() : scPlay(); });
+  document.getElementById('scSplit').addEventListener('click', scSplit);
+  document.getElementById('scDel').addEventListener('click', scDelete);
+  document.getElementById('scLeft').addEventListener('click', () => scMove(-1));
+  document.getElementById('scRight').addEventListener('click', () => scMove(1));
+  document.getElementById('scClear').addEventListener('click', scClear);
+  document.getElementById('scExport').addEventListener('click', scExportDialog);
+  document.getElementById('scZoom').addEventListener('input', e => { sc.pps = +e.target.value; scRender_(); });
+  scWin.addEventListener('click', e => { const b = e.target.closest('button'); if(b) b.blur(); });   // Spacja nie ma „klikać” ostatniego przycisku
+  function scSeekFromPointer(e){ const r = scInner.getBoundingClientRect(); scPause(); scShow((e.clientX - r.left)/sc.pps); }
+  scRuler.addEventListener('pointerdown', e => {
+    scSeekFromPointer(e); try{ scRuler.setPointerCapture(e.pointerId); }catch(err){}
+    const mv = ev => scSeekFromPointer(ev), up = () => { scRuler.removeEventListener('pointermove', mv); scRuler.removeEventListener('pointerup', up); };
+    scRuler.addEventListener('pointermove', mv); scRuler.addEventListener('pointerup', up);
+  });
+  scTrack.addEventListener('pointerdown', e => { if(e.target === scTrack){ sc.sel = null; scTrack.querySelectorAll('.scClip').forEach(n => n.classList.remove('sel')); scSeekFromPointer(e); } });
+  addEventListener('keydown', e => {                                      // skróty: Spacja, S, Delete
+    if(!scWin.classList.contains('open') || scModal.classList.contains('show')) return;
+    if(e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    if(e.code === 'Space'){ e.preventDefault(); sc.playing ? scPause() : scPlay(); }
+    else if(e.code === 'KeyS'){ e.preventDefault(); scSplit(); }
+    else if(e.code === 'Delete' || e.code === 'Backspace'){ e.preventDefault(); scDelete(); }
+  });
+  scDeskRefresh();
   /* ===== Pepper – nagrywarka (instalacja 20 s) ===== */
   const pcPepperWindow = document.getElementById('pcPepperWindow');
   const pcPepIcon = document.getElementById('pcPepDesktopIcon');
@@ -3288,6 +3733,13 @@
   const TR_R = 9.7;                                                          // promień pasa jazdy na rondzie (wyspa ma 5,5, asfalt 14)
   const LANE_SOUTH = RB.x + 2.5, LANE_NORTH = RB.x - 2.5;                    // pasy zjazdu do supermarketu: na południe (-z) i z powrotem
   const circ = (from, to) => { const pts = []; for(let a = from; a > to - 0.01; a -= 0.5) pts.push([RB.x + Math.cos(a)*TR_R, RB.z + Math.sin(a)*TR_R, 1]); return pts; };   // trzeci element = 1: punkt na rondzie (do kierunkowskazów)   // rondo: kierunek przeciwny do ruchu wskazówek w mapie (wyspa po lewej)
+  const wcirc = (from, to) => { const pts = []; for(let a = from; a > to - 0.01; a -= 0.5) pts.push([WR.x + Math.cos(a)*TR_R, WR.z + Math.sin(a)*TR_R, 1]); return pts; };   // zachodnie rondo (ten sam kierunek jazdy)
+  const wTurn = () => {                                                      // wjazd na zachodnie rondo, objazd i jazda dalej na wschód: losowo w Krótką albo w Poprzeczną
+    const out = wcirc(-0.2, -5.8).concat([[-58, TRAFFIC_LANE_E]]);
+    return Math.random() < 0.5 ? out.concat([[-9,TRAFFIC_LANE_E],[-2.5,-8],[-2.5,-3],[-2.5,71]])
+                               : out.concat([[POP_X-9,TRAFFIC_LANE_E],[POP_X-2.5,-8],[POP_X-2.5,-3],[POP_X-2.5,POP_END-1]]);
+  };
+  const wStart = wcirc(-3.4, -5.9).concat([[-64, TRAFFIC_LANE_E]]);         // start auta na rondzie → wyjazd na Długą na wschód
   const AGD_PARK_X = [80,84,88,92,96,100];                                    // miejsca przed sklepem AGD (między liniami placu, z = -59,3)
   const parkSlot = () => {
     if(Math.random() < 0.4) return {agd:true, west:true, x:AGD_PARK_X[Math.floor(Math.random()*AGD_PARK_X.length)]};   // parking przed AGD
@@ -3306,7 +3758,7 @@
           : sl.west ? [[sl.x,-59.3],[sl.x,-56.6],[sl.x+2.2,-54],[LANE_NORTH,-50.5]]
                     : [[sl.x,-59.3],[sl.x,-57.3],[sl.x-2.2,-55],[129.5,-53.5],[LANE_NORTH,-50.5]]).concat([[LANE_NORTH,-27]]);
   };
-  const westExit = [[118,TRAFFIC_LANE_W],[112,TRAFFIC_LANE_W],[-79,TRAFFIC_LANE_W]];
+  const westExit = () => [[118,TRAFFIC_LANE_W],[112,TRAFFIC_LANE_W],[-68,TRAFFIC_LANE_W]].concat(wTurn());
   const SPOL_CAR_END = 82;                                                  // koniec trasy aut na Społecznej (jezdnia kończy się na 84)
   // Pełna pętla po przedłużonej Społecznej: pas w stronę wzgórza (po prawej stronie jazdy), zakręt, odcinek na zachód do końca drogi,
   // nawrót na końcu i pas powrotny. Pasy są przesunięte o 2,5 m od osi drogi (SPOL_PATH), więc podążają za zakrętem.
@@ -3329,41 +3781,41 @@
   const withYield = (pts, kind, jx) => { pts.yield = {wp:1, kind, jx: jx || 0}; return pts; };      // wp = punkt linii zatrzymania; kind = kierunek skrętu
   const TRAFFIC_ROUTES = [
     // Długa na wschód → rondo → parking supermarketu
-    () => withPark([[-79,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,-0.9), [[136,-23]], toParking())),
+    () => withPark([...wStart,[113,TRAFFIC_LANE_E]].concat(circ(2.6,-0.9), [[136,-23]], toParking())),
     // Długa na wschód → pełne okrążenie ronda → z powrotem na zachód
-    () => [[-79,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,-2.4), westExit),
+    () => [...wStart,[113,TRAFFIC_LANE_E]].concat(circ(2.6,-2.4), westExit()),
     // ulica boczna → w prawo na Długą → rondo → parking
     () => withYield(withPark([[2.5,71],[2.5,-6.5],[5.5,TRAFFIC_LANE_E],[14,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,-0.9), [[136,-23]], toParking())), 'right'),
     // ulica boczna → Długa → okrążenie ronda → powrót na zachód
-    () => withYield([[2.5,71],[2.5,-6.5],[5.5,TRAFFIC_LANE_E],[14,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,-2.4), westExit), 'right'),
+    () => withYield([[2.5,71],[2.5,-6.5],[5.5,TRAFFIC_LANE_E],[14,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,-2.4), westExit()), 'right'),
     // Długa na zachód (wjazd od strony ronda)
-    () => [[116,TRAFFIC_LANE_W],[-79,TRAFFIC_LANE_W]],
+    () => [[116,TRAFFIC_LANE_W],[-68,TRAFFIC_LANE_W]].concat(wTurn()),
     // ulica boczna → w LEWO na Długą (na zachód): trzeba ustąpić jadącym główną ulicą z obu stron
-    () => withYield([[2.5,71],[2.5,-6.5],[2.2,-10],[0.5,-14],[-3,TRAFFIC_LANE_W],[-8,TRAFFIC_LANE_W],[-79,TRAFFIC_LANE_W]], 'left'),
+    () => withYield([[2.5,71],[2.5,-6.5],[2.2,-10],[0.5,-14],[-3,TRAFFIC_LANE_W],[-8,TRAFFIC_LANE_W],[-68,TRAFFIC_LANE_W]].concat(wTurn()), 'left'),
     // z Długiej w prawo w ulicę boczną
-    () => [[-79,TRAFFIC_LANE_E],[-9,TRAFFIC_LANE_E],[-2.5,-8],[-2.5,-3],[-2.5,71]],
+    () => [...wStart,[-9,TRAFFIC_LANE_E],[-2.5,-8],[-2.5,-3],[-2.5,71]],
     // wyjazd z parkingu → rondo → Długa na zachód
-    () => [].concat(fromParking(), circ(-1.9,-2.4), westExit),
+    () => [].concat(fromParking(), circ(-1.9,-2.4), westExit()),
     // ===== Ulica Poprzeczna (x = POP_X): pasy x-2,5 (na +z) i x+2,5 (na -z) =====
     // z Długiej w prawo w Poprzeczną
-    () => [[-79,TRAFFIC_LANE_E],[POP_X-9,TRAFFIC_LANE_E],[POP_X-2.5,-8],[POP_X-2.5,-3],[POP_X-2.5,POP_END-1]],
+    () => [...wStart,[POP_X-9,TRAFFIC_LANE_E],[POP_X-2.5,-8],[POP_X-2.5,-3],[POP_X-2.5,POP_END-1]],
     // Poprzeczna → w prawo na Długą → rondo → parking
     () => withYield(withPark([[POP_X+2.5,POP_END-1],[POP_X+2.5,-6.5],[POP_X+5.5,TRAFFIC_LANE_E],[POP_X+14,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,-0.9), [[136,-23]], toParking())), 'right', POP_X),
     // Poprzeczna → w prawo na Długą → okrążenie ronda → powrót na zachód
-    () => withYield([[POP_X+2.5,POP_END-1],[POP_X+2.5,-6.5],[POP_X+5.5,TRAFFIC_LANE_E],[POP_X+14,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,-2.4), westExit), 'right', POP_X),
+    () => withYield([[POP_X+2.5,POP_END-1],[POP_X+2.5,-6.5],[POP_X+5.5,TRAFFIC_LANE_E],[POP_X+14,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,-2.4), westExit()), 'right', POP_X),
     // Poprzeczna → w LEWO na Długą (na zachód): ustąpić jadącym z obu stron
-    () => withYield([[POP_X+2.5,POP_END-1],[POP_X+2.5,-6.5],[POP_X+2.2,-10],[POP_X+0.5,-14],[POP_X-3,TRAFFIC_LANE_W],[POP_X-8,TRAFFIC_LANE_W],[-79,TRAFFIC_LANE_W]], 'left', POP_X),
+    () => withYield([[POP_X+2.5,POP_END-1],[POP_X+2.5,-6.5],[POP_X+2.2,-10],[POP_X+0.5,-14],[POP_X-3,TRAFFIC_LANE_W],[POP_X-8,TRAFFIC_LANE_W],[-68,TRAFFIC_LANE_W]].concat(wTurn()), 'left', POP_X),
     // ===== Ulica Społeczna (x = RB.x): pasy RB.x-2,5 (na +z, zjazd z ronda) i RB.x+2,5 (na -z, wjazd na rondo) =====
     // Długa na wschód → rondo → zjazd w Społeczną
-    () => [[-79,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,2.0), [[RB.x-2.5,-4.6],[RB.x-2.5,-1]], spolHill(), [[RB.x+2.5,0]], circ(1.3,-2.4), westExit),
+    () => [...wStart,[113,TRAFFIC_LANE_E]].concat(circ(2.6,2.0), [[RB.x-2.5,-4.6],[RB.x-2.5,-1]], spolHill(), [[RB.x+2.5,0]], circ(1.3,-2.4), westExit()),
     // Społeczna → rondo → parking supermarketu
     () => withPark([[RB.x+2.5,SPOL_CAR_END],[RB.x+2.5,0]].concat(circ(1.3,-0.7), [[136,-23]], toParking())),
     // Społeczna → rondo → pełne okrążenie → Długa na zachód
-    () => [[RB.x+2.5,SPOL_CAR_END],[RB.x+2.5,0]].concat(circ(1.3,-2.4), westExit),
+    () => [[RB.x+2.5,SPOL_CAR_END],[RB.x+2.5,0]].concat(circ(1.3,-2.4), westExit()),
     // parking supermarketu → rondo (pełne 3/4 okrążenia) → Społeczna
-    () => [].concat(fromParking(), circ(-1.9,-4.4), [[RB.x-2.5,-1]], spolHill(), [[RB.x+2.5,0]], circ(1.3,-2.4), westExit),
+    () => [].concat(fromParking(), circ(-1.9,-4.4), [[RB.x-2.5,-1]], spolHill(), [[RB.x+2.5,0]], circ(1.3,-2.4), westExit()),
     // Długa → rondo → Społeczna aż do końca wzgórza i z powrotem → rondo → parking supermarketu
-    () => withPark([[-79,TRAFFIC_LANE_E],[113,TRAFFIC_LANE_E]].concat(circ(2.6,2.0), [[RB.x-2.5,-4.6],[RB.x-2.5,-1]], spolHill(), [[RB.x+2.5,0]], circ(1.3,-0.7), [[136,-23]], toParking()))
+    () => withPark([...wStart,[113,TRAFFIC_LANE_E]].concat(circ(2.6,2.0), [[RB.x-2.5,-4.6],[RB.x-2.5,-1]], spolHill(), [[RB.x+2.5,0]], circ(1.3,-0.7), [[136,-23]], toParking()))
   ];
   const TRAFFIC_COLORS = [0xc0392b,0x2e6fb5,0xe0b020,0x2e8b57,0xeeeeee,0x6c3483,0xe67e22,0x333840];
   const trafficCars = [];
@@ -3390,40 +3842,56 @@
   for(let i=0;i<6;i++){ const c = makeTrafficCar(); c.wait = 0.5 + i*1.5; trafficCars.push(c); }   // różne opóźnienia startu
 
 
-  // ===== Autobus miejski (linia 1): jedzie w jedną stronę po przystankach STACJA PALIW → DOM G • UBRANIA → PANDY • AGD → DŁUGA, potem jedzie dalej i znika =====
+  // ===== Autobus miejski (linia 1): jedzie po przystankach GÓRNA → SPOŁECZNA → PASAŻ → DŁUGA, okrąża zachodnie rondo i wraca tą samą trasą (przystanki po przeciwnej stronie: DŁUGA → PASAŻ → SPOŁECZNA → GÓRNA) na PKS =====
   // Po kilkudziesięciu sekundach pojawia się na początku trasy i kurs się powtarza. Zatrzymuje się przy każdym przystanku (BUS_DWELL s).
   const BUS_DWELL = 10;                                                     // postój na przystanku (s): drzwi otwarte, można wsiąść / wysiąść
   const BUS_GAP = [40, 70];                                                 // przerwa między kursami (s): min, max
   const BUS_ROUTE = (function(){
     const Z_SP = SPOL_TURN_Z + 2.5, pts = [];                               // pas „w stronę ronda” na odcinku wschód–zachód Społecznej (z = 152,5), obok przystanku przy stacji
     const flat = arr => arr.forEach(q => pts.push([q[0], q[1]]));           // circ() zwraca trzeci element (flaga ronda) – tu niepotrzebny
-    pts.push([52, Z_SP], [91, Z_SP, 'STACJA PALIW']);                       // start tuż przed przystankiem (przy stacji paliw), postój
+    pts.push([52, Z_SP], [91, Z_SP, 'GÓRNA']);                       // start tuż przed przystankiem (przy stacji paliw), postój
     const n = SPOL_PATH.length;
     for(let i = n-2; i >= 0; i--){                                          // pas powrotny Społecznej (ten sam co w spolHill): łuk i prosta na północ
       const a = SPOL_PATH[Math.max(0, i-1)], b = SPOL_PATH[Math.min(n-1, i+1)];
       const tx = b[0]-a[0], tz = b[1]-a[1], tl = Math.hypot(tx, tz) || 1;
       pts.push([SPOL_PATH[i][0] + 2.5*tz/tl, SPOL_PATH[i][1] - 2.5*tx/tl]);
     }
-    pts.push([RB.x + 2.5, 44.25, 'DOM G • UBRANIA']);                       // przystanek po wschodniej stronie Społecznej (między Domem G a sklepem z ubraniami)
+    pts.push([RB.x + 2.5, 44.25, 'SPOŁECZNA']);                       // przystanek po wschodniej stronie Społecznej (między Domem G a sklepem z ubraniami)
     pts.push([RB.x + 2.5, 0]);
     flat(circ(1.3, -0.7));                                                  // rondo → zjazd do supermarketu
     pts.push([136, -23], [LANE_SOUTH, -27], [LANE_SOUTH, -49], [131.5, -52.2], [128, -53.7], [112, -53.7]);
-    pts.push([105.5, -53.7, 'PANDY • AGD']);                                // przystanek w przerwie między sklepem AGD a supermarketem Pandy (autobus staje na placu przed nimi)
+    pts.push([105.5, -53.7, 'PASAŻ']);                                // przystanek w przerwie między sklepem AGD a supermarketem Pandy (autobus staje na placu przed nimi)
     pts.push([100, -53.6], [96, -53.3], [93, -52.2], [92, -50.2], [94.5, -48.6], [99, -48.6], [104, -49.8], [110, -51.2]);   // nawrót na placu
     pts.push([LANE_NORTH, -50.5], [LANE_NORTH, -27]);
     flat(circ(-1.9, -2.4));                                                 // rondo → Długa na zachód
-    pts.push([118, TRAFFIC_LANE_W], [112, TRAFFIC_LANE_W], [-33.25, TRAFFIC_LANE_W, 'DŁUGA'], [-79, TRAFFIC_LANE_W]);   // przystanek na Długiej (północna strona, między domami 2 i 3), potem dalej na zachód i znika
+    pts.push([118, TRAFFIC_LANE_W], [112, TRAFFIC_LANE_W], [-33.25, TRAFFIC_LANE_W, 'DŁUGA'], [-68, TRAFFIC_LANE_W]);
+    flat(wcirc(-0.2, -5.8));                                                // objazd zachodniego ronda – nawrót
+    // ----- powrót na PKS tą samą trasą, po przeciwnej stronie ulic: Długa → Pasaż → Społeczna → Górna -----
+    pts.push([-65, TRAFFIC_LANE_E, 'DŁUGA'], [113, TRAFFIC_LANE_E]);        // przystanek równoległy Długa (południowa strona), potem na wschód do ronda
+    flat(circ(2.6, -0.9));                                                  // rondo → zjazd do supermarketu
+    pts.push([136, -23], [LANE_SOUTH, -27], [LANE_SOUTH, -49], [131.5, -52.2], [128, -53.7], [112, -53.7]);
+    pts.push([105.5, -53.7, 'PASAŻ']);                                      // ten sam przystanek co w drodze tam (plac przed AGD i Pandy)
+    pts.push([100, -53.6], [96, -53.3], [93, -52.2], [92, -50.2], [94.5, -48.6], [99, -48.6], [104, -49.8], [110, -51.2]);   // nawrót na placu
+    pts.push([LANE_NORTH, -50.5], [LANE_NORTH, -27]);
+    flat(circ(-1.9, -4.4));                                                 // rondo → w Społeczną (pas w stronę wzgórza)
+    pts.push([RB.x - 2.5, -1], [RB.x - 2.5, 42.5, 'SPOŁECZNA']);            // przystanek równoległy Społeczna (zachodnia strona, między Domem D a E)
+    for(let i = 0; i <= n-2; i++){                                          // pas „z ronda” (po drugiej stronie niż w drodze tam): prosta, łuk i Górna na zachód
+      const a = SPOL_PATH[Math.max(0, i-1)], b = SPOL_PATH[Math.min(n-1, i+1)];
+      const tx = b[0]-a[0], tz = b[1]-a[1], tl = Math.hypot(tx, tz) || 1;
+      pts.push([SPOL_PATH[i][0] + 2.5*(-tz/tl), SPOL_PATH[i][1] + 2.5*(tx/tl)]);
+    }
+    pts.push([100, 147.5], [91, 147.5, 'GÓRNA'], [84, 147.5]);               // przystanek równoległy Górna (północna strona, naprzeciwko stacji); tuż za nim koniec kursu – dalej autobus wraca na PKS
     return pts;
   })();
   // --- Model autobusu: pusta w środku skorupa (podłoga, ściany z oknami i otworami drzwi, dach) + wnętrze (fotele, poręcze, kabina kierowcy) ---
   const BUS_YF = 1.05;                                                      // wysokość podłogi wnętrza nad ziemią
   const BUS_DOORS_X = [2.4, -1.0];                                          // drzwi po prawej stronie: lokalne x środka otworu (przednie i tylne)
   const BUS_SEATS = [];                                                     // przeszkody wewnątrz (lokalnie: x do przodu, z w prawo): {x, z, hx, hz}
-  function makeBusModel(){                                                  // przód = +X, prawa strona (drzwi) = +Z, jak w autach ruchu
+  function makeBusModel(opt){ opt = opt || {}; const seatsLen = BUS_SEATS.length;                                                  // przód = +X, prawa strona (drzwi) = +Z, jak w autach ruchu
     const g = new THREE.Group();
     const lm = (c, em) => new THREE.MeshLambertMaterial({color:c, emissive:em || 0x000000});   // lekka emisja: wnętrze nie jest czarne w nocy
     const bx = (w, h, d, m, x, y, z, shadow) => { const o = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); o.position.set(x, y, z); if(shadow) o.castShadow = true; g.add(o); return o; };
-    const white = lm(0xf4f6f8, 0x2c2c2c), blue = lm(0x1565c0, 0x0a2a55), floorM = lm(0x55595e, 0x1c1d1f), dark = lm(0x2b2f33, 0x111213);
+    const white = lm(0xf4f6f8, 0x2c2c2c), blue = lm(opt.color || 0x1565c0, opt.emissive || 0x0a2a55), floorM = lm(0x55595e, 0x1c1d1f), dark = lm(0x2b2f33, 0x111213);
     const steel = lm(0xb8c0c8, 0x303338), seatM = lm(0x2a5fa8, 0x10284a);
     const glass = new THREE.MeshLambertMaterial({color:0x9fd3f0, transparent:true, opacity:0.32, emissive:0x10202a});
     const L = 9.6, T = 0.08, ZC = 1.25;                                     // długość, grubość ścian, oś ścian bocznych (z = ±1,25)
@@ -3481,13 +3949,14 @@
       const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph), new THREE.MeshBasicMaterial({map:t}));
       m.position.set(x, y, z); m.rotation.y = ry; g.add(m);
     };
-    const front = (gc, w, h) => { gc.fillStyle = '#111'; gc.fillRect(0,0,w,h); gc.fillStyle = '#ffb300'; gc.font = 'bold 40px sans-serif'; gc.textAlign = 'center'; gc.textBaseline = 'middle'; gc.fillText('1  DŁUGA', w/2, h/2 + 2); };
-    const back = (gc, w, h) => { gc.fillStyle = '#111'; gc.fillRect(0,0,w,h); gc.fillStyle = '#ffb300'; gc.font = 'bold 44px sans-serif'; gc.textAlign = 'center'; gc.textBaseline = 'middle'; gc.fillText('1', w/2, h/2 + 2); };
-    const side = (gc, w, h) => { gc.fillStyle = '#1565c0'; gc.fillRect(0,0,w,h); gc.fillStyle = '#fff'; gc.font = 'bold 44px sans-serif'; gc.textAlign = 'center'; gc.textBaseline = 'middle'; gc.fillText('🚌 AUTOBUS • LINIA 1', w/2, h/2 + 2); };
+    const front = (gc, w, h) => { gc.fillStyle = '#111'; gc.fillRect(0,0,w,h); gc.fillStyle = '#ffb300'; gc.font = 'bold 40px sans-serif'; gc.textAlign = 'center'; gc.textBaseline = 'middle'; gc.fillText(opt.front || '1  DŁUGA', w/2, h/2 + 2); };
+    const back = (gc, w, h) => { gc.fillStyle = '#111'; gc.fillRect(0,0,w,h); gc.fillStyle = '#ffb300'; gc.font = 'bold 44px sans-serif'; gc.textAlign = 'center'; gc.textBaseline = 'middle'; gc.fillText(opt.back || '1', w/2, h/2 + 2); };
+    const side = (gc, w, h) => { gc.fillStyle = opt.sideBg || '#1565c0'; gc.fillRect(0,0,w,h); gc.fillStyle = '#fff'; gc.font = 'bold 44px sans-serif'; gc.textAlign = 'center'; gc.textBaseline = 'middle'; gc.fillText(opt.side || '🚌 AUTOBUS • LINIA 1', w/2, h/2 + 2); };
     sign(256, 64, front, 2.0, 0.22, 4.805, 2.85, 0, Math.PI/2);
     sign(128, 64, back, 0.6, 0.22, -4.805, 2.85, 0, -Math.PI/2);
     sign(512, 56, side, 5.2, 0.46, 0.0, 0.72, ZC + 0.045, 0);
     sign(512, 56, side, 5.2, 0.46, 0.0, 0.72, -ZC - 0.045, Math.PI);
+    if(opt.extra) BUS_SEATS.length = seatsLen;                              // kolejne egzemplarze (PKS) nie dublują przeszkód wnętrza autobusu miejskiego
     g.rotation.order = 'YXZ'; g.visible = false; scene.add(g);              // jak auta: przechył liczony po obrocie kierunku jazdy
     return {group:g, roof, doors};
   }
@@ -3563,16 +4032,9 @@
     BUS.door += Math.max(-dt*1.6, Math.min(dt*1.6, BUS.doorTarget - BUS.door));
     applyBusDoors();
     BUS.roof.visible = !(busRide && !firstPerson);                           // w widoku z zewnątrz dach znika, żeby było widać wnętrze
-    if(!BUS.active){                                                         // czeka na kolejny kurs
-      BUS.wait -= dt;
-      if(BUS.wait > 0) return;
-      const sx = BUS_ROUTE[0][0], sz = BUS_ROUTE[0][1];
-      if(trafficCars.some(o => o.active && Math.hypot(o.group.position.x-sx, o.group.position.z-sz) < 14) || Math.hypot(player.position.x-sx, player.position.z-sz) < 14){ BUS.wait = 1; return; }   // miejsce zajęte / gracz tuż obok
-      BUS.wp = 1; BUS.speed = 0; BUS.dwell = 0; BUS.stuck = 0; BUS.pitch = 0; BUS.door = 0; BUS.doorTarget = 0;
-      BUS.heading = Math.atan2(BUS_ROUTE[1][1]-sz, BUS_ROUTE[1][0]-sx);
-      BUS.group.position.set(sx, terrainH(sx, sz) + 0.02, sz);
-      BUS.group.rotation.y = -BUS.heading; BUS.group.rotation.z = 0;
-      BUS.group.visible = true; BUS.active = true;
+    if(!BUS.active){                                                         // kursu nie ma: autobus linii 1 rusza wyłącznie z PKS (patrz updatePksBuses)
+      if(BUS.wait > 0) BUS.wait -= dt;
+      else if(pksAway) pksReturn();                                         // po przerwie autobus wraca na PKS
       return;
     }
     if(BUS.dwell > 0){                                                       // postój: drzwi otwarte, na koniec zamykają się przed odjazdem
@@ -3589,6 +4051,7 @@
     let blocked = false;
     if(BUS.stuck < 4){                                                       // po 4 s zakleszczenia autobus przejeżdża „przez” przeszkodę (jak auta)
       blocked = trafficCars.some(o => o.active && ahead(o.group.position.x, o.group.position.z, 12, 2.5))
+             || pksBuses.some(o => ahead(o.group.position.x, o.group.position.z, 12, 2.6))
              || (hasCar && !carDriving && pcar.group.visible && ahead(pcar.group.position.x, pcar.group.position.z, 11, 2.5));
     }
     if(!blocked && !busRide) blocked = ahead(player.position.x, player.position.z, 10, 2.2);   // gracz (pieszo lub autem) na jezdni; pasażer się nie liczy
@@ -3596,7 +4059,7 @@
     if(BUS.stuck > 7) BUS.stuck = 0;
     let cap = 8;
     if(Math.abs(da) > 0.35) cap = Math.min(cap, 4);                          // zakręty i nawrót
-    if(Math.hypot(p.x-RB.x, p.z-RB.z) < 17) cap = Math.min(cap, 5);          // rondo
+    if(Math.hypot(p.x-RB.x, p.z-RB.z) < 17 || Math.hypot(p.x-WR.x, p.z-WR.z) < 17) cap = Math.min(cap, 5);          // rondo
     let target = blocked ? 0 : cap;
     if(stopName) target = Math.min(target, Math.max(0, dist - 0.4) * 1.3);   // łagodne hamowanie do przystanku
     BUS.speed += (target - BUS.speed) * Math.min(1, 2.5*dt);
@@ -3617,7 +4080,137 @@
     if(BUS.wp >= BUS_ROUTE.length){                                          // koniec trasy: autobus znika, za jakiś czas pojawi się nowy kurs
       if(busRide) leaveBus(true);                                            // pasażer wysiada przed zniknięciem
       BUS.active = false; BUS.group.visible = false; BUS.speed = 0; BUS.door = 0; BUS.doorTarget = 0;
-      BUS.wait = BUS_GAP[0] + Math.random()*(BUS_GAP[1] - BUS_GAP[0]);
+      BUS.wait = pksAway ? 0 : BUS_GAP[0] + Math.random()*(BUS_GAP[1] - BUS_GAP[0]);   // kurs kończy się na Górnej – autobus od razu jedzie na PKS
+    }
+  }
+
+  // ===== Autobusy PKS: 3 autobusy stoją na stanowiskach 1–3; gdy jeden kończy kurs (Społeczna → rondo → z powrotem), wyjeżdża kolejny =====
+  // Kolejka: z przodu (stanowisko 1) stoi autobus, który pojedzie następny. Po jego wyjeździe reszta podjeżdża o jedno stanowisko do przodu,
+  // a wracający autobus objeżdża plac i staje na końcu kolejki (stanowisko 3). Po krótkim postoju wyjeżdża następny.
+  const PKS_DWELL = [7, 11];                                               // postój po powrocie (s): min, max, zanim ruszy kolejny autobus
+  const PKS_COURSE = (function(){
+    const Zq = PKS_ZQ, JX = PKS_JX, xs = JX + 2.5, xe = JX - 2.5;          // pas wyjazdu (na północ) i wjazdu (na południe)
+    const strip = a => a.map(q => [q[0], q[1]]);                           // circ() dodaje trzeci element (flaga ronda) – tu byłby odczytany jako „przystanek”
+    const n = SPOL_PATH.length, east = [], west = [];
+    for(let i = n-2; i >= 0; i--){                                         // pas w stronę ronda (wschodni / północny) – jak w trasie autobusu miejskiego
+      const a = SPOL_PATH[Math.max(0, i-1)], b = SPOL_PATH[Math.min(n-1, i+1)];
+      const tx = b[0]-a[0], tz = b[1]-a[1], tl = Math.hypot(tx, tz) || 1;
+      east.push([SPOL_PATH[i][0] + 2.5*tz/tl, SPOL_PATH[i][1] - 2.5*tx/tl]);
+    }
+    for(let i = 0; i <= n-2; i++){                                         // pas z ronda (zachodni / południowy) – jak w ruchu drogowym
+      const a = SPOL_PATH[Math.max(0, i-1)], b = SPOL_PATH[Math.min(n-1, i+1)];
+      const tx = b[0]-a[0], tz = b[1]-a[1], tl = Math.hypot(tx, tz) || 1;
+      west.push([SPOL_PATH[i][0] + 2.5*(-tz/tl), SPOL_PATH[i][1] + 2.5*(tx/tl)]);
+    }
+    const pts = [[PKS_BAYS[0].x, Zq], [36.2, Zq], [39.4, 175.6], [xs, 171.5], [xs, 165], [xs, 159], [xs + 0.6, 155.4], [xs + 3, 153.2], [xs + 8, 152.5], [70, 152.5], [100, 152.5]];   // wyjazd z peronu i w prawo na Społeczną
+    pts.push(...east, [RB.x + 2.5, 40], [RB.x + 2.5, 0]);                  // Społeczna aż do ronda
+    pts.push(...strip(circ(1.3, -4.4)), [RB.x - 2.5, -1], [RB.x - 2.5, 40]);   // pełne okrążenie ronda (nawrót) i powrót
+    pts.push(...west, [100, 147.5], [72, 147.5], [50, 147.5]);             // Społeczna na zachód
+    pts.push([43.5, 148.2], [38, 150], [xe, 153], [xe, 158], [xe, 164.5]);  // skręt w lewo za stacją paliw, w drogę do PKS
+    pts.push([33.5, 168.2], [28, 168.5], [10, 168.5], [-4, 168.5], [-8.5, 171], [-8.5, 175], [-5.5, Zq], [-3, Zq]);   // objazd placu od północy i wjazd na koniec kolejki od zachodu
+    pts.push([PKS_BAYS[2].x, Zq, true]);                                   // stanowisko 3 (trzeci element = zatrzymanie)
+    return pts;
+  })();
+  let pksAway = null;                                                      // autobus PKS aktualnie jadący jako linia 1 (model BUS); po kursie wraca na PKS
+  const pksBuses = [], pksBays = [null, null, null];                       // pksBays[i] – autobus zajmujący stanowisko i+1
+  let pksTimer = 6, pksOnCourse = null;                                    // czas do wyjazdu kolejnego, autobus na kursie
+  function applyPksDoors(b){                                               // 0 = zamknięte, 1 = otwarte (jak w autobusie miejskim)
+    const d = b.door, e = d*d*(3 - 2*d), sl = Math.min(1, e*2), sx = Math.max(0, e*2 - 1);
+    b.doors.forEach(D => {
+      D.l.position.set(D.dx - 0.275 - 0.58*sx, 1.775, 1.25 - 0.13*sl);
+      D.r.position.set(D.dx + 0.275 + 0.58*sx, 1.775, 1.25 - 0.13*sl);
+    });
+  }
+  for(let i = 0; i < 3; i++){
+    const m = makeBusModel({extra:true});   // ten sam wygląd i napisy co autobus miejski linii 1
+    const b = {group:m.group, roof:m.roof, doors:m.doors, door:1, doorTarget:1, active:true, state:'parked', bay:i, route:null, wp:0, heading:0, speed:0, pitch:0, stuck:0, hl:4.8, hw:1.35};
+    b.group.position.set(PKS_BAYS[i].x, terrainH(PKS_BAYS[i].x, PKS_ZQ) + 0.02, PKS_ZQ);
+    b.group.rotation.y = 0; b.group.visible = true; applyPksDoors(b);
+    pksBuses.push(b); pksBays[i] = b;
+  }
+  function pksHandOff(b){                                                  // autobus z PKS wyjeżdża na Społeczną jako linia 1: przejmuje go model BUS (przystanki, wsiadanie)
+    const p = b.group.position;
+    BUS.wp = 1; BUS.speed = b.speed; BUS.dwell = 0; BUS.stuck = 0; BUS.pitch = b.pitch; BUS.door = 0; BUS.doorTarget = 0;
+    BUS.heading = Math.atan2(BUS_ROUTE[1][1]-p.z, BUS_ROUTE[1][0]-p.x);
+    BUS.group.position.set(p.x, p.y, p.z); BUS.group.rotation.y = -BUS.heading; BUS.group.rotation.z = BUS.pitch;
+    BUS.group.visible = true; BUS.active = true;
+    b.group.visible = false; b.group.position.set(-9999, 0, -9999); b.speed = 0; b.state = 'away'; pksAway = b;
+  }
+  function pksReturn(){                                                    // koniec kursu linii 1: autobus wraca ze Społecznej na PKS (na koniec kolejki)
+    const b = pksAway; pksAway = null;
+    const wi = PKS_COURSE.findIndex(q => q[0] === 72 && q[1] === 147.5);
+    b.route = PKS_COURSE; b.wp = wi; b.state = 'course'; b.stuck = 0; b.speed = 0; b.pitch = 0; b.door = 0; b.doorTarget = 0;
+    const bx = BUS.group.position.x, bz = BUS.group.position.z;             // zaczyna tam, gdzie kurs się skończył (przystanek Górna)
+    b.heading = Math.PI; b.group.position.set(bx, terrainH(bx, bz) + 0.02, bz); b.group.rotation.y = -b.heading; b.group.rotation.z = 0;
+    b.group.visible = true;
+  }
+  function pksDrive(b, dt){                                                // jazda po b.route; true = dojechał do punktu zatrzymania
+    const p = b.group.position, tgt = b.route[b.wp], tx = tgt[0], tz = tgt[1], stop = !!tgt[2], dist = Math.hypot(tx-p.x, tz-p.z);
+    let da = Math.atan2(tz-p.z, tx-p.x) - b.heading; while(da > Math.PI) da -= Math.PI*2; while(da < -Math.PI) da += Math.PI*2;
+    b.heading += Math.sign(da) * Math.min(Math.abs(da), 1.7*dt);
+    const hx = Math.cos(b.heading), hz = Math.sin(b.heading);
+    const ahead = (x, z, range, side) => { const dx = x-p.x, dz = z-p.z, fwd = dx*hx + dz*hz, lat = -dx*hz + dz*hx; return fwd > 0 && fwd < range && Math.abs(lat) < side; };
+    let blocked = false;
+    if(b.stuck < 4){                                                       // po 4 s zakleszczenia przejeżdża „przez” przeszkodę (jak auta i autobus miejski)
+      blocked = trafficCars.some(o => o.active && ahead(o.group.position.x, o.group.position.z, 12, 2.5))
+             || (BUS.active && [-3.5, 0, 3.5].some(k => ahead(BUS.group.position.x + Math.cos(BUS.heading)*k, BUS.group.position.z + Math.sin(BUS.heading)*k, 11, 2.6)))
+             || pksBuses.some(o => o !== b && ahead(o.group.position.x, o.group.position.z, 12, 2.6))
+             || (hasCar && !carDriving && pcar.group.visible && ahead(pcar.group.position.x, pcar.group.position.z, 11, 2.5));
+    }
+    if(!blocked) blocked = ahead(player.position.x, player.position.z, 10, 2.2);   // gracz (pieszo lub autem) przed autobusem
+    b.stuck = (blocked && b.speed < 0.5) ? b.stuck + dt : 0;
+    if(b.stuck > 7) b.stuck = 0;
+    let cap = 8;
+    if(Math.abs(da) > 0.35) cap = Math.min(cap, 4);                        // zakręty
+    if(p.z > 163 && p.x < 48) cap = Math.min(cap, 4.5);                    // na placu PKS wolniej
+    if(Math.hypot(p.x-RB.x, p.z-RB.z) < 17 || Math.hypot(p.x-WR.x, p.z-WR.z) < 17) cap = Math.min(cap, 5);        // rondo
+    let target = blocked ? 0 : cap;
+    if(stop) target = Math.min(target, Math.max(0, dist - 0.4) * 1.3);     // łagodne hamowanie do stanowiska
+    b.speed += (target - b.speed) * Math.min(1, 2.5*dt);
+    p.x += hx * b.speed * dt; p.z += hz * b.speed * dt;
+    b.group.rotation.y = -b.heading;
+    {   // wysokość i przechył wg nachylenia terenu
+      const hf = terrainH(p.x + hx*4, p.z + hz*4), hb = terrainH(p.x - hx*4, p.z - hz*4);
+      b.pitch += (Math.atan2(hf - hb, 8) - b.pitch) * Math.min(1, dt*8);
+      p.y = (hf + hb)/2 + 0.02; b.group.rotation.z = b.pitch;
+    }
+    const rel = (tx-p.x)*hx + (tz-p.z)*hz;
+    if(stop){ if((dist < 1.0 && b.speed < 1.2) || (rel < 0 && dist < 5)){ b.speed = 0; return true; } }
+    else if(dist < 3.5) b.wp++;
+    return false;
+  }
+  function updatePksBuses(dt){
+    for(const b of pksBuses){                                              // drzwi: otwarte na stanowisku, zamknięte w ruchu
+      if(b.state !== 'parked' && b.state !== 'closing') b.doorTarget = 0;
+      b.door += Math.max(-dt*1.6, Math.min(dt*1.6, b.doorTarget - b.door));
+      applyPksDoors(b);
+    }
+    for(let i = 1; i < pksBays.length; i++){                               // kolejka podjeżdża do przodu, gdy zwolni się stanowisko przed autobusem
+      const b = pksBays[i];
+      if(b && b.state === 'parked' && !pksBays[i-1]){
+        pksBays[i-1] = b; pksBays[i] = null; b.bay = i-1; b.state = 'shift';
+        b.doorTarget = 0; b.route = [[PKS_BAYS[i-1].x, PKS_ZQ, true]]; b.wp = 0;
+      }
+    }
+    const front = pksBays[0];                                              // wyjazd kolejnego autobusu dopiero gdy poprzedni skończył kurs
+    if(!pksOnCourse && front && front.state === 'parked'){
+      pksTimer -= dt;
+      if(pksTimer <= 0){ front.state = 'closing'; front.doorTarget = 0; }
+    }
+    for(const b of pksBuses){
+      const p = b.group.position;
+      if(b.state === 'closing'){
+        if(b.door < 0.02){ b.state = 'leaving'; b.route = PKS_COURSE; b.wp = 1; b.stuck = 0; pksOnCourse = b; }
+      } else if(b.state === 'shift'){
+        if(pksDrive(b, dt)){ b.state = 'parked'; b.doorTarget = 1; b.heading = 0; b.group.rotation.y = 0; }
+      } else if(b.state === 'leaving' || b.state === 'course'){
+        if(b.state === 'leaving' && Math.hypot(p.x - PKS_BAYS[0].x, p.z - PKS_ZQ) > 14){ pksBays[0] = null; b.state = 'course'; }   // stanowisko 1 wolne dopiero, gdy autobus odjechał
+        if(b.state === 'course' && b.wp === 9 && p.x >= 52 && !BUS.active){ pksHandOff(b); continue; }   // na Społecznej autobus zaczyna kurs linii 1
+        if(pksDrive(b, dt)){                                               // koniec kursu: stoi na końcu kolejki, za chwilę wyjedzie następny
+          b.state = 'parked'; b.bay = 2; pksBays[2] = b; b.doorTarget = 1; b.heading = 0; b.group.rotation.y = 0; b.route = null;
+          pksOnCourse = null; pksTimer = PKS_DWELL[0] + Math.random()*(PKS_DWELL[1] - PKS_DWELL[0]);
+        }
+      }
     }
   }
 
@@ -3868,7 +4461,7 @@
   function spawnTrafficCar(car){
     const route = TRAFFIC_ROUTES[Math.floor(Math.random()*TRAFFIC_ROUTES.length)]();
     const [sx, sz] = route[0];
-    if(trafficCars.some(o => o !== car && o.active && Math.hypot(o.group.position.x-sx, o.group.position.z-sz) < 14) || (BUS.active && Math.hypot(BUS.group.position.x-sx, BUS.group.position.z-sz) < 14)) return false;   // miejsce zajęte
+    if(trafficCars.some(o => o !== car && o.active && Math.hypot(o.group.position.x-sx, o.group.position.z-sz) < 14) || pksBuses.some(o => Math.hypot(o.group.position.x-sx, o.group.position.z-sz) < 14) || (BUS.active && Math.hypot(BUS.group.position.x-sx, BUS.group.position.z-sz) < 14)) return false;   // miejsce zajęte
     if(route.park){ const lx = route[route.length-1][0]; if(trafficCars.some(o => o !== car && o.active && o.route && o.route.park && o.route[o.route.length-1][0] === lx)) return false; }   // to miejsce parkingowe już zajmuje inne auto
     car.route = route; car.wp = 1; car.parked = false; car.stuck = 0; car.yieldWait = 0; car.sig = 0; car.sigT = 0;
     car.heading = Math.atan2(route[1][1]-sz, route[1][0]-sx);
@@ -3901,6 +4494,7 @@
     if(car.stuck < 4){                                                         // po 4 s zakleszczenia auto przejeżdża „przez” przeszkodę
       for(const o of trafficCars) if(o !== car && o.active && check(o.group.position.x, o.group.position.z, 9, 2.3)) return true;
       if(BUS.active){ const bp = BUS.group.position, bcx = Math.cos(BUS.heading), bsz = Math.sin(BUS.heading); for(const k of [-3.5, 0, 3.5]) if(check(bp.x + bcx*k, bp.z + bsz*k, 8, 2.6)) return true; }   // autobus (długi): sprawdź tył, środek i przód
+      for(const o of pksBuses){ const bcx = Math.cos(o.heading), bsz = Math.sin(o.heading); for(const k of [-3.5, 0, 3.5]) if(check(o.group.position.x + bcx*k, o.group.position.z + bsz*k, 8, 2.6)) return true; }   // autobusy PKS
       if(hasCar && !carDriving && pcar.group.visible && check(pcar.group.position.x, pcar.group.position.z, 8, 2.3)) return true;   // zaparkowane auto gracza
     }
     return check(player.position.x, player.position.z, 8, 2.0);                // gracz na jezdni – auto zwalnia i staje
@@ -3972,7 +4566,7 @@
       if(car.stuck > 7) car.stuck = 0;
       let cap = car.cruise;
       if(Math.abs(da) > 0.35) cap = Math.min(cap, 5);
-      if(Math.hypot(p.x-RB.x, p.z-RB.z) < 17) cap = Math.min(cap, 6);              // rondo
+      if(Math.hypot(p.x-RB.x, p.z-RB.z) < 17 || Math.hypot(p.x-WR.x, p.z-WR.z) < 17) cap = Math.min(cap, 6);              // rondo
       if(car.route.park && car.wp >= car.route.length-4) cap = Math.min(cap, 4);   // manewr parkowania
       if(yw && Math.hypot(tx-p.x, tz-p.z) < 14) cap = Math.min(cap, 5);          // hamowanie przed linią zatrzymania
       const target = blocked ? 0 : (mustWait ? Math.min(cap, Math.max(0, Math.hypot(tx-p.x, tz-p.z) - 0.3) * 1.5) : cap);
@@ -4017,8 +4611,8 @@
     for(const e of MAP_EXTENTS){ M.minX=Math.min(M.minX,e.minX); M.maxX=Math.max(M.maxX,e.maxX); M.minZ=Math.min(M.minZ,e.minZ); M.maxZ=Math.max(M.maxZ,e.maxZ); }
     const fit=Math.min((w-2*pad)/(M.maxX-M.minX),(h-2*pad)/(M.maxZ-M.minZ)), sx=fit, sz=fit;
     const offX=(w-(M.maxX-M.minX)*fit)/2, offY=(h-(M.maxZ-M.minZ)*fit)/2;
-    // Odbicie osi X: mapa ma być zgodna z orientacją widzianą przez gracza
-    const pt=(x,z)=>({x:offX+(MAP_BOUNDS.maxX-x)*sx,y:h-offY-(z-MAP_BOUNDS.minZ)*sz});
+    // Orientacja mapy: północ (−Z) u góry, wschód (+X) po prawej, zachód (−X) po lewej
+    const pt=(x,z)=>({x:offX+(x-MAP_BOUNDS.minX)*sx,y:offY+(z-MAP_BOUNDS.minZ)*sz});
     const isBig = canvas===bigMapCanvas;
     // Siatka współrzędnych świata (co 20 m, po przybliżeniu co 10 m) z opisem osi X i Z
     if(isBig && mapCoords){
@@ -4026,8 +4620,8 @@
       const gf = 10*Math.max(.62,Math.min(1.35,w/660))*(view?1.4/k:1);
       ctx.save(); ctx.lineWidth=1/k; ctx.strokeStyle='rgba(255,255,255,.16)'; ctx.fillStyle='rgba(255,255,255,.78)';
       ctx.font=`${gf}px system-ui`; ctx.shadowColor='#18232c'; ctx.shadowBlur=3;
-      for(let gx=gx0; gx<=M.maxX; gx+=step){ const a=pt(gx,M.minZ), b=pt(gx,M.maxZ); ctx.strokeStyle=gx===0?'rgba(255,255,255,.4)':'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.fillText('x'+gx,a.x,a.y-2/k); }
-      for(let gz=gz0; gz<=M.maxZ; gz+=step){ const a=pt(M.maxX,gz), b=pt(M.minX,gz); ctx.strokeStyle=gz===0?'rgba(255,255,255,.4)':'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText('z'+gz,a.x+3/k,a.y); }
+      for(let gx=gx0; gx<=M.maxX; gx+=step){ const a=pt(gx,M.minZ), b=pt(gx,M.maxZ); ctx.strokeStyle=gx===0?'rgba(255,255,255,.4)':'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillText('x'+gx,a.x,a.y+2/k); }
+      for(let gz=gz0; gz<=M.maxZ; gz+=step){ const a=pt(M.minX,gz), b=pt(M.maxX,gz); ctx.strokeStyle=gz===0?'rgba(255,255,255,.4)':'rgba(255,255,255,.16)'; ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); ctx.textAlign='left'; ctx.textBaseline='middle'; ctx.fillText('z'+gz,a.x+3/k,a.y); }
       ctx.restore();
     }
     // Ulice i chodniki
@@ -4048,12 +4642,12 @@
         const B=HILL_BOX, cw=Math.round((B.maxX-B.minX)/2), ch=Math.round((B.maxZ-B.minZ)/2), hc=document.createElement('canvas'); hc.width=cw; hc.height=ch;
         const hx=hc.getContext('2d'), id=hx.createImageData(cw,ch);
         for(let j=0;j<ch;j++) for(let i=0;i<cw;i++){
-          const wx=B.maxX-(i+.5)*2, wz=B.minZ+(ch-j-.5)*2, hh=terrainH(wx,wz)/HILL.h, o=(j*cw+i)*4;
+          const wx=B.minX+(i+.5)*2, wz=B.minZ+(j+.5)*2, hh=terrainH(wx,wz)/HILL.h, o=(j*cw+i)*4;
           id.data[o]=110-30*hh; id.data[o+1]=140-20*hh; id.data[o+2]=95-20*hh; id.data[o+3]=hh<0.02?0:255*(0.35+0.4*hh);
         }
         hx.putImageData(id,0,0); window.__hillMapImg=hc;
       }
-      const B=HILL_BOX, p0=pt(B.maxX,B.maxZ), p1=pt(B.minX,B.minZ);
+      const B=HILL_BOX, p0=pt(B.minX,B.minZ), p1=pt(B.maxX,B.maxZ);
       ctx.drawImage(window.__hillMapImg,p0.x,p0.y,p1.x-p0.x,p1.y-p0.y);
     }
     mrect(RB.x-11,RB.z+12,RB.x+11,SPOL_END,'#c4c1b5'); mrect(RB.x-ROAD_W/2,RB.z+12,RB.x+ROAD_W/2,SPOL_END,'#454b50');   // ulica Społeczna
@@ -4062,6 +4656,9 @@
         SPOL_PATH.forEach((q,i)=>{ const c=pt(q[0],q[1]); if(i) ctx.lineTo(c.x,c.y); else ctx.moveTo(c.x,c.y); }); ctx.stroke(); ctx.restore(); };
       strokePath(22,'#c4c1b5'); strokePath(ROAD_W,'#454b50');
     }
+    mrect(PKS_JX-ROAD_W/2-3.15,155,PKS_JX+ROAD_W/2+3.15,164,'#c4c1b5'); mrect(PKS_JX-ROAD_W/2,155,PKS_JX+ROAD_W/2,164,'#454b50'); mrect(-12,164,47,192,'#454b50');   // PKS: dojazd i plac
+    {const c=pt(WR.x,WR.z);ctx.fillStyle='#454b50';ctx.beginPath();ctx.arc(c.x,c.y,WR.rOut*sx,0,Math.PI*2);ctx.fill();
+     ctx.fillStyle='#8aa879';ctx.beginPath();ctx.arc(c.x,c.y,WR.rIn*sx,0,Math.PI*2);ctx.fill();}
     {const c=pt(RB.x,RB.z);ctx.fillStyle='#454b50';ctx.beginPath();ctx.arc(c.x,c.y,RB.rOut*sx,0,Math.PI*2);ctx.fill();
      ctx.fillStyle='#8aa879';ctx.beginPath();ctx.arc(c.x,c.y,RB.rIn*sx,0,Math.PI*2);ctx.fill();}
     // Budynki z rzeczywistych współrzędnych świata
@@ -4071,7 +4668,7 @@
       ctx.fillRect(Math.min(q.x,r.x),r.y,Math.abs(r.x-q.x),q.y-r.y);ctx.strokeRect(Math.min(q.x,r.x),r.y,Math.abs(r.x-q.x),q.y-r.y);
     }
     // Podpisy najważniejszych miejsc
-    const labels=[['Real Shop',SHOP.x,SHOP.z],['Restauracja',REST.x,REST.z],['Bank',BANK.x,BANK.z],['Mebelek',FURN.x,FURN.z],...HOMES.map(H=>[H.owned?H.label+' (twój)':H.label,H.x,H.z]),['Supermarket Pandy (8–22)',SUPER.x,SUPER.z],['Sklep AGD',AGD.x,AGD.z],['Ubrania',CLOTH.x,CLOTH.z],['Salon samochodowy',CAR.x,CAR.z],['Lakiernik',PAINT.x,PAINT.z],['Mechanik',MECH.x,MECH.z],['Stacja paliw',STATION.x,STATION.z],...BUS_STOPS.map(b=>['Przystanek',b.x,b.z])];
+    const labels=[['Real Shop',SHOP.x,SHOP.z],['Restauracja',REST.x,REST.z],['Bank',BANK.x,BANK.z],['Mebelek',FURN.x,FURN.z],...HOMES.map(H=>[H.owned?H.label+' (twój)':H.label,H.x,H.z]),['Supermarket Pandy (8–22)',SUPER.x,SUPER.z],['Sklep AGD',AGD.x,AGD.z],['Ubrania',CLOTH.x,CLOTH.z],['Salon samochodowy',CAR.x,CAR.z],['Lakiernik',PAINT.x,PAINT.z],['Mechanik',MECH.x,MECH.z],['Stacja paliw',STATION.x,STATION.z],['PKS',PKS_BLD.x,PKS_BLD.z],...BUS_STOPS.map(b=>['Przystanek',b.x,b.z])];
     const scaleUI=Math.max(.62,Math.min(1.35,w/660)), scale=scaleUI*(view?1.4/k:1);
     ctx.font=`bold ${12*scale}px system-ui`;ctx.textAlign='center';ctx.textBaseline='middle';
     for(const [name,x,z] of labels){const q=pt(x,z);ctx.fillStyle='#fff';ctx.shadowColor='#18232c';ctx.shadowBlur=4;ctx.fillText(name,q.x,q.y-10*scale);}
@@ -4082,6 +4679,7 @@
     q=pt(4,40);ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-Math.PI/2);ctx.fillText('KRÓTKA',0,0);ctx.restore();
     q=pt(POP_X+1,30);ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-Math.PI/2);ctx.fillText('POPRZECZNA',0,0);ctx.restore();
     q=pt(RB.x+1,45);ctx.save();ctx.translate(q.x,q.y);ctx.rotate(-Math.PI/2);ctx.fillText('SPOŁECZNA',0,0);ctx.restore();
+    q=pt(22,150);ctx.fillText('GÓRNA',q.x,q.y);                                   // odcinek Społecznej na zachód przy stacji paliw
     // Upper: punkt odbioru (A) lub celu (B) aktywnego kursu
     for(const um of upperMapMarks()){
       const uq=pt(um.x,um.z), ur=(9+Math.sin(performance.now()/250)*1.5)*scale;
@@ -4092,7 +4690,7 @@
       ctx.restore();
     }
     // Gracz i kierunek patrzenia
-    const p=pt(player.position.x,player.position.z);const ang=-((carDriving?carHeading:player.rotation.y)||0);   // w aucie znacznik obraca się razem z autem
+    const p=pt(player.position.x,player.position.z);const ang=Math.PI-((carDriving?carHeading:player.rotation.y)||0);   // w aucie znacznik obraca się razem z autem
     ctx.save();ctx.translate(p.x,p.y);ctx.rotate(ang);ctx.fillStyle='#ffd54a';ctx.strokeStyle='#342600';ctx.lineWidth=2/k;
     ctx.beginPath();ctx.moveTo(0,-11*scale);ctx.lineTo(7*scale,8*scale);ctx.lineTo(0,5*scale);ctx.lineTo(-7*scale,8*scale);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
     ctx.restore();
@@ -4106,7 +4704,7 @@
       ctx.fillStyle='#ffd54a'; ctx.fillText(txt,12,h-9);
       if(isBig && mapCursor){
         const lx=(mapCursor.px-(view?view.tx:0))/k, ly=(mapCursor.py-(view?view.ty:0))/k;
-        const wx=M.maxX-(lx-offX)/sx, wz=M.minZ+(h-offY-ly)/sz;
+        const wx=M.minX+(lx-offX)/sx, wz=M.minZ+(ly-offY)/sz;
         if(wx>=M.minX-5&&wx<=M.maxX+5&&wz>=M.minZ-5&&wz<=M.maxZ+5){
           ctx.strokeStyle='rgba(255,255,255,.75)'; ctx.lineWidth=1; ctx.setLineDash([5,4]);
           ctx.beginPath(); ctx.moveTo(mapCursor.px,0); ctx.lineTo(mapCursor.px,h); ctx.moveTo(0,mapCursor.py); ctx.lineTo(w,mapCursor.py); ctx.stroke(); ctx.setLineDash([]);
@@ -4885,7 +5483,16 @@
     ['ul. Krótka',6.65,20], ['ul. Krótka',-6.65,52],
     ['ul. Poprzeczna',71.35,8], ['Mechanik',71.35,42], ['Salon samochodowy',84.65,25], ['Lakiernik',84.65,46], ['ul. Poprzeczna',84.65,58],
     ['Rondo',112,-7.4], ['ul. Społeczna',123.35,30], ['ul. Społeczna',136.65,18], ['Sklep z ubraniami',136.65,56],
-    ['Supermarket Pandy',124,-61], ['Sklep AGD',92,-61]
+    ['Supermarket Pandy',124,-61], ['Sklep AGD',92,-61],
+    // --- nowe miejsca ---
+    ['Dom A',6.65,10], ['Dom B',-6.65,19],                                  // Krótka: domy do wynajęcia (chodnik przed drzwiami)
+    ['Dom C',123.35,14], ['Dom D',123.35,33], ['Dom E',123.35,52],          // Społeczna, strona zachodnia
+    ['Dom F',136.65,14], ['Dom G',136.65,33],                               // Społeczna, strona wschodnia
+    ['Stacja paliw',67,156.65], ['PKS (dworzec)',19,183.5],                 // wzgórze: chodnik przed stacją, plac przed budynkiem dworca
+    ['ul. Górna',20,143.4], ['ul. Górna',84,143.4],                         // północny chodnik ulicy Górnej
+    ['Przystanek DŁUGA',-33.25,-20.6], ['Przystanek PASAŻ',105.5,-62.8],
+    ['Przystanek SPOŁECZNA',136.65,44.25], ['Przystanek GÓRNA',91,156.65],
+    ['Przystanek DŁUGA',-65,-7.35], ['Przystanek SPOŁECZNA',123.35,42.5], ['Przystanek GÓRNA',91,143.35]
   ];
   const upperRoute = (a, b) => Math.abs(a[1]-b[1]) + Math.abs(a[2]-b[2]);       // trasa ≈ odległość „po ulicach”
   const upperFare = m => Math.max(4, Math.round(3 + m*0.08));                    // zarobek rośnie z długością trasy (ok. 1 moneta na 12 m)
@@ -4934,7 +5541,7 @@
   }
   function upperAccept(){
     const o = upperApp.offer; if(!o || !hasCar) return;
-    const npc = makeRiderNpc(); npc.position.set(o.pickup[1], 0, o.pickup[2]); npc.visible = true;
+    const npc = makeRiderNpc(); npc.position.set(o.pickup[1], terrainH(o.pickup[1], o.pickup[2]), o.pickup[2]); npc.visible = true;
     upperApp.ride = {stage:'pickup', pickup:o.pickup, dest:o.dest, route:o.route, fare:o.fare, npc, boarding:false};
     upperApp.offer = null;
     toast(`Zlecenie przyjęte 🚖 Odbierz pasażera: ${o.pickup[0]} (zielone A na mapie)`);
@@ -4951,7 +5558,7 @@
   function upperFinish(){
     const r = upperApp.ride; if(!r) return;
     const cp = pcar.group.position, c = Math.cos(carHeading), sn = Math.sin(carHeading);
-    r.npc.position.set(cp.x - c*2.0, 0, cp.z + sn*2.0); r.npc.visible = true;       // pasażer wysiada z prawej strony auta i idzie do celu
+    r.npc.position.set(cp.x - c*2.0, terrainH(cp.x - c*2.0, cp.z + sn*2.0), cp.z + sn*2.0); r.npc.visible = true;       // pasażer wysiada z prawej strony auta i idzie do celu
     upperWalkers.push({mesh:r.npc, tx:r.dest[1], tz:r.dest[2], life:5});
     const fare = r.fare; upperApp.done++; upperApp.earned += fare;
     r.npc = null; upperClearRide();
@@ -5001,6 +5608,7 @@
       const w = upperWalkers[i]; w.life -= dt;
       const dx = w.tx - w.mesh.position.x, dz = w.tz - w.mesh.position.z, d = Math.hypot(dx,dz);
       if(d > 0.3){ w.mesh.position.x += dx/d*Math.min(d, 2.6*dt); w.mesh.position.z += dz/d*Math.min(d, 2.6*dt); w.mesh.rotation.y = Math.atan2(dx,dz); }
+      w.mesh.position.y = terrainH(w.mesh.position.x, w.mesh.position.z);
       if(w.life <= 0){ scene.remove(w.mesh); upperWalkers.splice(i,1); }
     }
     const r = upperApp.ride;
@@ -5010,13 +5618,14 @@
     if(r){
       const cp = pcar.group.position, slow = Math.abs(carV) < 2.5;
       if(r.stage === 'pickup'){
-        upperPickBeacon.position.set(r.pickup[1], 0, r.pickup[2]); upperPickBeacon.userData.cone.position.y = 7.2 + Math.sin(time*3)*0.35;
+        upperPickBeacon.position.set(r.pickup[1], terrainH(r.pickup[1], r.pickup[2]), r.pickup[2]); upperPickBeacon.userData.cone.position.y = 7.2 + Math.sin(time*3)*0.35;
         const dcar = Math.hypot(cp.x - r.npc.position.x, cp.z - r.npc.position.z);
         if(!r.boarding && carDriving && dcar < 9 && slow){ r.boarding = true; toast('Pasażer idzie do auta 🚶'); }
         if(r.boarding && (dcar > 20 || !hasCar)) r.boarding = false;
         const tx = r.boarding ? cp.x : r.pickup[1], tz = r.boarding ? cp.z : r.pickup[2];
         const dx = tx - r.npc.position.x, dz = tz - r.npc.position.z, d = Math.hypot(dx,dz);
         if(d > 0.3){ const st = Math.min(d, 3.2*dt); r.npc.position.x += dx/d*st; r.npc.position.z += dz/d*st; r.npc.rotation.y = Math.atan2(dx,dz); }
+        r.npc.position.y = terrainH(r.npc.position.x, r.npc.position.z);
         if(r.boarding && d < 1.6){                                          // pasażer wsiadł
           r.stage = 'dest'; r.npc.visible = false; r.boarding = false;
           toast(`Pasażer wsiadł 🚖 Zawieź go: ${r.dest[0]} (czerwone B na mapie)`); upperRefreshPhone();
@@ -5024,7 +5633,7 @@
         const dd = Math.round(Math.hypot(cp.x - r.pickup[1], cp.z - r.pickup[2])/5)*5;
         txt = `🚖 Upper<br>🟢 Odbierz pasażera: ${r.pickup[0]}<br>Odległość: ${dd} m<br>Zarobek: ${r.fare} 🪙`;
       } else {
-        upperDestBeacon.position.set(r.dest[1], 0, r.dest[2]); upperDestBeacon.userData.cone.position.y = 7.2 + Math.sin(time*3)*0.35;
+        upperDestBeacon.position.set(r.dest[1], terrainH(r.dest[1], r.dest[2]), r.dest[2]); upperDestBeacon.userData.cone.position.y = 7.2 + Math.sin(time*3)*0.35;
         const d = Math.hypot(cp.x - r.dest[1], cp.z - r.dest[2]);
         if(carDriving && d < 8 && slow){ upperFinish(); return; }
         txt = `🚖 Upper – pasażer na pokładzie<br>🔴 Cel: ${r.dest[0]}<br>Odległość: ${Math.round(d/5)*5} m<br>Zarobek: ${r.fare} 🪙`;
@@ -5970,7 +6579,7 @@
       }
     }
     // Kolizje gracza z samochodami: obrócony prostokąt dopasowany do modelu auta (4,2 × 1,9 m), a nie duże koło.
-    for(const car of trafficCars.concat(busRide ? [] : [BUS])){
+    for(const car of trafficCars.concat(pksBuses, busRide ? [] : [BUS])){
       if(!car.active || !car.group.visible) continue;
       const cp = car.group.position, th = car.heading, vhl = car.hl || 2.1, vhw = car.hw || 0.95;
       const tfx = Math.cos(th), tfz = Math.sin(th);                      // przód auta ruchu; bok: (-tfz, tfx)
@@ -6036,6 +6645,7 @@
     updateHomeDoor(dt);
     updateTraffic(dt);
     updateBus(dt);
+    updatePksBuses(dt);
     if(busRide) busCarry(mx, mz, speed, dt);                                     // gracz jedzie razem z autobusem
     updateOvens(dt);
     updateUpper(dt, gameElapsed);
