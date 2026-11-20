@@ -27,10 +27,11 @@ if(!ok){try{Object.defineProperty(window,n,{value:mem(),configurable:true})}catc
 </script>
 </head>
 <body>
-<div id="hud"><b>Real life</b><br>WASD / strzałki – ruch<br>Shift – bieg / wstawanie ze snu / zsiadanie z roweru, Spacja – skok<br>V – kamera pierwszoosobowa / trzecioosobowa<br>Q / E lub przeciągnięcie myszą – obrót kamery<br>Kółko – zoom, I – ekwipunek, M – mapa<br>F – interakcja / rower / kopanie kilofem (kopalnia), P – telefon<br>W aucie: Z / C – kierunkowskaz lewy / prawy, X – awaryjne, B – hamulec ręczny, H – klakson (przytrzymaj)</div>
+<div id="hud"><b>Real life</b><br>WASD / strzałki – ruch<br>Shift – bieg / wstawanie ze snu / zsiadanie z roweru, Spacja – skok<br>V – kamera pierwszoosobowa / trzecioosobowa<br>Q / E lub przeciągnięcie myszą – obrót kamery<br>Kółko – zoom, I – ekwipunek, M – mapa<br>F – interakcja / rower / kopanie kilofem (kopalnia), P – telefon<br>W aucie: Z / C – kierunkowskaz lewy / prawy, X – awaryjne, L – światła, B – hamulec ręczny, H – klakson (przytrzymaj)</div>
 <div id="stats">
   <div class="stat" id="stHunger"><span class="ic">🍖</span><div class="bar"><div class="fill" id="hungerFill"></div></div><span class="val" id="hungerVal">100</span></div>
   <div class="stat" id="stEnergy"><span class="ic">⚡</span><div class="bar"><div class="fill" id="energyFill"></div></div><span class="val" id="energyVal">100</span></div>
+  <div class="stat" id="stHygiene"><span class="ic">🧼</span><div class="bar"><div class="fill" id="hygieneFill"></div></div><span class="val" id="hygieneVal">100</span></div>
 </div>
 <div id="placeUI"><div id="placeMsg">Ustawianie biurka: idź tam, gdzie ma stanąć – podgląd jest przed tobą</div>
   <div class="btns"><button id="pRot">⟳ Obróć (R)</button><button id="pOk">✔ Postaw (F)</button><button id="pNo" class="no">✕ Anuluj (Esc)</button></div></div>
@@ -71,6 +72,22 @@ if(!ok){try{Object.defineProperty(window,n,{value:mem(),configurable:true})}catc
     <button id="resumeBtn" type="button">▶ Wznów grę</button>
     <button id="saveBtn" type="button">💾 ZAPISZ</button>
     <button id="mpBtn" type="button">🌐 Multiplayer</button>
+    <button id="settingsBtn" type="button">⚙️ Ustawienia</button>
+  </div>
+</div>
+<div id="settingsPanel">
+  <div id="stMain">
+    <h3>⚙️ Ustawienia</h3>
+    <div id="stSoundSlot"></div>
+    <button id="stCtrlBtn" type="button" class="stBtn">🎮 Zmień sterowanie</button>
+    <button id="stCloseBtn" type="button" class="stBtn stBack">← Wróć</button>
+  </div>
+  <div id="stCtrl">
+    <h3>🎮 Zmień sterowanie</h3>
+    <p class="stHint">Kliknij przycisk z klawiszem, a potem naciśnij nowy klawisz. Esc – anuluj. Strzałki zawsze działają też jako ruch.</p>
+    <div id="ctrlList"></div>
+    <button id="ctrlReset" type="button" class="stBtn stWarn">↺ Przywróć domyślne</button>
+    <button id="ctrlBack" type="button" class="stBtn stBack">← Wróć</button>
   </div>
 </div>
 <div id="job"><b>🛵 Dostawca</b><br><span id="jobInfo"></span></div>

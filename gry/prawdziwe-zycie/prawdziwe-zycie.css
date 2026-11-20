@@ -54,7 +54,9 @@ html,body{margin:0;height:100%;overflow:hidden;background:#87ceeb;font-family:sy
   #fridge,#wardrobe{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(340px,calc(100vw - 28px));max-height:75vh;overflow:auto;background:rgba(20,24,30,.97);color:#fff;border-radius:14px;padding:16px;display:none;z-index:25;box-sizing:border-box}
   #fridge h3,#wardrobe h3{margin:0 0 8px} #fridgeList,#wardrobeList{display:grid;gap:7px;margin:12px 0}
   #wardrobeList .empty{opacity:.75;font-size:13px;line-height:1.45;background:rgba(255,255,255,.08);padding:14px;border-radius:8px;text-align:center}
-  #wardrobeList .cloth{display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.09);padding:9px;border-radius:8px}
+  #wardrobeList .cdot{position:static;display:inline-block;vertical-align:middle;margin-left:2px}
+  #wardrobeList .wsub{font-size:12px;opacity:.7;text-transform:uppercase;letter-spacing:.04em;margin-top:4px}
+  #wardrobeList .cloth{gap:8px;display:flex;justify-content:space-between;align-items:center;background:rgba(255,255,255,.09);padding:9px;border-radius:8px}
   .foodrow{display:flex;align-items:center;justify-content:space-between;background:rgba(255,255,255,.09);padding:9px;border-radius:8px;gap:8px}
   #fridge button,#wardrobe button{background:#3a7bd5;color:white;border:0;border-radius:6px;padding:7px 10px;cursor:pointer}
   #computerUI{position:fixed;inset:0;display:none;z-index:180;background:#07111f;color:#fff;font-family:system-ui,sans-serif;}
@@ -167,6 +169,16 @@ html,body{margin:0;height:100%;overflow:hidden;background:#87ceeb;font-family:sy
   #dlgName{font-weight:600;color:#ffd54a;font-size:14px}
   #dlgText{font-size:14px;line-height:1.45}
   #dlgBtns{display:flex;flex-wrap:wrap;gap:8px}
+  #basketHud .bgrid{display:flex;flex-wrap:wrap;justify-content:center;gap:5px;max-width:min(300px,calc(100vw - 28px));margin:6px 0}
+  #basketHud .slot{width:52px;font-size:26px;cursor:default}
+  #basketHud .slot .n{font-size:12px;font-weight:700}
+  #basketHud .slot .pr{position:absolute;left:3px;top:2px;font-size:10px;opacity:.85}
+  #basketHud .slot .pr .coin{width:1em;height:1em;vertical-align:-.15em}
+  #dlgGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+  #dlgGrid .slot{font-size:30px;flex-direction:column;padding-top:12px}
+  #dlgGrid .slot:hover{border-color:#ffd54a;background:rgba(255,255,255,.18)}
+  #dlgGrid .slot .nm{position:absolute;left:3px;right:3px;top:3px;font-size:10px;line-height:1.1;text-align:center;opacity:.85;pointer-events:none}
+  #dlgGrid .slot .n{font-size:12px;font-weight:700}
   #dlgBtns button{background:#3a7bd5;color:#fff;border:0;border-radius:6px;padding:7px 12px;cursor:pointer;font-size:13px}
   #basketHud{position:fixed;left:50%;top:50px;transform:translateX(-50%);color:#fff;background:rgba(0,0,0,.5);padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.5;display:none;pointer-events:none;text-align:center;z-index:5}
   #job{position:fixed;right:12px;top:12px;color:#fff;background:rgba(0,0,0,.4);padding:8px 12px;border-radius:8px;font-size:13px;line-height:1.5;display:none;pointer-events:none;max-width:220px}
@@ -198,6 +210,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#87ceeb;font-family:sy
   .stat .bar{height:11px;background:rgba(255,255,255,.18);border-radius:6px;overflow:hidden}
   .stat .fill{height:100%;width:100%;border-radius:6px;transition:width .25s linear,background .3s}
   .stat .val{text-align:right;font-variant-numeric:tabular-nums}
+  #hygieneFill{background:#2196f3}
   .stat.low .bar{animation:statBlink .8s infinite}
   @keyframes statBlink{50%{box-shadow:0 0 0 2px rgba(255,70,70,.9)}}
   #placeUI{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:rgba(20,24,30,.93);color:#fff;border-radius:12px;padding:10px 14px;display:none;z-index:18;text-align:center;font-size:13px;width:min(380px,calc(100vw - 28px));box-sizing:border-box}
@@ -207,7 +220,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#87ceeb;font-family:sy
   #placeMsg.bad{color:#ff8a80}
   .slot.part{opacity:.4}
   #knob{position:absolute;left:35px;top:35px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.6)}
-  #mapCanvas{position:fixed;left:12px;bottom:12px;width:190px;height:142px;border:2px solid rgba(255,255,255,.75);border-radius:10px;background:rgba(12,20,27,.88);z-index:8;pointer-events:none;box-shadow:0 3px 14px rgba(0,0,0,.35)}
+  #mapCanvas{position:fixed;left:12px;bottom:12px;width:260px;height:195px;border:2px solid rgba(255,255,255,.75);border-radius:10px;background:rgba(12,20,27,.88);z-index:8;pointer-events:none;box-shadow:0 3px 14px rgba(0,0,0,.35)}
   #mapOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.78);z-index:150;color:#fff}
   #mapOverlay.open{display:flex}
   #mapCard{position:relative;width:min(920px,92vw);padding:18px;background:#18232c;border:1px solid rgba(255,255,255,.22);border-radius:16px;box-shadow:0 15px 55px rgba(0,0,0,.55);box-sizing:border-box}
@@ -215,7 +228,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#87ceeb;font-family:sy
   #mapCard p{margin:8px 0 0;font-size:13px;color:#d7e0e8}
   #mapBigCanvas{cursor:zoom-in;display:block;width:100%;height:auto;aspect-ratio:4/3;border-radius:10px;border:1px solid rgba(255,255,255,.25);box-sizing:border-box}
   #mapClose{position:absolute;right:16px;top:14px;border:0;border-radius:7px;padding:7px 11px;background:#3a7bd5;color:white;font-size:14px;cursor:pointer}
-  @media(max-width:600px){#mapCanvas{width:145px;height:109px;left:8px;bottom:8px}#mapCard{padding:12px}#mapCard h2{font-size:17px}#mapClose{right:10px;top:9px;padding:5px 8px}}
+  @media(max-width:600px){#mapCanvas{width:180px;height:135px;left:8px;bottom:8px}#mapCard{padding:12px}#mapCard h2{font-size:17px}#mapClose{right:10px;top:9px;padding:5px 8px}}
 
 /* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
 html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
@@ -303,3 +316,21 @@ html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:non
   #ovenUI button.no{background:#555}
 
   .slot .cdot{position:absolute;left:4px;bottom:3px;width:11px;height:11px;border-radius:50%;border:1px solid rgba(255,255,255,.75);box-sizing:border-box}
+
+  /* ===== Ustawienia (menu pauzy) ===== */
+  #settingsBtn{display:block;width:100%;margin-top:10px;border:0;border-radius:8px;padding:10px 20px;background:#3d4654;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+  #settingsPanel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(380px,calc(100vw - 28px));max-height:80vh;overflow:auto;background:rgba(20,24,30,.97);color:#fff;border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:18px;display:none;z-index:120;box-sizing:border-box}
+  #settingsPanel h3{margin:0 0 12px;font-size:21px;text-align:center}
+  #stCtrl{display:none}
+  #settingsPanel .stHint{margin:0 0 12px;color:#cbd2dc;font-size:13px;line-height:1.4}
+  #settingsPanel .stBtn{display:block;width:100%;margin-top:10px;border:0;border-radius:8px;padding:10px 20px;background:#3a7bd5;color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+  #settingsPanel .stBack{background:#3d4654}
+  #settingsPanel .stWarn{background:#b3402f}
+  #ctrlList{display:grid;gap:6px}
+  .ctrlRow{display:grid;grid-template-columns:1fr 112px;align-items:center;gap:10px;font-size:14px}
+  .ctrlGroup{margin:10px 0 2px;color:#8fa2bb;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+  .ctrlKey{border:1px solid rgba(255,255,255,.25);border-radius:7px;padding:7px 8px;background:rgba(255,255,255,.1);color:#fff;font-size:13px;font-weight:700;cursor:pointer;min-height:34px}
+  .ctrlKey:hover{background:rgba(255,255,255,.18)}
+  .ctrlKey.mod{border-color:#6fb1ff}
+  .ctrlKey.listen{background:#3a7bd5;border-color:#fff;animation:ctrlBlink .8s infinite alternate}
+  @keyframes ctrlBlink{to{opacity:.65}}

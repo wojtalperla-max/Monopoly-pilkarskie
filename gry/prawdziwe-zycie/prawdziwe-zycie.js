@@ -8,7 +8,7 @@
     isPaused = !!value;
     pauseScreen.style.display = isPaused ? 'flex' : 'none';
     pauseBtn.textContent = isPaused ? '▶ Wznów' : '⏸ Pauza';
-    if(!isPaused){ const mpp = document.getElementById('mpPanel'); if(mpp) mpp.style.display = 'none'; }
+    if(!isPaused){ const mpp = document.getElementById('mpPanel'); if(mpp) mpp.style.display = 'none'; closeSettings(); }
     if(isPaused){
       // Usuń wciśnięte klawisze i sterowanie dotykowe, aby postać nie ruszyła po wznowieniu.
       for(const key in keys) keys[key] = false;
@@ -18,6 +18,159 @@
   }
   pauseBtn.addEventListener('click', () => setPaused(!isPaused));
   document.getElementById('resumeBtn').addEventListener('click', () => setPaused(false));
+
+  // ===== Ustawienia (menu pauzy): dźwięk + „Zmień sterowanie” =====
+  // Zmiana sterowania działa jako warstwa tłumacząca: wciśnięty klawisz jest zamieniany na domyślny kod akcji,
+  // więc cała reszta gry (która nasłuchuje np. KeyF, KeyI…) działa bez zmian.
+  const CTRL_ACTIONS = [
+    {id:'forward', g:'Ruch',     n:'Do przodu',                       def:'KeyW'},
+    {id:'back',    g:'Ruch',     n:'Do tyłu',                         def:'KeyS'},
+    {id:'left',    g:'Ruch',     n:'W lewo',                          def:'KeyA'},
+    {id:'right',   g:'Ruch',     n:'W prawo',                         def:'KeyD'},
+    {id:'run',     g:'Ruch',     n:'Bieg / wstań / zsiądź / wysiądź', def:'ShiftLeft'},
+    {id:'jump',    g:'Ruch',     n:'Skok / hamulec auta',             def:'Space'},
+    {id:'cam',     g:'Kamera',   n:'Widok 1. / 3. osoby',             def:'KeyV'},
+    {id:'camL',    g:'Kamera',   n:'Obrót kamery w lewo',             def:'KeyQ'},
+    {id:'camR',    g:'Kamera',   n:'Obrót kamery w prawo',            def:'KeyE'},
+    {id:'act',     g:'Akcje',    n:'Interakcja / rower / kilof',      def:'KeyF'},
+    {id:'pick',    g:'Akcje',    n:'Podnieś mebel / współrzędne mapy',def:'KeyG'},
+    {id:'rot',     g:'Akcje',    n:'Obróć stawiany przedmiot',        def:'KeyR'},
+    {id:'inv',     g:'Akcje',    n:'Ekwipunek',                       def:'KeyI'},
+    {id:'map',     g:'Akcje',    n:'Mapa',                            def:'KeyM'},
+    {id:'phone',   g:'Akcje',    n:'Telefon',                         def:'KeyP'},
+    {id:'sigL',    g:'Samochód', n:'Kierunkowskaz lewy',              def:'KeyZ'},
+    {id:'sigR',    g:'Samochód', n:'Kierunkowskaz prawy',             def:'KeyC'},
+    {id:'hazard',  g:'Samochód', n:'Światła awaryjne',                def:'KeyX'},
+    {id:'brake',   g:'Samochód', n:'Hamulec ręczny',                  def:'KeyB'},
+    {id:'horn',    g:'Samochód', n:'Klakson',                         def:'KeyH'},
+    {id:'lights',  g:'Samochód', n:'Światła przednie',                def:'KeyL'}
+  ];
+  const CTRL_DEFAULT_CODES = new Set(CTRL_ACTIONS.map(a => a.def));
+  const CTRL_FORBIDDEN = /^(Escape|Enter|NumpadEnter|Tab|Backspace|Delete|ContextMenu|Meta.*|OS.*|F\d+|CapsLock|NumLock|ScrollLock|Pause|PrintScreen|Insert|Home|End|PageUp|PageDown)$/;
+  let ctrlMap = {};
+  function ctrlResetMap(){ CTRL_ACTIONS.forEach(a => { ctrlMap[a.id] = a.def; }); }
+  function ctrlLoad(){
+    ctrlResetMap();
+    try{
+      const s = JSON.parse(localStorage.getItem('pz_keys') || 'null');
+      if(!s || typeof s !== 'object') return;
+      const used = new Set(), tmp = {};
+      for(const a of CTRL_ACTIONS){
+        const c = s[a.id];
+        if(typeof c === 'string' && c.length < 30 && !CTRL_FORBIDDEN.test(c) && !used.has(c)){ tmp[a.id] = c; used.add(c); }
+        else tmp[a.id] = null;
+      }
+      // akcje bez poprawnego wpisu dostają domyślny klawisz, o ile nie jest już zajęty
+      for(const a of CTRL_ACTIONS){ if(!tmp[a.id] && !used.has(a.def)){ tmp[a.id] = a.def; used.add(a.def); } }
+      if(CTRL_ACTIONS.every(a => tmp[a.id])) ctrlMap = tmp;
+    }catch(err){}
+  }
+  function ctrlSave(){ try{ localStorage.setItem('pz_keys', JSON.stringify(ctrlMap)); }catch(err){} }
+  ctrlLoad();
+
+  // fizyczny klawisz → kod, który ma zobaczyć gra (string), false = klawisz został przeniesiony (zablokuj), null = bez zmian
+  function ctrlTranslate(code){
+    for(const a of CTRL_ACTIONS) if(ctrlMap[a.id] === code) return a.def;
+    return CTRL_DEFAULT_CODES.has(code) ? false : null;
+  }
+  function ctrlKeyName(code){
+    const m = {Space:'Spacja', ShiftLeft:'Lewy Shift', ShiftRight:'Prawy Shift', ControlLeft:'Lewy Ctrl', ControlRight:'Prawy Ctrl',
+      AltLeft:'Lewy Alt', AltRight:'Prawy Alt', ArrowUp:'↑', ArrowDown:'↓', ArrowLeft:'←', ArrowRight:'→',
+      Backquote:'`', Minus:'-', Equal:'=', BracketLeft:'[', BracketRight:']', Backslash:'\\', Semicolon:';', Quote:"'", Comma:',', Period:'.', Slash:'/'};
+    if(m[code]) return m[code];
+    if(/^Key[A-Z]$/.test(code)) return code.slice(3);
+    if(/^Digit\d$/.test(code)) return code.slice(5);
+    if(/^Numpad/.test(code)) return 'Num ' + code.slice(6);
+    return code;
+  }
+
+  const stPanel = document.getElementById('settingsPanel');
+  const stMain = document.getElementById('stMain'), stCtrl = document.getElementById('stCtrl');
+  const ctrlListEl = document.getElementById('ctrlList');
+  let ctrlListening = null, ctrlSynth = false;
+
+  function ctrlRender(){
+    ctrlListEl.innerHTML = '';
+    let grp = '';
+    for(const a of CTRL_ACTIONS){
+      if(a.g !== grp){ grp = a.g; const gh = document.createElement('div'); gh.className = 'ctrlGroup'; gh.textContent = grp; ctrlListEl.appendChild(gh); }
+      const row = document.createElement('div'); row.className = 'ctrlRow';
+      const lb = document.createElement('span'); lb.textContent = a.n;
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'ctrlKey';
+      if(ctrlListening === a.id){ b.classList.add('listen'); b.textContent = 'naciśnij klawisz…'; }
+      else { b.textContent = ctrlKeyName(ctrlMap[a.id]); if(ctrlMap[a.id] !== a.def) b.classList.add('mod'); }
+      b.addEventListener('click', () => { ctrlListening = (ctrlListening === a.id) ? null : a.id; ctrlRender(); });
+      row.appendChild(lb); row.appendChild(b); ctrlListEl.appendChild(row);
+    }
+  }
+  function ctrlAssign(id, code){
+    const a = CTRL_ACTIONS.find(x => x.id === id), old = ctrlMap[id];
+    const other = CTRL_ACTIONS.find(x => x.id !== id && ctrlMap[x.id] === code);
+    if(other){ ctrlMap[other.id] = old; try{ toast('Zamieniono klawisze: ' + other.n); }catch(err){} }
+    ctrlMap[id] = code;
+    ctrlSave();
+  }
+  function showSettings(){
+    document.getElementById('pauseCard').style.display = 'none';
+    const mpp = document.getElementById('mpPanel'); if(mpp) mpp.style.display = 'none';
+    stMain.style.display = 'block'; stCtrl.style.display = 'none';
+    stPanel.style.display = 'block';
+  }
+  function closeSettings(){
+    ctrlListening = null;
+    stPanel.style.display = 'none';
+    stMain.style.display = 'block'; stCtrl.style.display = 'none';
+    document.getElementById('pauseCard').style.display = '';
+  }
+  function showCtrl(){ ctrlListening = null; ctrlRender(); stMain.style.display = 'none'; stCtrl.style.display = 'block'; }
+  function backToSettingsMain(){ ctrlListening = null; stMain.style.display = 'block'; stCtrl.style.display = 'none'; }
+  document.getElementById('settingsBtn').addEventListener('click', showSettings);
+  document.getElementById('stCloseBtn').addEventListener('click', closeSettings);
+  document.getElementById('stCtrlBtn').addEventListener('click', showCtrl);
+  document.getElementById('ctrlBack').addEventListener('click', backToSettingsMain);
+  document.getElementById('ctrlReset').addEventListener('click', () => { ctrlResetMap(); ctrlListening = null; ctrlSave(); ctrlRender(); });
+
+  // Warstwa tłumacząca – musi być zarejestrowana jako pierwsza (faza przechwytywania), przed pozostałymi nasłuchami klawiszy
+  function ctrlOnKey(e){
+    if(ctrlSynth) return;
+    const t = e.target;
+    const settingsOpen = stPanel.style.display === 'block';
+    if(settingsOpen){
+      if(e.type === 'keydown'){
+        if(ctrlListening){
+          e.preventDefault(); e.stopImmediatePropagation();
+          if(e.repeat) return;
+          if(e.code === 'Escape'){ ctrlListening = null; ctrlRender(); return; }
+          if(CTRL_FORBIDDEN.test(e.code)){ try{ toast('Tego klawisza nie można przypisać'); }catch(err){} return; }
+          const id = ctrlListening; ctrlListening = null;
+          ctrlAssign(id, e.code); ctrlRender();
+          return;
+        }
+        if(e.code === 'Escape'){            // Esc w ustawieniach cofa o krok, a nie wznawia gry
+          e.preventDefault(); e.stopImmediatePropagation();
+          if(e.repeat) return;
+          if(stCtrl.style.display === 'block') backToSettingsMain(); else closeSettings();
+          return;
+        }
+      }
+      e.stopImmediatePropagation(); return;   // w ustawieniach klawisze nie trafiają do gry
+    }
+    if(t && t.closest && t.closest('input,textarea,select,[contenteditable="true"]')) return;
+    const cu = document.getElementById('computerUI');
+    if(cu && cu.classList.contains('show')) return;                  // w komputerze (ShortCut, Internet) obowiązują klawisze domyślne
+    const to = ctrlTranslate(e.code);
+    if(to === null || to === e.code) return;
+    e.stopImmediatePropagation();
+    if(to === false) return;                                         // klawisz przeniesiony na inną akcję – nic nie robi
+    if(e.code === 'Space' || to === 'Space') e.preventDefault();
+    ctrlSynth = true;
+    try{
+      window.dispatchEvent(new KeyboardEvent(e.type, {code: to, key: to, bubbles: true, cancelable: true, repeat: e.repeat,
+        shiftKey: e.shiftKey, ctrlKey: e.ctrlKey, altKey: e.altKey, metaKey: e.metaKey}));
+    }finally{ ctrlSynth = false; }
+  }
+  addEventListener('keydown', ctrlOnKey, true);
+  addEventListener('keyup', ctrlOnKey, true);
 
   const renderer = new THREE.WebGLRenderer({antialias:true});
   renderer.setPixelRatio(Math.min(devicePixelRatio,2));
@@ -376,9 +529,9 @@
   const SHOP = {x:18, z:-3, w:10, d:6, h:3.6};
   // Dom gracza przy krótkiej ulicy (x=0), drzwiami (lokalne +z) zwrócony w stronę jezdni.
   const HOME = {x:14, z:10, w:9, d:8, h:3.5, rot:-Math.PI/2};   // AKTYWNY dom (ten, w którym jesteś); jego położenie podmienia setActiveHome()
-  const HOMES = [                                               // oba domy gracza – do wynajęcia (30 monet / dobę)
+  const HOMES = [                                               // domy gracza – do wynajęcia (B: 30 monet / dobę, pozostałe: 20)
     {id:'A', label:'Dom A', x:14,  z:10, rot:-Math.PI/2, rented:false, paidUntil:0, exterior:[]},
-    {id:'B', label:'Dom B', x:-14, z:19, rot: Math.PI/2, rented:false, paidUntil:0, exterior:[]},
+    {id:'B', label:'Dom B', x:-15, z:19, w:14, d:10, rot: Math.PI/2, rented:false, paidUntil:0, exterior:[]},   // większy: 14 × 10, trzy pomieszczenia (salon z kuchnią, sypialnia, łazienka)
     // ulica Społeczna (prawy zjazd z ronda): zachodnia strona – drzwi na wschód, wschodnia – drzwi na zachód
     {id:'C', label:'Dom C', x:116, z:14, rot: Math.PI/2, rented:false, paidUntil:0, exterior:[]},
     {id:'D', label:'Dom D', x:116, z:33, rot: Math.PI/2, rented:false, paidUntil:0, exterior:[]},
@@ -387,7 +540,16 @@
     {id:'G', label:'Dom G', x:144, z:33, rot:-Math.PI/2, rented:false, paidUntil:0, exterior:[]}
   ];
   let homeCur = HOMES[0];
-  function setActiveHome(H){ homeCur = H; HOME.x = H.x; HOME.z = H.z; HOME.rot = H.rot; }
+  // Układ wnętrza (współrzędne lokalne domu: +z = przód z drzwiami, x w poprzek). Standardowy dom ma jedno pomieszczenie 9 × 8.
+  const HOME_LAY_STD = {bed:{x:-2.4,z:-1.5}, fridge:{x:2.8,z:-2.5}, outlet:{x:0.6,z:-3.6}, sleep:{x:-2.4,z:-0.7}, wake:{x:-0.6,z:-1.0}, rooms:false, reserve:[]};
+  // Dom B (14 × 10): z = 0 – ściana działowa; z przodu salon z kuchnią (drzwi wejściowe), z tyłu po lewej sypialnia, po prawej łazienka (przejścia na x = ∓3,5)
+  const HOME_LAY_B = {bed:{x:-4.4,z:-3.0}, fridge:{x:5.6,z:0.6}, outlet:{x:-1.8,z:0.55,wallZ:0.14}, sleep:{x:-4.4,z:-2.2}, wake:{x:-2.6,z:-2.5}, rooms:true, reserve:[[-3.5,0,1.8,1.8],[3.5,0,1.8,1.8]]};
+  function homeDimsOf(H){ const q = Math.abs(Math.sin(H.rot)) > 0.5, w = H.w || 9, d = H.d || 8; return {w, d, ww:q ? d : w, wd:q ? w : d}; }
+  function setActiveHome(H){
+    homeCur = H; HOME.x = H.x; HOME.z = H.z; HOME.rot = H.rot;
+    const D = homeDimsOf(H); HOME.w = D.w; HOME.d = D.d; HOME.ww = D.ww; HOME.wd = D.wd;
+    HOME.lay = H.id === 'B' ? HOME_LAY_B : HOME_LAY_STD;
+  }
   const homeQuarter = Math.abs(Math.sin(HOME.rot)) > 0.5;      // obrócony o 90° – wymiary w świecie zamienione
   HOME.ww = homeQuarter ? HOME.d : HOME.w;                      // szerokość w osi X świata
   HOME.wd = homeQuarter ? HOME.w : HOME.d;                      // głębokość w osi Z świata
@@ -515,8 +677,8 @@
     Math.hypot(x - RB.x, z - RB.z) < RB.rOut + 3 + m ||                                         // rondo z chodnikiem
     (x > 78 - m && x < RB.x && Math.abs(z - ROAD_Z) < NEW_STREET_EDGE + m) ||                   // przedłużenie Długiej
     (Math.abs(x - RB.x) < NEW_STREET_EDGE + m && z < RB.z && z > SUPER.z + SUPER.d/2 - m) ||    // zjazd do supermarketu
-    (Math.abs(x - SUPER.x) < SUPER.w/2 + m && z < -52 + m && z > SUPER.z - SUPER.d/2 - m) ||    // parking i budynek
-    (Math.abs(x - (AGD.x + 2)) < 16 + m && z < -52 + m && z > AGD.z - AGD.d/2 - m) ||           // sklep AGD z parkingiem
+    (Math.abs(x - SUPER.x) < SUPER.w/2 + m && z < -44 + m && z > SUPER.z - SUPER.d/2 - m) ||    // parking i budynek (plac sięga do z = -44)
+    (Math.abs(x - (AGD.x + 2)) < 16 + m && z < -44 + m && z > AGD.z - AGD.d/2 - m) ||           // sklep AGD z parkingiem (plac sięga do z = -44)
     (Math.abs(x - RB.x) < 22 + m && z > RB.z + 8 - m && z < 90 + m) ||                          // ulica Społeczna z domami i sklepem odzieżowym
     (Math.abs(x - POP_X) < POP_EDGE + m && z > SIDE_ROAD_START - m && z < POP_END + m) ||       // ulica Poprzeczna
     (Math.abs(x - GORN_X) < GORN_EDGE + m && z < GORN_START + m && z > GORN_END - m) ||         // ulica Górnicza
@@ -587,7 +749,7 @@
       ROUND_COLL.push({x: RB.x + Math.cos(a)*5.0, z: RB.z + Math.sin(a)*5.0, r: 0.4});
     }
     // 3) lewy zjazd (w stronę -z) do supermarketu
-    const exitStart = RB.z - 12.5, exitEnd = -52, exitLen = exitStart - exitEnd < 0 ? exitEnd - exitStart : exitStart - exitEnd;
+    const exitStart = RB.z - 12.5, exitEnd = -44, exitLen = exitStart - exitEnd < 0 ? exitEnd - exitStart : exitStart - exitEnd;
     const exitG = new THREE.Group(); exitG.position.set(RB.x, 0, (exitStart + exitEnd)/2); exitG.rotation.y = Math.PI/2; street.add(exitG);
     const exitRoad = new THREE.Mesh(new THREE.PlaneGeometry(exitLen, ROAD_W), new THREE.MeshLambertMaterial({map:asphaltTex(exitLen)}));
     exitRoad.rotation.x = -Math.PI/2; exitRoad.position.y = 0.02; exitRoad.receiveShadow = true; exitG.add(exitRoad);
@@ -620,8 +782,9 @@
       });
     }
     // 4) parking przed supermarketem
-    const apron = new THREE.Mesh(new THREE.PlaneGeometry(SUPER.w, 12), new THREE.MeshLambertMaterial({map:grainTex(SUPER.w/TILE, 12/TILE)}));
-    apron.rotation.x = -Math.PI/2; apron.position.set(SUPER.x, 0.03, -58); apron.receiveShadow = true; street.add(apron);
+    const APRON_D = 20, APRON_Z = -54;                                    // plac: z od -64 (chodnik) do -44; miejsca postojowe z = -61,5…-56,5, dalej dwa pasy ruchu (z = -54,2 na zachód, z = -49,2 na wschód) i miejsce na nawrót autobusu
+    const apron = new THREE.Mesh(new THREE.PlaneGeometry(SUPER.w, APRON_D), new THREE.MeshLambertMaterial({map:grainTex(SUPER.w/TILE, APRON_D/TILE)}));
+    apron.rotation.x = -Math.PI/2; apron.position.set(SUPER.x, 0.03, APRON_Z); apron.receiveShadow = true; street.add(apron);
     const lineMat = new THREE.MeshBasicMaterial({color:0xe8e8e8});
     for(let i=0;i<=10;i++){
       const ln = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 5), lineMat);
@@ -629,6 +792,11 @@
     }
     const frontWalk = new THREE.Mesh(new THREE.BoxGeometry(SUPER.w, 0.2, 2), walkMat);
     frontWalk.position.set(SUPER.x, 0.1, -63); frontWalk.receiveShadow = true; street.add(frontWalk);
+    for(let x = 80; x <= 150; x += 4){                                      // przerywana linia środkowa placu (rozdziela pas na zachód i pas na wschód) – bez odcinka na zjeździe
+      if(x > 120 && x < 136) continue;
+      const dash = new THREE.Mesh(new THREE.BoxGeometry(2, 0.02, 0.12), lineMat);
+      dash.position.set(x, 0.05, -51.7); street.add(dash);
+    }
     // 5) budynek supermarketu: patrz buildSupermarket() niżej (po deklaracji WALLS)
   })();
 
@@ -1062,12 +1230,15 @@
     if(!inside && basket){ basket = null; renderBasket(); toast('Wyszedłeś bez płacenia – koszyk odłożony, towary wróciły na regały'); }
   }
 
-  // ===== Sklep AGD „Domator” obok Pandy (po zachodniej stronie): inny układ niż supermarket – salon ze ścianami sprzętu i ladą =====
+  // ===== Sklep „Dom i AGD” obok Pandy (po zachodniej stronie): inny układ niż supermarket – salon ze ścianami sprzętu i ladą =====
   const agdExterior = [];
   let agdRoof = null, agdInside = false, agdNpc = null;
   const agdNpcDist = () => agdNpc ? Math.hypot(player.position.x - agdNpc.position.x, player.position.z - agdNpc.position.z) : 99;
   const AGD_GOODS = [
-    {id:'oven',      p:40, n:'Piekarnik', big:true}
+    {id:'oven',      p:40, n:'Piekarnik', big:true},
+    {id:'toilet',    p:45, n:'Toaleta'},
+    {id:'bathtub',   p:80, n:'Wanna'},
+    {id:'mirror',    p:35, n:'Lustro stojące'}
   ];
   (function buildApplianceStore(){
     const SX = AGD.x, SZ = AGD.z, w = AGD.w, d = AGD.d, H = AGD.h, t = 0.4, gap = 4, fz = d/2;
@@ -1085,8 +1256,8 @@
                blue:new THREE.MeshBasicMaterial({color:0x4fc3f7}), graphite:lamb(0x3a4249)};
 
     // parking i chodnik przed sklepem (przedłużenie parkingu Pandy)
-    const apron = new THREE.Mesh(new THREE.PlaneGeometry(32, 12), lamb(0x3d3d42));
-    apron.rotation.x = -Math.PI/2; apron.position.set(SX + 2, 0.03, -58); apron.receiveShadow = true; street.add(apron);
+    const apron = new THREE.Mesh(new THREE.PlaneGeometry(32, 20), lamb(0x3d3d42));                 // plac 20 m (z od -64 do -44), jak przy Pandzie
+    apron.rotation.x = -Math.PI/2; apron.position.set(SX + 2, 0.03, -54); apron.receiveShadow = true; street.add(apron);
     const lineMat = new THREE.MeshBasicMaterial({color:0xe8e8e8});
     for(let i=0;i<=6;i++){ const ln = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 5), lineMat); ln.position.set(SX - 12 + i*4, 0.05, -59); street.add(ln); }
     const walk = new THREE.Mesh(new THREE.BoxGeometry(w, 0.05, 2), walkMat); walk.position.set(SX, 0.025, -63); walk.receiveShadow = true; street.add(walk);
@@ -1115,7 +1286,7 @@
     box(3.6,0.03,1.4,lamb(0x333333),0,0.07,fz-1,false);
     agdExterior.push(box(7,0.25,2.2,orange,0,3.7,fz+1.1,false));
     const signTex = tex(1024,128,(g,cw,ch)=>{ g.fillStyle='#e0702a'; g.fillRect(0,0,cw,ch); g.strokeStyle='#fff'; g.lineWidth=6; g.strokeRect(5,5,cw-10,ch-10);
-      g.fillStyle='#fff'; g.font='bold 78px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('⚡ AGD DOMATOR ⚡', cw/2, ch/2+4); });
+      g.fillStyle='#fff'; g.font='bold 78px sans-serif'; g.textAlign='center'; g.textBaseline='middle'; g.fillText('⚡ DOM I AGD ⚡', cw/2, ch/2+4); });
     agdExterior.push(plane(15,1.9,new THREE.MeshBasicMaterial({map:signTex}),0,H-1.45,fz+0.07));
     const label = (text, pw, px, py, pz, ry, bg) => {
       const lt = tex(512,96,(g,cw,ch)=>{ g.fillStyle=bg||'#1f3a52'; g.fillRect(0,0,cw,ch); g.strokeStyle='#fff'; g.lineWidth=4; g.strokeRect(4,4,cw-8,ch-8);
@@ -1123,11 +1294,38 @@
       return plane(pw, pw*96/512, new THREE.MeshBasicMaterial({map:lt}), px, py, pz, ry);
     };
 
-    // wystawa: tylko piekarniki przy prawej ścianie (front w stronę −X) – ten sam model, który kupuje się u sprzedawcy
+    // wystawa: cały asortyment ze sprzedawcy (piekarniki, wanny, toalety, lustra) – te same modele, które się kupuje
     const place = (g, x, y, z, ry) => { g.position.set(x, y, z); g.rotation.y = ry || 0; grp.add(g); return g; };
+
+    // piekarniki przy prawej ścianie (front w stronę −X)
     [-7,-5.2,-3.4,-1.6].forEach(z => place(makeOven(false), w/2-t-0.4, 0, z, -Math.PI/2));
     WALLS.push({x:SX+w/2-t-0.4, z:SZ-4.3, w:0.8, d:7.2});
     label('🍳 PIEKARNIKI', 3.4, w/2-t-0.05, 2.2, -4.3, -Math.PI/2, '#8a3a1a');
+
+    // wanny przy lewej ścianie (front w stronę +X, długi bok wzdłuż ściany)
+    [-7,-4.6,-2.2].forEach(z => place(makeBathtub(false), -w/2+t+0.45, 0, z, Math.PI/2));
+    WALLS.push({x:SX-w/2+t+0.45, z:SZ-4.6, w:0.8, d:6.6});
+    label('🛁 WANNY', 3.4, -w/2+t+0.05, 2.2, -4.6, Math.PI/2, '#1f5f7a');
+
+    // toalety przy tylnej ścianie, po lewej stronie (front w stronę +Z)
+    [-8,-6.6,-5.2,-3.8].forEach(x => place(makeToilet(false), x, 0, -d/2+t+0.35, 0));
+    WALLS.push({x:SX-5.9, z:SZ-d/2+t+0.4, w:4.64, d:0.8});
+    label('🚽 TOALETY', 3.4, -5.9, 2.2, -d/2+t+0.05, 0, '#4a5d6b');
+
+    // lustra stojące przy tylnej ścianie, po prawej stronie: w sklepie to zwykła szyba (prawdziwe odbicie działa dopiero w domu gracza)
+    const glassTex = tex(64,128,(g,cw,ch)=>{ const gr = g.createLinearGradient(0,0,cw,ch); gr.addColorStop(0,'#e9f6ff'); gr.addColorStop(.45,'#9fd3f0'); gr.addColorStop(.55,'#d6eefc'); gr.addColorStop(1,'#7fb8d8'); g.fillStyle = gr; g.fillRect(0,0,cw,ch); });
+    const makeShopMirror = () => {
+      const mg = new THREE.Group();
+      const mb = (bw,bh,bd,c,x,y,z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), lamb(c)); m.position.set(x,y,z); m.castShadow = m.receiveShadow = true; mg.add(m); };
+      mb(0.9,1.9,0.08,0x6d4c41,0,1.0,0);                                            // rama
+      [-0.38,0.38].forEach(x => mb(0.06,0.05,0.42,0x4e342e,x,0.025,-0.05));         // nóżki
+      const gl = new THREE.Mesh(new THREE.PlaneGeometry(0.78,1.74), new THREE.MeshBasicMaterial({map:glassTex}));
+      gl.position.set(0,1.0,0.045); mg.add(gl);                                     // szyba
+      return mg;
+    };
+    [3.5,5.1,6.7,8.3].forEach(x => place(makeShopMirror(), x, 0, -d/2+t+0.3, 0));
+    WALLS.push({x:SX+5.9, z:SZ-d/2+t+0.3, w:5.7, d:0.6});
+    label('🪞 LUSTRA', 3.4, 5.9, 2.9, -d/2+t+0.05, 0, '#6d4c41');
 
     // lada kasowa przy wejściu (prawa strona) i kasjer
     box(6,1.1,1.0,orange,8.5,0.55,6.6,true);
@@ -1179,7 +1377,7 @@
       const canHold = inv.some(x => x && x.id === g.id) || inv.indexOf(null) >= 0;
       if(!canHold){ toast('Ekwipunek pełny – zrób miejsce'); return; }
     }
-    if(!payAny(g.p, 'zakup w AGD Domator: ' + g.n.toLowerCase())){
+    if(!payAny(g.p, 'zakup w Dom i AGD: ' + g.n.toLowerCase())){
       toast(`${g.n} kosztuje ${g.p} monet 🪙 (masz ${coins()}${bank.opened ? ' + ' + bank.balance + ' na koncie' : ''})`); return;
     }
     if(g.big) addBig(g.id); else addItem(g.id);
@@ -1188,9 +1386,20 @@
     toast(`Kupiono: ${ITEMS[g.id].i} ${ITEMS[g.id].n}`);
   }
   function openAgdTalk(msg){
-    say(msg || 'Witaj w AGD Domator! Mamy na sprzedaż piekarnik za 40 monet 🪙 – w ekwipunku zajmie 8 slotów, a ustawisz go w swoim domu.',
-      AGD_GOODS.map(g => ({label:`Kup ${g.n.toLowerCase()} (${g.p} 🪙)`, fn:() => buyAgd(g)})).concat([{label:'Wyjdź', fn:closeDialog}]),
+    say(msg || 'Witaj w Dom i AGD! Kliknij kwadrat z towarem, żeby go kupić. Wszystko ustawisz w swoim domu; piekarnik zajmie w ekwipunku 8 slotów.',
+      [{label:'Wyjdź', fn:closeDialog}],
       '🔌 Adam, sprzedawca AGD', 'agd');
+    const grid = document.createElement('div');                       // kwadraty z ikonkami – jak sloty w ekwipunku
+    grid.id = 'dlgGrid';
+    AGD_GOODS.forEach(g => {
+      const it = ITEMS[g.id], el = document.createElement('div');
+      el.className = 'slot';
+      el.title = `${g.n} – ${g.p} monet` + (g.big ? ` (zajmuje ${BIG[g.id].slots} slotów)` : '');
+      el.innerHTML = `<span class="nm">${g.n}</span>${it.i}<span class="n">${coinHTML(g.p + ' 🪙')}</span>`;
+      el.onclick = () => buyAgd(g);
+      grid.appendChild(el);
+    });
+    $('dlgText').insertAdjacentElement('afterend', grid);
   }
 
   // Sklep z wnętrzem (front od strony ulicy, grupa obrócona o 180°)
@@ -1547,6 +1756,39 @@
     return g;
   }
 
+  function makeToilet(ghost){
+    const g = new THREE.Group();
+    const M = c => ghost ? deskGhostMat : new THREE.MeshLambertMaterial({color:c});
+    const bx = (w,h,d,c,x,y,z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), M(c)); m.position.set(x,y,z); if(!ghost) m.castShadow = m.receiveShadow = true; g.add(m); return m; };
+    bx(0.34,0.2,0.4,0xf4f6f7,0,0.12,0.08);                                          // cokół miski
+    bx(0.4,0.22,0.52,0xf4f6f7,0,0.32,0.1);                                          // miska
+    bx(0.42,0.04,0.5,0xdfe5e8,0,0.45,0.1);                                          // deska
+    bx(0.38,0.05,0.34,0xeef1f3,0,0.5,-0.0);                                         // klapa (uchylona do tyłu)
+    bx(0.44,0.46,0.2,0xf4f6f7,0,0.62,-0.22);                                        // spłuczka
+    bx(0.1,0.03,0.06,0xaab4ba,0,0.87,-0.22);                                        // przycisk
+    return g;
+  }
+  function makeBathtub(ghost){
+    const g = new THREE.Group();
+    const M = c => ghost ? deskGhostMat : new THREE.MeshLambertMaterial({color:c});
+    const bx = (w,h,d,c,x,y,z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), M(c)); m.position.set(x,y,z); if(!ghost) m.castShadow = m.receiveShadow = true; g.add(m); return m; };
+    bx(1.8,0.56,0.8,0xf4f6f7,0,0.3,0);                                              // korpus wanny
+    bx(1.6,0.03,0.6,0x6ab7e8,0,0.58,0);                                             // woda
+    [-0.75,0.75].forEach(x => [-0.32,0.32].forEach(z => bx(0.08,0.04,0.08,0x9aa5ad,x,0.02,z)));   // nóżki
+    bx(0.08,0.3,0.08,0xaab4ba,-0.78,0.75,0); bx(0.06,0.06,0.2,0xaab4ba,-0.78,0.9,0.1);              // bateria z wylewką
+    return g;
+  }
+  function makeMirrorFurn(ghost){                                                   // lustro stojące: szyba z odbiciem skierowana w lokalne +z
+    const g = new THREE.Group();
+    const M = c => ghost ? deskGhostMat : new THREE.MeshLambertMaterial({color:c});
+    const bx = (w,h,d,c,x,y,z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), M(c)); m.position.set(x,y,z); if(!ghost) m.castShadow = m.receiveShadow = true; g.add(m); return m; };
+    bx(0.9,1.9,0.08,0x6d4c41,0,1.0,0);                                              // rama
+    [-0.38,0.38].forEach(x => bx(0.06,0.05,0.42,0x4e342e,x,0.025,-0.05));           // nóżki
+    if(ghost){ bx(0.78,1.74,0.02,0x9fd3f0,0,1.0,0.045); }
+    else { const mm = makeMirrorPlane(0.78,1.74); mm.position.set(0,1.0,0.045); g.add(mm); }
+    return g;
+  }
+
   function makeOven(ghost){
     const g = new THREE.Group();
     const M = c => ghost ? deskGhostMat : new THREE.MeshLambertMaterial({color:c});
@@ -1600,7 +1842,7 @@
       const glow = new THREE.Sprite(new THREE.SpriteMaterial({map:makeLamp.glowTex, transparent:true, blending:THREE.AdditiveBlending, depthWrite:false, fog:false}));
       glow.scale.set(1.5,1.5,1); glow.position.y = -0.66; g.add(glow);                                                           // ciepła poświata wokół żarówki
     }
-    if(ghost) add(new THREE.CylinderGeometry(0.3,0.3,0.02,20), deskGhostMat, 0.09 - HOME.h);                  // znacznik na podłodze pod lampą
+    if(ghost) add(new THREE.CylinderGeometry(0.25,0.25,0.02,20), deskGhostMat, 0.09 - HOME.h);                  // znacznik na podłodze pod lampą
     return g;
   }
   // Stała pula świateł (zmiana liczby świateł w scenie wymuszałaby przekompilowanie shaderów) – świecą pierwsze 3 lampy.
@@ -1812,7 +2054,12 @@
   // ===== Sklep z ubraniami przy ulicy Społecznej (wschodnia strona, drzwi na zachód – w stronę jezdni) =====
   const CLOTH = {x:144, z:56, w:10, d:7, h:3.6};                 // w – wzdłuż osi Z świata, d – wzdłuż osi X świata
   BUILDINGS.push({x:CLOTH.x, z:CLOTH.z, w:CLOTH.d, d:CLOTH.w, open:true});
-  const HAT_PRICE = 10, CAP_PRICE = 8;
+  const HAT_PRICE = 10, CAP_PRICE = 8, SHIRT_PRICE = 6, SHOES_PRICE = 12, PANTS_PRICE = 10, PANTS_DEF = 0x333333;
+  // Buty mają dwa kolory (cholewka + podeszwa) zapisane w jednej liczbie: cholewka + podeszwa * 0x1000000
+  const SH_DEF_UP = 0x1d1d1f, SH_DEF_SOLE = 0xe8e8e8;
+  const shoeEnc = (u, so) => (u & 0xffffff) + (so & 0xffffff) * 0x1000000;
+  const shoeUp = v => v % 0x1000000, shoeSole = v => Math.floor(v / 0x1000000);
+  const NOSTACK = id => id === 'shirt' || id === 'shoes' || id === 'pants';        // każda sztuka w osobnym slocie
   function buildCapGroup(color){                         // czapka z daszkiem: kopuła + półokrągły daszek + guzik, jeden materiał (jeden kolor)
     const g = new THREE.Group(), m = new THREE.MeshLambertMaterial({color});
     const crown = new THREE.Mesh(new THREE.SphereGeometry(0.3, 18, 10, 0, Math.PI*2, 0, Math.PI/2), m); crown.scale.y = 0.8;
@@ -1855,7 +2102,7 @@
     clothExterior.push(box(5.0, 0.1, 1.3, pink, 0, 2.7, d/2+0.65, false));
     const sc = document.createElement('canvas'); sc.width = 512; sc.height = 128;
     const sg = sc.getContext('2d'); sg.fillStyle = '#7b3f5c'; sg.fillRect(0,0,512,128);
-    sg.fillStyle = '#ffd6e8'; sg.font = 'bold 60px sans-serif'; sg.textAlign = 'center'; sg.textBaseline = 'middle'; sg.fillText('👕 UBRANIA 🎩', 256, 68);
+    sg.fillStyle = '#ffd6e8'; sg.font = 'bold 60px sans-serif'; sg.textAlign = 'center'; sg.textBaseline = 'middle'; sg.fillText('👕 ZARA\'Z 🎩', 256, 68);
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 1.15), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sc)}));
     sign.position.set(0, 3.1, d/2+0.04); grp.add(sign); clothExterior.push(sign);
 
@@ -1889,6 +2136,52 @@
     const cprice = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.4), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(cpc)}));
     cprice.position.set(-2.4, 0.7, 1.86); grp.add(cprice);
 
+    // stojak z koszulką i ceną
+    box(0.5, 0.9, 0.5, dark, -1.2, 0.45, 1.6, true);
+    const sdisp = new THREE.Group(), smat = new THREE.MeshLambertMaterial({color:0x2d6cdf});
+    const sTorso = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.55, 0.26), smat); sTorso.position.y = 0.3;
+    const sArmL = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.4, 0.2), smat), sArmR = sArmL.clone();
+    sArmL.position.set(-0.33, 0.38, 0); sArmR.position.set(0.33, 0.38, 0); sArmL.rotation.z = 0.5; sArmR.rotation.z = -0.5;
+    sdisp.add(sTorso, sArmL, sArmR); sdisp.position.set(-1.2, 0.95, 1.6); sdisp.rotation.y = 0.2;
+    sdisp.children.forEach(m => m.castShadow = true); grp.add(sdisp);
+    const spc = document.createElement('canvas'); spc.width = 256; spc.height = 128;
+    const spg = spc.getContext('2d'); spg.fillStyle = '#fff6d6'; spg.fillRect(0,0,256,128); spg.strokeStyle = '#d1477a'; spg.lineWidth = 8; spg.strokeRect(4,4,248,120);
+    spg.fillStyle = '#222'; spg.textAlign = 'center'; spg.textBaseline = 'middle'; spg.font = 'bold 40px sans-serif'; spg.fillText('KOSZULKA', 128, 40);
+    spg.font = 'bold 44px sans-serif'; spg.fillStyle = '#c0392b'; spg.fillText(SHIRT_PRICE + ' monet', 128, 92);
+    const sprice = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.4), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(spc)}));
+    sprice.position.set(-1.2, 0.7, 1.86); grp.add(sprice);
+
+    // stojak z butami i ceną
+    box(0.5, 0.9, 0.5, dark, 3.6, 0.45, 1.6, true);
+    const bdisp = new THREE.Group(), bTop = lamb(0x1d1d1f), bSole = lamb(0xe8e8e8);
+    [-0.13, 0.13].forEach(ox => {
+      const t1 = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.12,0.38), bTop); t1.position.set(ox, 0.09, 0);
+      const s1 = new THREE.Mesh(new THREE.BoxGeometry(0.21,0.05,0.4), bSole); s1.position.set(ox, 0.025, 0);
+      t1.castShadow = s1.castShadow = true; bdisp.add(t1, s1);
+    });
+    bdisp.position.set(3.6, 0.9, 1.6); bdisp.rotation.y = -0.3; grp.add(bdisp);
+    const bpc = document.createElement('canvas'); bpc.width = 256; bpc.height = 128;
+    const bpg = bpc.getContext('2d'); bpg.fillStyle = '#fff6d6'; bpg.fillRect(0,0,256,128); bpg.strokeStyle = '#d1477a'; bpg.lineWidth = 8; bpg.strokeRect(4,4,248,120);
+    bpg.fillStyle = '#222'; bpg.textAlign = 'center'; bpg.textBaseline = 'middle'; bpg.font = 'bold 40px sans-serif'; bpg.fillText('BUTY', 128, 40);
+    bpg.font = 'bold 44px sans-serif'; bpg.fillStyle = '#c0392b'; bpg.fillText(SHOES_PRICE + ' monet', 128, 92);
+    const bprice = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.4), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(bpc)}));
+    bprice.position.set(3.6, 0.7, 1.86); grp.add(bprice);
+
+    // stojak ze spodniami i ceną
+    box(0.5, 0.9, 0.5, dark, 2.4, 0.45, 1.6, true);
+    const pdisp = new THREE.Group(), pmat = lamb(0x333333);
+    const pWaist = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.1,0.18), pmat); pWaist.position.y = 0.45;
+    const pLegL = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.5,0.16), pmat), pLegR = pLegL.clone();
+    pLegL.position.set(-0.1, 0.2, 0); pLegR.position.set(0.1, 0.2, 0);
+    pdisp.add(pWaist, pLegL, pLegR); pdisp.position.set(2.4, 0.95, 1.6); pdisp.rotation.y = -0.2;
+    pdisp.children.forEach(m => m.castShadow = true); grp.add(pdisp);
+    const ppc = document.createElement('canvas'); ppc.width = 256; ppc.height = 128;
+    const ppg = ppc.getContext('2d'); ppg.fillStyle = '#fff6d6'; ppg.fillRect(0,0,256,128); ppg.strokeStyle = '#d1477a'; ppg.lineWidth = 8; ppg.strokeRect(4,4,248,120);
+    ppg.fillStyle = '#222'; ppg.textAlign = 'center'; ppg.textBaseline = 'middle'; ppg.font = 'bold 40px sans-serif'; ppg.fillText('SPODNIE', 128, 40);
+    ppg.font = 'bold 44px sans-serif'; ppg.fillStyle = '#c0392b'; ppg.fillText(PANTS_PRICE + ' monet', 128, 92);
+    const pprice = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.4), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(ppc)}));
+    pprice.position.set(2.4, 0.7, 1.86); grp.add(pprice);
+
     // lada sprzedawcy
     box(3.7, 1.1, 0.8, dark, 2.45, 0.55, -1.2, true);
     box(3.9, 0.08, 1.0, lamb(0xd7b98a), 2.45, 1.14, -1.2, false);
@@ -1910,7 +2203,7 @@
       const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c), transparent:true}));
       sp.scale.set(sw, sh, 1); sp.position.set(npc.position.x, y, npc.position.z); scene.add(sp); return sp;
     };
-    tag(g => { g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0,8,256,48); g.fillStyle = '#fff'; g.font = 'bold 26px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('Ola • ubrania', 128, 33); }, 1.8, 0.45, 2.7);
+    tag(g => { g.fillStyle = 'rgba(0,0,0,.55)'; g.fillRect(0,8,256,48); g.fillStyle = '#fff'; g.font = 'bold 26px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('Ola • ZARA\'Z', 128, 33); }, 1.8, 0.45, 2.7);
     clothNpc.userData.mark = tag(g => { g.fillStyle = '#ffd54a'; g.strokeStyle = '#000'; g.lineWidth = 6; g.font = 'bold 60px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.strokeText('!', 128, 34); g.fillText('!', 128, 34); }, 1.0, 0.25, 3.1);
     clothLight.position.set(CX, 3.0, CZ); scene.add(clothLight);
   })();
@@ -1927,9 +2220,12 @@
   }
   const HEAD_DEF = {
     hat:{price:HAT_PRICE, name:'Kapelusz', acc:'kapelusz', gen:'kapelusza', emoji:'🎩', def:0x222222},
-    cap:{price:CAP_PRICE, name:'Czapka z daszkiem', acc:'czapkę z daszkiem', gen:'czapki z daszkiem', emoji:'🧢', def:0xc62828}
+    cap:{price:CAP_PRICE, name:'Czapka z daszkiem', acc:'czapkę z daszkiem', gen:'czapki z daszkiem', emoji:'🧢', def:0xc62828},
+    shirt:{price:SHIRT_PRICE, name:'Koszulka', acc:'koszulkę', gen:'koszulki', emoji:'👕', get def(){ return accShirtCol; }},   // domyślnie w kolorze konta
+    shoes:{price:SHOES_PRICE, name:'Buty', acc:'buty', gen:'butów', emoji:'👟', def:SH_DEF_UP},
+    pants:{price:PANTS_PRICE, name:'Spodnie', acc:'spodnie', gen:'spodni', emoji:'👖', def:PANTS_DEF}
   };
-  const canAddItem = (id, color) => inv.some(x => x && x.id === id && x.color === color) || inv.indexOf(null) >= 0;
+  const canAddItem = (id, color) => (!NOSTACK(id) && inv.some(x => x && x.id === id && x.color === color)) || inv.indexOf(null) >= 0;   // koszulki się nie stackują
   function buyHeadwear(kind, color){
     const D = HEAD_DEF[kind];
     if(coins() < D.price){ toast(`${D.name} kosztuje ${D.price} monet 🪙 (masz ${coins()})`); return false; }
@@ -1940,12 +2236,13 @@
     return true;
   }
   // okno wyboru koloru RGB kapelusza / czapki (podgląd na żywo na postaci)
-  let headUiKind = null, headPrevWorn = null, headColor = 0;
+  let headUiKind = null, headPrevWorn = null, headColor = 0, headColor2 = 0, headPart = 0;   // headColor2/headPart: buty mają 2 kolory (0 = cholewka, 1 = podeszwa)
   const headUI = document.createElement('div'); headUI.id = 'headUI';
   headUI.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(330px,calc(100vw - 28px));background:rgba(20,24,30,.97);color:#fff;border-radius:14px;padding:16px;display:none;z-index:40;box-sizing:border-box;font-size:14px';
   const hRow = (id, name, col) => `<div style="display:flex;align-items:center;gap:8px;margin:8px 0"><b style="width:16px;color:${col}">${name}</b><input id="${id}" type="range" min="0" max="255" value="0" style="flex:1"><input id="${id}n" type="number" min="0" max="255" value="0" style="width:58px;padding:3px;border-radius:6px;border:0;background:#2b3340;color:#fff"></div>`;
   const HEAD_PRESETS = [0x222222,0xffffff,0xc62828,0xef6c00,0xf9a825,0x2e7d32,0x1565c0,0x6a1b9a,0xd1477a,0x6d4c41];
   headUI.innerHTML = `<h3 id="headTitle" style="margin:0 0 10px"></h3>
+    <div id="headTabs" style="display:none;gap:8px;margin-bottom:10px"><button id="headTab0" type="button" style="flex:1;padding:8px;border:0;border-radius:8px;background:#333;color:#fff;cursor:pointer"><i id="headTab0c" style="display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid #fff;margin-right:6px;vertical-align:middle"></i>Cholewka</button><button id="headTab1" type="button" style="flex:1;padding:8px;border:0;border-radius:8px;background:#333;color:#fff;cursor:pointer"><i id="headTab1c" style="display:inline-block;width:12px;height:12px;border-radius:3px;border:1px solid #fff;margin-right:6px;vertical-align:middle"></i>Podeszwa</button></div>
     <div id="headSwatch" style="height:54px;border-radius:10px;border:2px solid rgba(255,255,255,.25);margin-bottom:10px"></div>
     <div style="display:flex;align-items:center;gap:10px"><span>Paleta:</span><input id="headPick" type="color" style="width:56px;height:32px;border:0;background:none;padding:0"><span id="headHex" style="opacity:.8;font-family:monospace"></span></div>
     <div id="headPresets" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px"></div>
@@ -1966,32 +2263,43 @@
     const hex = '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
     hEl('headR').value = hEl('headRn').value = r; hEl('headG').value = hEl('headGn').value = g; hEl('headB').value = hEl('headBn').value = b;
     hEl('headPick').value = hex; hEl('headHex').textContent = hex.toUpperCase() + `  (${r}, ${g}, ${b})`; hEl('headSwatch').style.background = hex;
-    headColor = (r << 16) | (g << 8) | b;
-    if(headUiKind) setWorn({id:headUiKind, color:headColor});                 // podgląd na postaci
+    const c24 = (r << 16) | (g << 8) | b;
+    if(headPart === 1) headColor2 = c24; else headColor = c24;
+    if(headUiKind === 'shoes'){ hEl('headTab0c').style.background = '#' + hex6(headColor); hEl('headTab1c').style.background = '#' + hex6(headColor2); }
+    if(headUiKind) setWorn({id:headUiKind, color: headUiKind === 'shoes' ? shoeEnc(headColor, headColor2) : headColor});   // podgląd na postaci
   }
   ['R','G','B'].forEach(k => ['','n'].forEach(sfx => { hEl('head'+k+sfx).oninput = e => {
     const v = {R:hEl('headR').value, G:hEl('headG').value, B:hEl('headB').value}; v[k] = e.target.value; headSet(v.R, v.G, v.B);
   }; }));
   hEl('headPick').oninput = () => { const h = hEl('headPick').value; headSet(parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)); };
+  function headTab(n){                                                         // buty: przełączanie edycji cholewka / podeszwa
+    headPart = n; const v = n ? headColor2 : headColor;
+    hEl('headTab0').style.outline = n ? 'none' : '2px solid #fff'; hEl('headTab1').style.outline = n ? '2px solid #fff' : 'none';
+    headSet(v >> 16 & 255, v >> 8 & 255, v & 255);
+  }
+  hEl('headTab0').onclick = () => headTab(0); hEl('headTab1').onclick = () => headTab(1);
   function closeHeadUI(cancel, reopenTalk){
     if(!headUiKind) return;
-    setWorn(headPrevWorn);                                                     // wracamy do tego, co gracz miał na głowie
+    if(headUiKind === 'shirt') setShirt(headPrevWorn); else if(headUiKind === 'shoes') setShoes(headPrevWorn); else if(headUiKind === 'pants') setPants(headPrevWorn); else setWorn(headPrevWorn);   // wracamy do tego, co gracz miał na sobie
     headUiKind = null; headUI.style.display = 'none';
     if(reopenTalk) openClothTalk();
   }
   function openHeadPicker(kind){
     closeDialog();
-    headPrevWorn = worn ? {id:worn.id, color:worn.color} : null; headUiKind = kind;
+    const pw = kind === 'shirt' ? wornShirt : kind === 'shoes' ? wornShoes : kind === 'pants' ? wornPants : worn;
+    headPrevWorn = pw ? {id:pw.id, color:pw.color} : null; headUiKind = kind;
     const D = HEAD_DEF[kind];
     hEl('headTitle').textContent = `${D.emoji} ${D.name} – wybierz kolor`;
     hEl('headOk').innerHTML = coinHTML(`Kup (${D.price} 🪙)`);
     headUI.style.display = 'block';
-    headSet(D.def >> 16 & 255, D.def >> 8 & 255, D.def & 255);
+    hEl('headTabs').style.display = kind === 'shoes' ? 'flex' : 'none'; headPart = 0;
+    if(kind === 'shoes'){ headColor = SH_DEF_UP; headColor2 = SH_DEF_SOLE; headTab(0); }
+    else headSet(D.def >> 16 & 255, D.def >> 8 & 255, D.def & 255);
     if(document.pointerLockElement) try{ document.exitPointerLock(); }catch(e){}
     hEl('headOk').focus();
   }
   hEl('headOk').onclick = () => {
-    const kind = headUiKind, color = headColor; if(!kind) return;
+    const kind = headUiKind, color = kind === 'shoes' ? shoeEnc(headColor, headColor2) : headColor; if(!kind) return;
     const D = HEAD_DEF[kind];
     if(!buyHeadwear(kind, color)) return;
     closeHeadUI(false);
@@ -2002,8 +2310,8 @@
   headUI.addEventListener('keydown', e => { e.stopPropagation(); if(e.code === 'Escape') closeHeadUI(true, true); });
   headUI.addEventListener('keyup', e => e.stopPropagation());
   function openClothTalk(msg){
-    say(msg || `Witaj w sklepie z ubraniami! Mam elegancki kapelusz za ${HAT_PRICE} monet 🪙 i czapkę z daszkiem za ${CAP_PRICE} monet 🪙. Kolor wybierzesz sam z palety RGB. Założysz je w ekwipunku (I).`,
-      [{label:`Kup kapelusz (${HAT_PRICE} 🪙)`, fn:() => openHeadPicker('hat')}, {label:`Kup czapkę z daszkiem (${CAP_PRICE} 🪙)`, fn:() => openHeadPicker('cap')}, {label:'Wyjdź', fn:closeDialog}], '👗 Ola, sprzedawczyni', 'cloth');
+    say(msg || `Witaj w ZARA'Z! Mam elegancki kapelusz za ${HAT_PRICE} monet 🪙, czapkę z daszkiem za ${CAP_PRICE} monet 🪙 koszulkę za ${SHIRT_PRICE} monet 🪙, buty za ${SHOES_PRICE} monet 🪙 i spodnie za ${PANTS_PRICE} monet 🪙. Kolory wybierzesz sam z palety RGB. Założysz je w ekwipunku (I).`,
+      [{label:`Kup kapelusz (${HAT_PRICE} 🪙)`, fn:() => openHeadPicker('hat')}, {label:`Kup czapkę z daszkiem (${CAP_PRICE} 🪙)`, fn:() => openHeadPicker('cap')}, {label:`Kup koszulkę (${SHIRT_PRICE} 🪙)`, fn:() => openHeadPicker('shirt')}, {label:`Kup buty (${SHOES_PRICE} 🪙)`, fn:() => openHeadPicker('shoes')}, {label:`Kup spodnie (${PANTS_PRICE} 🪙)`, fn:() => openHeadPicker('pants')}, {label:'Wyjdź', fn:closeDialog}], '👗 Ola, sprzedawczyni', 'cloth');
   }
 
   // ===== Salon samochodowy przy ulicy Poprzecznej (wschodnia strona, drzwi na zachód) =====
@@ -2019,8 +2327,9 @@
     part(new THREE.BoxGeometry(4.2,.7,1.9), bodyMat, 0, .68, 0);
     const cabin = part(new THREE.BoxGeometry(2.3,.62,1.7), bodyMat, -.2, 1.3, 0);
     const glassBand = part(new THREE.BoxGeometry(2.35,.45,1.72), lm(0x2b3a46), -.2, 1.32, 0); glassBand.scale.set(.97,1,1);
-    part(new THREE.BoxGeometry(.04,.14,1.5), new THREE.MeshBasicMaterial({color:0xfff2b0}), 2.11, .78, 0);
-    part(new THREE.BoxGeometry(.04,.14,1.5), new THREE.MeshBasicMaterial({color:0xc01818}), -2.11, .78, 0);
+    const headMat = new THREE.MeshBasicMaterial({color:0xfff2b0}), tailMat = new THREE.MeshBasicMaterial({color:0xc01818});
+    part(new THREE.BoxGeometry(.04,.14,1.5), headMat, 2.11, .78, 0);
+    part(new THREE.BoxGeometry(.04,.14,1.5), tailMat, -2.11, .78, 0);
     const sigGeo = new THREE.BoxGeometry(.1,.17,.3), sigL = new THREE.MeshBasicMaterial({color:SIG_OFF}), sigR = new THREE.MeshBasicMaterial({color:SIG_OFF});
     [2.12,-2.12].forEach(x => { part(sigGeo, sigL, x, .78, -.84); part(sigGeo, sigR, x, .78, .84); });   // lokalny +z = prawa strona
     const wheelGeo = new THREE.CylinderGeometry(.36,.36,.26,14), wheelMat = lm(0x16161a), wheels = [];
@@ -2030,7 +2339,7 @@
     });
     g.rotation.y = -Math.PI/2;                                      // przód (+X modelu) → +Z grupy zewnętrznej
     const wrap = new THREE.Group(); wrap.add(g);
-    return {group:wrap, wheels, bodyMat, sigL, sigR, root:g, cabin, glassBand};
+    return {group:wrap, wheels, bodyMat, sigL, sigR, headMat, tailMat, root:g, cabin, glassBand};
   }
   BUILDINGS.push({x:CAR.x, z:CAR.z, w:CAR.d, d:CAR.w, open:true});
   const carWallMat = new THREE.MeshLambertMaterial({color:0xe9edf2});
@@ -2672,20 +2981,27 @@
   const placedDesks = [];
   let placing = null;
   const deskDims = r => (r % 2) ? {w:0.8, d:1.6} : {w:1.6, d:0.8};
-  const furnDims = (kind, r) => kind === 'lamp' ? {w:0.5, d:0.5} : kind === 'chair' ? {w:0.5, d:0.5} : kind === 'wardrobe' ? ((r % 2) ? {w:0.6, d:1.2} : {w:1.2, d:0.6}) : kind === 'computer' ? {w:0.82, d:0.62} : kind === 'oven' ? ((r % 2) ? {w:0.7, d:0.9} : {w:0.9, d:0.7}) : deskDims(r);
-  const furnNoun = kind => kind === 'lamp' ? {nom:'lampa', gen:'lampy'} : kind === 'chair' ? {nom:'krzesło', gen:'krzesła'} : kind === 'wardrobe' ? {nom:'szafa', gen:'szafy'} : kind === 'computer' ? {nom:'komputer', gen:'komputera'} : kind === 'oven' ? {nom:'piekarnik', gen:'piekarnika'} : {nom:'biurko', gen:'biurka'};
-  const makeFurn = (kind, ghost) => kind === 'lamp' ? makeLamp(ghost) : kind === 'chair' ? makeChair(ghost) : kind === 'wardrobe' ? makeWardrobe(ghost) : kind === 'computer' ? makeComputer(ghost) : kind === 'oven' ? makeOven(ghost) : makeDesk(ghost);
+  const furnDimsBase = (kind, r) => kind === 'lamp' ? {w:0.5, d:0.5} : kind === 'chair' ? {w:0.5, d:0.5} : kind === 'wardrobe' ? ((r % 2) ? {w:0.68, d:1.3} : {w:1.3, d:0.68}) : kind === 'computer' ? {w:0.82, d:0.62} : kind === 'oven' ? ((r % 2) ? {w:0.7, d:0.9} : {w:0.9, d:0.7}) : deskDims(r);
+  const furnNounBase = kind => kind === 'lamp' ? {nom:'lampa', gen:'lampy'} : kind === 'chair' ? {nom:'krzesło', gen:'krzesła'} : kind === 'wardrobe' ? {nom:'szafa', gen:'szafy'} : kind === 'computer' ? {nom:'komputer', gen:'komputera'} : kind === 'oven' ? {nom:'piekarnik', gen:'piekarnika'} : {nom:'biurko', gen:'biurka'};
+  const makeFurnBase = (kind, ghost) => kind === 'lamp' ? makeLamp(ghost) : kind === 'chair' ? makeChair(ghost) : kind === 'wardrobe' ? makeWardrobe(ghost) : kind === 'computer' ? makeComputer(ghost) : kind === 'oven' ? makeOven(ghost) : makeDesk(ghost);
+  // Wyposażenie łazienki sprzedawane w Dom i AGD: toaleta, wanna, lustro stojące (ustawiane i podnoszone jak meble)
+  const FIXT = ['toilet','bathtub','mirror'];
+  const FIXT_DIMS = {toilet:[0.5,0.8], bathtub:[1.8,0.8], mirror:[0.9,0.52]}, FIXT_NOUN = {toilet:{nom:'toaleta', gen:'toalety'}, bathtub:{nom:'wanna', gen:'wanny'}, mirror:{nom:'lustro', gen:'lustra'}};
+  const furnDims = (kind, r) => FIXT_DIMS[kind] ? ((r % 2) ? {w:FIXT_DIMS[kind][1], d:FIXT_DIMS[kind][0]} : {w:FIXT_DIMS[kind][0], d:FIXT_DIMS[kind][1]}) : furnDimsBase(kind, r);
+  const furnNoun = kind => FIXT_NOUN[kind] || furnNounBase(kind);
+  const makeFurn = (kind, ghost) => kind === 'toilet' ? makeToilet(ghost) : kind === 'bathtub' ? makeBathtub(ghost) : kind === 'mirror' ? makeMirrorFurn(ghost) : makeFurnBase(kind, ghost);
   const overlap = (ax,az,aw,ad,b) => Math.abs(ax-b.x) < (aw+b.w)/2 - 0.001 && Math.abs(az-b.z) < (ad+b.d)/2 - 0.001;
   const homeReserved = () => [
-    homeRect(-2.4, -1.5, 2.3, 3.2),                      // łóżko
-    homeRect(2.8, -2.5, 1.3, 1.1),                       // lodówka
-    homeRect(0, HOME.d/2-0.9, 2.4, 1.8)                  // wolne przejście przy drzwiach
+    homeRect(HOME.lay.bed.x, HOME.lay.bed.z, 2.3, 3.2),          // łóżko
+    homeRect(HOME.lay.fridge.x, HOME.lay.fridge.z, 1.3, 1.1),    // lodówka
+    homeRect(0, HOME.d/2-0.9, 2.4, 1.8),                         // wolne przejście przy drzwiach
+    ...HOME.lay.reserve.map(r => homeRect(r[0], r[1], r[2], r[3]))   // wolne przejścia między pomieszczeniami
   ];
   function startPlacement(k){
     if(!homeInside){ toast('Meble możesz ustawiać tylko w swoim domu 🏠'); return; }
     if(placing) return;
     if(sitting){ toast('Najpierw wstań z krzesła'); return; }
-    const kind = inv[k] && ['chair','wardrobe','computer','lamp','oven'].includes(inv[k].id) ? inv[k].id : 'desk';
+    const kind = inv[k] && ['chair','wardrobe','computer','lamp','oven','toilet','bathtub','mirror'].includes(inv[k].id) ? inv[k].id : 'desk';
     const ghost = makeFurn(kind, true); scene.add(ghost);
     placing = {slot:k, kind, rot:0, ghost, valid:false, x:0, z:0};
     invEl.style.display = 'none';
@@ -2701,6 +3017,23 @@
     if(msg) toast(msg);
   }
   function rotatePlacement(){ if(placing) placing.rot = placing.kind === 'computer' ? (placing.rot + 1) % 2 : (placing.rot + 1) % 4; }
+  // Czy odcinek (x0,z0)→(x1,z1) przecina którąś ścianę domu (meble stojące w domu nie liczą się jako ściana).
+  function wallBetween(x0, z0, x1, z1){
+    const furn = new Set(placedDesks.map(pd => pd.wall));
+    if(sitting) furn.add(sitting.wall);
+    for(const w of WALLS){
+      if(furn.has(w) || w.enter !== undefined) continue;
+      const lo = [w.x - w.w/2, w.x + w.w/2, w.z - w.d/2, w.z + w.d/2];
+      if(Math.min(x0, x1) > lo[1] + 0.01 || Math.max(x0, x1) < lo[0] - 0.01 || Math.min(z0, z1) > lo[3] + 0.01 || Math.max(z0, z1) < lo[2] - 0.01) continue;
+      let t0 = 0, t1 = 1, hit = true;
+      for(const [d, q, a0, a1] of [[x1 - x0, x0, lo[0], lo[1]], [z1 - z0, z0, lo[2], lo[3]]]){
+        if(Math.abs(d) < 1e-9){ if(q < a0 || q > a1){ hit = false; break; } }
+        else { let u = (a0 - q)/d, v = (a1 - q)/d; if(u > v){ const tmp = u; u = v; v = tmp; } t0 = Math.max(t0, u); t1 = Math.min(t1, v); if(t0 > t1){ hit = false; break; } }
+      }
+      if(hit) return true;
+    }
+    return false;
+  }
   function updatePlacement(){
     if(!placing) return;
     if(!homeInside){ cancelPlacement('Wyszedłeś z domu – anulowano ustawianie mebla'); return; }
@@ -2729,20 +3062,38 @@
     }
     const lx = HOME.ww/2 - t - dm.w/2, lz = HOME.wd/2 - t - dm.d/2;
     let cx = player.position.x + Math.sin(facing)*1.8, cz = player.position.z + Math.cos(facing)*1.8;
-    cx = HOME.x + Math.max(-lx, Math.min(lx, cx - HOME.x));
-    cz = HOME.z + Math.max(-lz, Math.min(lz, cz - HOME.z));
-    cx = Math.round(cx*20)/20; cz = Math.round(cz*20)/20;
+    const clX = v => HOME.x + Math.max(-lx, Math.min(lx, v - HOME.x)), clZ = v => HOME.z + Math.max(-lz, Math.min(lz, v - HOME.z));
+    cx = clX(cx); cz = clZ(cz);
+    // Ściana jest twardą granicą: podgląd idzie od gracza w stronę celu i zatrzymuje się przed pierwszą ścianą (też działową) – nie przeskakuje na drugą stronę
+    const hitsWall = (x, z) => WALLS.some(b => b.struct && overlap(x, z, dm.w, dm.d, b));
+    {
+      const sx = clX(player.position.x), sz = clZ(player.position.z), N = 60;
+      let free = 0, blocked = 1;
+      for(let i = 1; i <= N; i++){ const u = i/N; if(hitsWall(sx + (cx-sx)*u, sz + (cz-sz)*u)){ blocked = u; break; } free = u; }
+      if(blocked < 1) for(let k = 0; k < 10; k++){ const m = (free + blocked)/2; if(hitsWall(sx + (cx-sx)*m, sz + (cz-sz)*m)) blocked = m; else free = m; }
+      cx = sx + (cx-sx)*free; cz = sz + (cz-sz)*free;
+      const snx = Math.round(cx*20)/20, snz = Math.round(cz*20)/20;
+      if(!hitsWall(snx, snz)){ cx = snx; cz = snz; }                                           // przyciąganie do siatki 5 cm tylko jeśli nie wchodzi w ścianę
+    }
     let ok = placing.kind === 'lamp' ? !placedDesks.some(pd => pd.kind === 'lamp' && Math.hypot(pd.wall.x-cx, pd.wall.z-cz) < 0.6)   // lampa wisi pod sufitem – meble jej nie przeszkadzają
       : !homeReserved().some(b => overlap(cx,cz,dm.w,dm.d,b)) && !WALLS.some(b => overlap(cx,cz,dm.w,dm.d,b));
     const px = Math.max(Math.abs(player.position.x-cx) - dm.w/2, 0), pz = Math.max(Math.abs(player.position.z-cz) - dm.d/2, 0);
     if(placing.kind !== 'lamp' && Math.hypot(px,pz) < 0.4) ok = false;                         // nie na postaci
+    let behindWall = false;
+    if(ok){                                                                                    // nie przez ścianę: między tobą a miejscem docelowym (środek i cztery rogi mebla) nie może być ściany
+      const hw = Math.max(0, dm.w/2 - 0.1), hd = Math.max(0, dm.d/2 - 0.1);   // rogi odsunięte do środka, żeby mebel przy samej ścianie nie był uznany za „za ścianą”
+      for(const [ox, oz] of [[0,0],[-hw,-hd],[hw,-hd],[-hw,hd],[hw,hd]]){
+        if(wallBetween(player.position.x, player.position.z, cx + ox, cz + oz)){ behindWall = true; break; }
+      }
+      if(behindWall) ok = false;
+    }
     placing.x = cx; placing.z = cz; placing.valid = ok;
     placing.ghost.position.set(cx, placing.kind === 'lamp' ? HOME.h : 0.07, cz); placing.ghost.rotation.y = placing.rot*Math.PI/2;
     deskGhostMat.color.setHex(ok ? 0x4caf50 : 0xe53935);
     const msg = $('placeMsg'); msg.classList.toggle('bad', !ok);
     const nn = furnNoun(placing.kind);
-    msg.textContent = placing.kind === 'lamp' ? (ok ? 'Idź tam, gdzie ma wisieć lampa. Zielone = można zamontować' : 'Tu nie da się zamontować lampy (inna lampa jest zbyt blisko)')
-      : ok ? `Idź tam, gdzie ma stanąć ${nn.nom}. Zielone = można postawić` : `Tu nie da się postawić ${nn.gen} (zajęte miejsce)`;
+    msg.textContent = placing.kind === 'lamp' ? (ok ? 'Idź tam, gdzie ma wisieć lampa. Zielone = można zamontować' : behindWall ? 'Nie zamontujesz lampy przez ścianę – przejdź na drugą stronę' : 'Tu nie da się zamontować lampy (inna lampa jest zbyt blisko)')
+      : ok ? `Idź tam, gdzie ma stanąć ${nn.nom}. Zielone = można postawić` : behindWall ? `Nie postawisz ${nn.gen} przez ścianę – przejdź na drugą stronę` : `Tu nie da się postawić ${nn.gen} (zajęte miejsce)`;
   }
   function confirmPlacement(){
     if(!placing) return;
@@ -2771,7 +3122,7 @@
     const wall = {x, z, w:dm.w, d:dm.d}; WALLS.push(wall);
     placedDesks.push({mesh, wall, kind});
     cancelPlacement(); renderInv();
-    toast(kind === 'oven' ? 'Piekarnik ustawiony 🍳 (F lub G przy piekarniku – podnieś)' : kind === 'chair' ? 'Krzesło ustawione 🪑 (G przy krześle – podnieś)' : kind === 'wardrobe' ? 'Szafa ustawiona 🚪 (F – otwórz, G – podnieś)' : 'Biurko ustawione 🗄️ (F przy biurku – podnieś)');
+    toast(FIXT.includes(kind) ? `Ustawiono: ${ITEMS[kind].i} ${ITEMS[kind].n} (F lub G przy przedmiocie – podnieś)` : kind === 'oven' ? 'Piekarnik ustawiony 🍳 (F lub G przy piekarniku – podnieś)' : kind === 'chair' ? 'Krzesło ustawione 🪑 (G przy krześle – podnieś)' : kind === 'wardrobe' ? 'Szafa ustawiona 🚪 (F – otwórz, G – podnieś)' : 'Biurko ustawione 🗄️ (F przy biurku – podnieś)');
   }
   function pickupComputer(pd){
     if(!pd || !pd.computer) return;
@@ -3423,16 +3774,50 @@
   let sitting = null;
   function sitOn(pd){
     sitting = pd;
-    const th = pd.mesh.rotation.y;
+    const th = pd.mesh.rotation.y + (pd.kind === 'bathtub' ? Math.PI/2 : 0);      // w wannie postać siedzi wzdłuż jej długiej osi, plecami do baterii
     player.position.set(pd.wall.x, 0, pd.wall.z); vy = 0;
     facing = th; player.rotation.y = th;
-    toast(pd.kind === 'bench' ? 'Siedzisz na ławce 🪑 F lub Shift – wstań' : 'Siedzisz 🪑 F lub Shift – wstań');
+    toast(pd.kind === 'bathtub' ? 'Kąpiesz się 🛁 Higiena rośnie • F lub Shift – wyjdź' : pd.kind === 'bench' ? 'Siedzisz na ławce 🪑 F lub Shift – wstań' : 'Siedzisz 🪑 F lub Shift – wstań');
+  }
+  // Bezpieczne miejsce po zsiadnięciu / wyjściu (rower, wanna, krzesło, ławka, auto): od (ox,oz) próbuje kierunku (bx,bz), a potem innych stron i krótszych odległości.
+  // Odrzuca punkty w ścianie/meblu/budynku oraz takie, do których odcinek od miejsca startu przecinałby ścianę (inaczej lądowałeś po drugiej stronie ściany).
+  function safeExitSpot(ox, oz, bx, bz, ignoreWall, minDist){
+    const rects = [];
+    for(const w of WALLS){
+      if(w === ignoreWall || w.enter !== undefined) continue;
+      if(Math.abs(w.x - ox) > w.w/2 + 7 || Math.abs(w.z - oz) > w.d/2 + 7) continue;
+      rects.push([w.x - w.w/2, w.x + w.w/2, w.z - w.d/2, w.z + w.d/2]);
+    }
+    for(const b of BUILDINGS){
+      if(b.open) continue;
+      if(Math.abs(b.x - ox) > b.w/2 + 7 || Math.abs(b.z - oz) > b.d/2 + 7) continue;
+      rects.push([b.x - b.w/2 - 0.4, b.x + b.w/2 + 0.4, b.z - b.d/2 - 0.4, b.z + b.d/2 + 0.4]);
+    }
+    const segHit = (x0, z0, x1, z1, r, e) => {
+      let t0 = 0, t1 = 1; const dx = x1 - x0, dz = z1 - z0;
+      for(const [pp, q, lo, hi] of [[dx, x0, r[0]-e, r[1]+e], [dz, z0, r[2]-e, r[3]+e]]){
+        if(Math.abs(pp) < 1e-9){ if(q < lo || q > hi) return false; }
+        else { let a = (lo - q)/pp, c = (hi - q)/pp; if(a > c){ const tmp = a; a = c; c = tmp; } t0 = Math.max(t0, a); t1 = Math.min(t1, c); if(t0 > t1) return false; }
+      }
+      return true;
+    };
+    const base = Math.hypot(bx, bz) || 1, phi = Math.atan2(bx, bz), mn = minDist || 0.8;
+    for(const f of [1, 0.85, 0.7, 0.6]){
+      const dist = Math.max(mn, base*f);
+      for(const da of [0, Math.PI/4, -Math.PI/4, Math.PI/2, -Math.PI/2, Math.PI*0.75, -Math.PI*0.75, Math.PI]){
+        const x = ox + Math.sin(phi + da)*dist, z = oz + Math.cos(phi + da)*dist;
+        if(rects.some(r => segHit(x, z, x, z, r, 0.45) || segHit(ox, oz, x, z, r, 0.05))) continue;
+        return {x, z};
+      }
+    }
+    return {x:ox + bx, z:oz + bz};                                                  // nic wolnego wokół – stare zachowanie (kolizje i tak wypchną postać)
   }
   function standUp(){
     if(!sitting) return;
     if(computerUiOpen) closeComputer();
     const th = sitting.mesh.rotation.y;
-    player.position.set(sitting.wall.x + Math.sin(th)*0.95, 0, sitting.wall.z + Math.cos(th)*0.95);
+    const sp = safeExitSpot(sitting.wall.x, sitting.wall.z, Math.sin(th)*0.95, Math.cos(th)*0.95, sitting.wall, 0.8);
+    player.position.set(sp.x, 0, sp.z);
     sitting = null;
   }
   function pickupDesk(pd){
@@ -3449,12 +3834,12 @@
       WALLS.splice(WALLS.indexOf(pd.wall), 1); placedDesks.splice(placedDesks.indexOf(pd), 1);
       renderInv(); toast('Podniesiono piekarnik 🍳'); return;
     }
-    if(pd.kind === 'chair' || pd.kind === 'wardrobe'){
+    if(pd.kind === 'chair' || pd.kind === 'wardrobe' || FIXT.includes(pd.kind)){
       if(!addItem(pd.kind)){ toast('Ekwipunek pełny!'); return; }
       if(pd.kind === 'wardrobe') closeWardrobe();
-      scene.remove(pd.mesh);
+      disposeFurnMesh(pd.mesh); scene.remove(pd.mesh);
       WALLS.splice(WALLS.indexOf(pd.wall), 1); placedDesks.splice(placedDesks.indexOf(pd), 1);
-      renderInv(); toast(pd.kind === 'chair' ? 'Podniesiono krzesło 🪑' : 'Podniesiono szafę 🚪'); return;
+      renderInv(); toast(FIXT.includes(pd.kind) ? `Podniesiono: ${ITEMS[pd.kind].n} ${ITEMS[pd.kind].i}` : pd.kind === 'chair' ? 'Podniesiono krzesło 🪑' : 'Podniesiono szafę 🚪'); return;
     }
     if(freeSlots() < DESK_SLOTS){ toast(`Potrzebujesz ${DESK_SLOTS} wolnych slotów w ekwipunku (wolne: ${freeSlots()})`); return; }
     addDesk();
@@ -3555,7 +3940,9 @@
     (Math.abs(x - SIDE_ROAD_X) < streetEdge + m && z > SIDE_ROAD_START - m && z < SIDE_ROAD_END + m) ||  // boczna ulica z chodnikami
     onNewStreets(x, z, m);                                                                              // rondo, zjazd i supermarket
   for(let i=spots.length-1;i>=0;i--) if(onStreet(spots[i].x, spots[i].z, 1.2)) spots.splice(i,1);
-  for(let i=spots.length-1;i>=0;i--) if(inShop(spots[i].x, spots[i].z, 1.5) || HOMES.some(H => Math.abs(spots[i].x-H.x) < HOME.ww/2+2 && Math.abs(spots[i].z-H.z) < HOME.wd/2+2)) spots.splice(i,1);
+  for(let i=spots.length-1;i>=0;i--) if(inShop(spots[i].x, spots[i].z, 1.5) || HOMES.some(H => { const D = homeDimsOf(H); return Math.abs(spots[i].x-H.x) < D.ww/2+2 && Math.abs(spots[i].z-H.z) < D.wd/2+2; })) spots.splice(i,1);
+  const FOUNT = {x:39, z:28};                                     // fontanna: środek między Krótką (x=0) a Poprzeczną (x=78), na wolnym placu za domami
+  for(let i=spots.length-1;i>=0;i--) if(Math.hypot(spots[i].x-FOUNT.x, spots[i].z-FOUNT.z) < 9.5) spots.splice(i,1);   // bez drzew na placu fontanny
   const trunkM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.25,0.35,3,7), new THREE.MeshLambertMaterial({color:0x6b4423}), spots.length);
   const crownM = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1.8,1), new THREE.MeshLambertMaterial({flatShading:true}), spots.length);
   trunkM.castShadow = crownM.castShadow = true;
@@ -3571,6 +3958,82 @@
   });
   ROUND_COLL.forEach(c => treeColl.push(c));   // wyspa ronda
   SIGN_COLL.forEach(c => treeColl.push(c));    // słupki znaków i tabliczek ulic
+
+  // ===== Fontanna na placu między Krótką a Poprzeczną =====
+  const fountainJets = (function buildFountain(){
+    const g = new THREE.Group(); g.position.set(FOUNT.x, 0, FOUNT.z);
+    const lm = (c, o) => new THREE.MeshLambertMaterial(Object.assign({color:c}, o||{}));
+    const stone = lm(0xc9c6bd), stoneDark = lm(0x9b978d), WATER_Y = 0.72;
+    const part = (geo, mat, y) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; m.castShadow = m.receiveShadow = true; g.add(m); return m; };
+    part(new THREE.CylinderGeometry(7.8, 7.8, 0.12, 48), lm(0xd8d4c8), 0.06);               // utwardzony plac
+    part(new THREE.CylinderGeometry(7.0, 7.0, 0.16, 48), lm(0xbdb9ae), 0.14);                // pierścień płyt
+    const wall = new THREE.Mesh(new THREE.LatheGeometry([[3.0,0.1],[3.0,0.95],[3.15,1.0],[3.65,1.0],[3.7,0.95],[3.7,0.1]].map(([r,y]) => new THREE.Vector2(r,y)), 40),
+      new THREE.MeshLambertMaterial({color:0xcfccc2, side:THREE.DoubleSide}));
+    wall.castShadow = wall.receiveShadow = true; g.add(wall);                                  // obrzeże basenu
+    const water = new THREE.Mesh(new THREE.CircleGeometry(3.0, 40), new THREE.MeshLambertMaterial({color:0x3f9fe0, emissive:0x0b3a66, transparent:true, opacity:0.82}));
+    water.rotation.x = -Math.PI/2; water.position.y = WATER_Y; g.add(water);
+    part(new THREE.CylinderGeometry(0.9, 1.1, 0.5, 20), stoneDark, 0.35);                      // cokół
+    part(new THREE.CylinderGeometry(0.35, 0.5, 1.5, 16), stone, 1.0);                          // trzon
+    part(new THREE.CylinderGeometry(1.5, 0.55, 0.38, 24), stone, 1.9);                         // dolna misa
+    part(new THREE.CylinderGeometry(0.22, 0.3, 0.9, 12), stone, 2.45);                         // górna kolumna
+    part(new THREE.CylinderGeometry(0.85, 0.3, 0.28, 20), stone, 2.95);                        // górna misa
+    part(new THREE.SphereGeometry(0.22, 12, 8), stoneDark, 3.2);                               // zwieńczenie
+    const lvl = new THREE.Mesh(new THREE.CircleGeometry(1.32, 24), new THREE.MeshLambertMaterial({color:0x3f9fe0, emissive:0x0b3a66, transparent:true, opacity:0.85}));
+    lvl.rotation.x = -Math.PI/2; lvl.position.y = 2.1; g.add(lvl);                             // woda w dolnej misie
+    // Strumienie: kropelki lecące parabolą (z górnej misy na boki, z dolnej do basenu, plus pionowy strumień)
+    const cv = document.createElement('canvas'); cv.width = cv.height = 32;
+    const cx = cv.getContext('2d'), gr = cx.createRadialGradient(16,16,0,16,16,16);
+    gr.addColorStop(0,'rgba(255,255,255,1)'); gr.addColorStop(0.5,'rgba(190,225,255,0.7)'); gr.addColorStop(1,'rgba(190,225,255,0)');
+    cx.fillStyle = gr; cx.fillRect(0,0,32,32);
+    const N = 150, arr = new Float32Array(N*3), jets = [];
+    for(let i=0;i<N;i++){
+      if(i < 96) jets.push({kind:0, a:(i%8)/8*Math.PI*2, ph:Math.random(), R:1.8 + Math.random()*0.5});          // 8 łuków z górnej misy
+      else if(i < 126) jets.push({kind:1, a:(i%10)/10*Math.PI*2, ph:Math.random(), R:1.0 + Math.random()*0.35});   // opadanie z dolnej misy
+      else jets.push({kind:2, a:Math.random()*6.28, ph:Math.random(), R:Math.random()*0.18});                      // pionowy strumień
+    }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({size:0.2, map:new THREE.CanvasTexture(cv), transparent:true, depthWrite:false, color:0xffffff}));
+    pts.frustumCulled = false; g.add(pts);
+    scene.add(g);
+    treeColl.push({x:FOUNT.x, z:FOUNT.z, r:3.9});                                              // basen jest przeszkodą
+    return {pts, arr, jets, water, WATER_Y};
+  })();
+  // 4 ławki dookoła fontanny (na pierścieniu płyt, siedziskiem do basenu): twarde i można na nich siedzieć (F), jak na przystankach
+  (function buildFountainBenches(){
+    const wood = new THREE.MeshLambertMaterial({color:0x8a5a32}), iron = new THREE.MeshLambertMaterial({color:0x2f3338});
+    const R = 6.4, BASE = 0.22;
+    [0, 1, 2, 3].forEach(k => {
+      const a = k*Math.PI/2;                                                                   // E, S, W, N – ławka równoległa do osi, więc kolizja prostokątna pasuje idealnie
+      const g = new THREE.Group();
+      const add = (w,h,d,mat,x,y,z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat); m.position.set(x,y,z); m.castShadow = m.receiveShadow = true; g.add(m); };
+      add(1.9,0.07,0.52,wood,0,0.28,0);                                                        // siedzisko (góra ok. 0,53 nad ziemią – jak na przystankach)
+      add(1.9,0.4,0.06,wood,0,0.62,-0.27);                                                     // oparcie (od strony zewnętrznej)
+      [-0.85,0.85].forEach(x => { add(0.07,0.26,0.5,iron,x,0.13,0); add(0.07,0.55,0.07,iron,x,0.52,-0.27); });   // boki ze stali
+      const bx = FOUNT.x + Math.cos(a)*R, bz = FOUNT.z + Math.sin(a)*R;
+      g.position.set(bx, BASE, bz);
+      const th = Math.atan2(-Math.cos(a), -Math.sin(a));                                       // przód ławki (+z) w stronę fontanny
+      g.rotation.y = th; scene.add(g);
+      const quarter = Math.abs(Math.sin(th)) > 0.5;                                            // ławka obrócona o 90° – wymiary w świecie zamienione
+      const wl = {x:bx, z:bz, w:quarter ? 0.52 : 1.9, d:quarter ? 1.9 : 0.52};
+      WALLS.push(wl);                                                                          // twarda ławka; siedzący gracz jest z niej „wyłączony” (pd.wall)
+      BENCH_SEATS.push({x:bx, z:bz, pd:{kind:'bench', mesh:{rotation:{y:th}}, wall:wl}});     // F – usiądź / wstań (sitOn / standUp)
+    });
+  })();
+  function updateFountain(t){
+    const F = fountainJets, p = player.position;
+    if(Math.hypot(p.x - FOUNT.x, p.z - FOUNT.z) > 90) return;                                  // daleko – nie animujemy
+    const a = F.arr;
+    F.jets.forEach((j, i) => {
+      const u = (t*0.7 + j.ph) % 1;
+      let r, y;
+      if(j.kind === 0){ r = (0.25 + (j.R - 0.25)*u) * (1.2 + 0.5*u); y = 3.3 + (F.WATER_Y - 3.3)*u*u + 1.1*4*u*(1-u); }
+      else if(j.kind === 1){ r = 1.0 + (j.R + 0.8)*u; y = 2.1 + (F.WATER_Y - 2.1)*u*u + 0.3*4*u*(1-u); }
+      else { r = j.R*u; y = 3.4 + 1.5*4*u*(1-u); }
+      a[i*3] = Math.cos(j.a)*r; a[i*3+1] = y; a[i*3+2] = Math.sin(j.a)*r;
+    });
+    F.pts.geometry.attributes.position.needsUpdate = true;
+    F.water.material.opacity = 0.8 + Math.sin(t*2.0)*0.04;
+  }
   let streetLampHalo = null;
   const streetLampHeadMat = new THREE.MeshBasicMaterial({color:0x666660}), streetLampOn = new THREE.Color(0xfff0c0);
 
@@ -3589,7 +4052,7 @@
     [-39,-57,-75].forEach(z => add(GORN_X - GORN_W/2 - 0.65, z, 1, 0));
     [12,60].forEach(z => add(RB.x + OFF, z, -1, 0));                                  // Społeczna
     [36,84].forEach(z => add(RB.x - OFF, z, 1, 0));
-    add(RB.x + OFF, -32, -1, 0); add(RB.x - OFF, -44, 1, 0);
+    add(RB.x + OFF, -32, -1, 0); add(RB.x - OFF, -41, 1, 0);
     add(AGD.x - 9, -61.5, 0, 1); add(AGD.x + 9, -61.5, 0, 1);                         // parking przed sklepem AGD                          // zjazd do supermarketu
     [90, 210, 330].forEach(deg => {                                                    // wyspa ronda
       const a = deg*Math.PI/180;
@@ -3654,7 +4117,7 @@
   const upper = new THREE.Group(); upper.position.set(0,0.8,0); body.add(upper);   // oś obrotu w biodrach
   box(0.7,0.9,0.4,0x2d6cdf,0,0.45,0,upper);           // tułów
   box(0.5,0.5,0.5,0xf1c27d,0,1.15,0,upper);           // głowa
-  box(0.52,0.15,0.52,0x4a2c12,0,1.45,-0.02,upper);    // włosy
+  const hair = box(0.52,0.15,0.52,0x4a2c12,0,1.45,-0.02,upper);    // włosy (chowane pod czapką z daszkiem)
   box(0.08,0.08,0.02,0x000000,-0.12,1.18,0.26,upper); // oczy
   box(0.08,0.08,0.02,0x000000,0.12,1.18,0.26,upper);
   function limb(x,y,col,parent){
@@ -3666,6 +4129,16 @@
   shinL.visible = shinR.visible = false;
   const armL = limb(-0.48,0.85,0x2d6cdf,upper), armR = limb(0.48,0.85,0x2d6cdf,upper);
   const legL = limb(-0.18,0.8,0x333333,body), legR = limb(0.18,0.8,0x333333,body);
+  // Buty: ciemny but z jasną podeszwą na końcu nogi (chód, rower) oraz na podudziach (na siedząco)
+  const shoeMat = mat(0x1d1d1f), soleMat = mat(0xe8e8e8);
+  function addShoe(parent, y){
+    const g = new THREE.Group();
+    const top = new THREE.Mesh(new THREE.BoxGeometry(0.29,0.12,0.4), shoeMat); top.position.set(0,0.07,0.06);
+    const sole = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.05,0.42), soleMat); sole.position.set(0,0.025,0.06);
+    top.castShadow = sole.castShadow = true; g.add(top, sole); g.position.y = y; parent.add(g); return g;
+  }
+  const legShoeL = addShoe(legL, -0.8), legShoeR = addShoe(legR, -0.8);
+  addShoe(shinL, -0.25); addShoe(shinR, -0.25);
   // Zielony plecak dostawcy – widoczny na plecach (−z; postać patrzy w stronę +z), gdy niesiesz zamówienie z restauracji
   const deliveryBackpack = new THREE.Group(); deliveryBackpack.visible = false; upper.add(deliveryBackpack);
   // bryła jak termiczny box kuriera (Glovo): prawie sześcian, zielony, z jaśniejszym pasem i logo z tyłu
@@ -3735,7 +4208,8 @@
     if(!bikeMounted) return;
     bikeMounted=false; player.visible=true; riderBlend=0;
     const a=bike.rotation.y;
-    player.position.set(bike.position.x+Math.cos(a)*1.0,0,bike.position.z-Math.sin(a)*1.0);   // zsiadasz z boku – rower jest twardy
+    const sp=safeExitSpot(bike.position.x,bike.position.z,Math.cos(a)*1.0,-Math.sin(a)*1.0,null,0.8);   // zsiadasz z boku (rower jest twardy) – a jeśli tam ściana, z drugiej strony
+    player.position.set(sp.x,0,sp.z);
     toast('Zsiadłeś z roweru');
   }
 
@@ -3751,39 +4225,145 @@
   const capG = buildCapGroup(0xc62828); capG.position.set(0, 1.40, -0.01); capG.visible = false;
   capG.traverse(o => { if(o.isMesh) o.castShadow = true; });
   upper.add(capG);
+  // Głowa (głowa, włosy, oczy) i nakrycia głowy na warstwie 1: kamera pierwszoosobowa ją pomija, żeby nie patrzeć „od środka” głowy,
+  // a reszta ciała (tułów, ręce, nogi) zostaje widoczna.
+  upper.children.forEach(o => { if((o.isMesh && o.position.y > 1) || o === hat || o === capG) o.traverse(m => m.layers.set(1)); });
+  camera.layers.enable(1);
   let worn = null;                                                // {id:'hat'|'cap', color} albo null
-  const isWorn = s => !!(worn && s && s.id === worn.id && s.color === worn.color);
+  const isWorn = s => s && (s.id === 'shirt' || s.id === 'shoes' || s.id === 'pants') ? false : !!(worn && s && s.id === worn.id && s.color === worn.color);   // założona koszulka nie leży w ekwipunku
+  // Koszulka: osobny slot od nakrycia głowy. Zdjęta = kolor konta gracza.
+  let wornShirt = null;                                           // {id:'shirt', color} albo null
+  let accShirtCol = 0x2d6cdf;                                     // kolor konta (domyślny niebieski)
+  function refreshShirt(){
+    const c = wornShirt ? wornShirt.color : accShirtCol;
+    upper.children[0].material.color.setHex(c);
+    armL.children[0].material.color.setHex(c); armR.children[0].material.color.setHex(c);
+  }
+  function setShirt(w){ wornShirt = w ? {id:'shirt', color:w.color} : null; refreshShirt(); }
+  // Buty: osobny slot; zdjęte = czarne z białą podeszwą. Dwa kolory zakodowane w jednej liczbie (shoeEnc).
+  let wornShoes = null;
+  function refreshShoes(){
+    const v = wornShoes ? wornShoes.color : shoeEnc(SH_DEF_UP, SH_DEF_SOLE);
+    shoeMat.color.setHex(shoeUp(v)); soleMat.color.setHex(shoeSole(v));
+  }
+  function setShoes(w){ wornShoes = w ? {id:'shoes', color:w.color} : null; refreshShoes(); }
+  // Spodnie: osobny slot, jeden kolor (nogi + podudzia na siedząco); zdjęte = domyślne ciemnoszare.
+  let wornPants = null;
+  function refreshPants(){
+    const c = wornPants ? wornPants.color : PANTS_DEF;
+    [legL.children[0], legR.children[0], shinL, shinR].forEach(o => o.material.color.setHex(c));
+  }
+  function setPants(w){ wornPants = w ? {id:'pants', color:w.color} : null; refreshPants(); }
+  const unwear = s => { if(s && s.id === 'shirt') setShirt(null); else if(s && s.id === 'shoes') setShoes(null); else if(s && s.id === 'pants') setPants(null); else setWorn(null); };
   function setWorn(w){
+    if(w && w.id === 'shirt'){ setShirt(w); return; }
+    if(w && w.id === 'shoes'){ setShoes(w); return; }
+    if(w && w.id === 'pants'){ setPants(w); return; }
     worn = w ? {id:w.id, color:w.color} : null;
     if(w){ const c = w.color !== undefined ? w.color : HEAD_DEF[w.id].def; (w.id === 'cap' ? capG.userData.mat : hm).color.setHex(c); }
     hat.visible = !!w && w.id === 'hat'; capG.visible = !!w && w.id === 'cap';
+    hair.visible = !(w && w.id === 'cap');                         // czapka z daszkiem: bez włosów
+  }
+
+  // ===== Działające lustro: płaskie odbicie – scena renderowana z „lustrzanej” kamery do tekstury szyby. Każde lustro (wbudowane w łazience Domu B
+  // i kupione w Dom i AGD) ma własną teksturę; w danej klatce odbicie liczymy tylko dla najbliższego lustra, które jest w kadrze. =====
+  const mirrorPlanes = [];
+  const mirrorCam = new THREE.PerspectiveCamera(); mirrorCam.layers.enable(1);     // warstwa 1 = głowa postaci (w odbiciu widać całą postać)
+  const mirrorPlane = new THREE.Plane(), mirrorTM = new THREE.Matrix4(), mirrorPM = new THREE.Matrix4(), mirrorFrustum = new THREE.Frustum();
+  const mV = {rp:new THREE.Vector3(), cp:new THREE.Vector3(), n:new THREE.Vector3(), view:new THREE.Vector3(), look:new THREE.Vector3(), tgt:new THREE.Vector3(), rot:new THREE.Matrix4(), sky:new THREE.Vector3()};
+  const mirrorVS = 'uniform mat4 textureMatrix; varying vec4 vUv; void main(){ vUv = textureMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
+  const mirrorFS = 'uniform sampler2D tDiffuse; varying vec4 vUv; void main(){ gl_FragColor = vec4(texture2DProj(tDiffuse, vUv).rgb * vec3(0.96, 0.98, 1.0), 1.0); }';
+  function makeMirrorPlane(w, h){
+    const rt = new THREE.WebGLRenderTarget(640, 360, {minFilter:THREE.LinearFilter, magFilter:THREE.LinearFilter});
+    const mm = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.ShaderMaterial({uniforms:{tDiffuse:{value:rt.texture}, textureMatrix:{value:new THREE.Matrix4()}}, vertexShader:mirrorVS, fragmentShader:mirrorFS}));
+    mm.userData.isMirror = true; mm.userData.rt = rt; mm.userData.asp = 16/9; mirrorPlanes.push(mm);
+    return mm;
+  }
+  function disposeMirrorPlane(mm){
+    const i = mirrorPlanes.indexOf(mm); if(i >= 0) mirrorPlanes.splice(i, 1);
+    try{ mm.userData.rt.dispose(); mm.geometry.dispose(); mm.material.dispose(); }catch(e){}
+  }
+  function disposeFurnMesh(mesh){ mesh.traverse(o => { if(o.userData && o.userData.isMirror) disposeMirrorPlane(o); }); }
+  function updateMirror(){
+    if(isPaused || typeof homeIn === 'undefined' || !homeIn || !mirrorPlanes.length) return;
+    const D = homeDimsOf(homeIn);
+    camera.updateMatrixWorld();
+    mirrorPM.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); mirrorFrustum.setFromProjectionMatrix(mirrorPM);
+    mV.cp.setFromMatrixPosition(camera.matrixWorld);
+    let m = null, bd = 1e9;
+    for(const c of mirrorPlanes){
+      c.updateMatrixWorld(); mV.rp.setFromMatrixPosition(c.matrixWorld);
+      if(Math.abs(mV.rp.x - homeIn.x) > D.ww/2 + 0.5 || Math.abs(mV.rp.z - homeIn.z) > D.wd/2 + 0.5) continue;   // tylko lustra w domu, w którym jesteś
+      if(!mirrorFrustum.intersectsObject(c)) continue;                                                              // lustra nie widać – bez odbicia
+      mV.rot.extractRotation(c.matrixWorld); mV.n.set(0,0,1).applyMatrix4(mV.rot);
+      mV.view.subVectors(mV.rp, mV.cp);
+      if(mV.view.dot(mV.n) > 0) continue;                                                                           // patrzysz na lustro od tyłu
+      const dd = mV.view.length(); if(dd < bd){ bd = dd; m = c; }
+    }
+    if(!m) return;
+    const rt = m.userData.rt;
+    if(Math.abs(camera.aspect - m.userData.asp) > 0.01){ m.userData.asp = camera.aspect; rt.setSize(640, Math.max(64, Math.round(640/camera.aspect))); }
+    mV.rp.setFromMatrixPosition(m.matrixWorld);
+    mV.rot.extractRotation(m.matrixWorld); mV.n.set(0,0,1).applyMatrix4(mV.rot);
+    mV.view.subVectors(mV.rp, mV.cp);
+    mV.view.reflect(mV.n).negate().add(mV.rp);
+    mV.rot.extractRotation(camera.matrixWorld);
+    mV.look.set(0,0,-1).applyMatrix4(mV.rot).add(mV.cp);
+    mV.tgt.subVectors(mV.rp, mV.look).reflect(mV.n).negate().add(mV.rp);
+    mirrorCam.position.copy(mV.view); mirrorCam.up.set(0,1,0).applyMatrix4(mV.rot).reflect(mV.n); mirrorCam.lookAt(mV.tgt);
+    mirrorCam.far = camera.far; mirrorCam.updateMatrixWorld(); mirrorCam.projectionMatrix.copy(camera.projectionMatrix);
+    mirrorTM.set(0.5,0,0,0.5, 0,0.5,0,0.5, 0,0,0.5,0.5, 0,0,0,1);
+    mirrorTM.multiply(mirrorCam.projectionMatrix).multiply(mirrorCam.matrixWorldInverse).multiply(m.matrixWorld);
+    m.material.uniforms.textureMatrix.value.copy(mirrorTM);
+    mV.n.set(0,0,1).applyMatrix4(mV.rot.extractRotation(m.matrixWorld));
+    mirrorPlane.setFromNormalAndCoplanarPoint(mV.n, mV.rp);                         // obcinamy wszystko za szybą (ścianę, świat na zewnątrz)
+    const prevRT = renderer.getRenderTarget(), prevAuto = renderer.shadowMap.autoUpdate;
+    mV.sky.copy(sky.position); sky.position.copy(mirrorCam.position);
+    renderer.shadowMap.autoUpdate = false;                                          // cienie z poprzedniej klatki – bez drugiego przebiegu cieni
+    renderer.clippingPlanes = [mirrorPlane]; m.visible = false;
+    renderer.setRenderTarget(rt); renderer.render(scene, mirrorCam);
+    renderer.setRenderTarget(prevRT); renderer.clippingPlanes = []; m.visible = true;
+    renderer.shadowMap.autoUpdate = prevAuto; sky.position.copy(mV.sky);
   }
 
   // Dom gracza (budowa)
   const homeWallMat = new THREE.MeshPhongMaterial({color:0xe8d9c4, shininess:8, specular:0x151515});   // Phong: światło lampy liczone per piksel
   const OUTLET_LOCAL = {x:0.6, z:-3.6};                         // gniazdko na tylnej ścianie domu (współrzędne lokalne)
-  const RENT_PRICE = 30;                                        // czynsz: monet za dobę gry
-  const BUY_PRICE = 750, SELL_PRICE = 600, MAX_PREPAID_DAYS = 7;   // sprzedaż domu = 80% ceny kupna                                        // zakup domu na stałe (bez czynszu)
+  // Ceny domów: Dom B – czynsz 30 / dobę, kupno 750; wszystkie pozostałe domy gracza – czynsz 20 / dobę, kupno 500. Sprzedaż = 80% ceny kupna.
+  const MAX_PREPAID_DAYS = 7;
+  const rentOf = H => H.id === 'B' ? 30 : 20;                   // czynsz: monet za dobę gry
+  const buyOf  = H => H.id === 'B' ? 750 : 500;                 // zakup domu na stałe (bez czynszu)
+  const sellOf = H => Math.round(buyOf(H) * 0.8);
   let dlgHome = null;
   function drawHomeSign(H){
     const g=H.signCtx; g.clearRect(0,0,320,84);
     g.fillStyle=H.owned?'#7a4e12':H.rented?'#315b79':'#2e7d32'; g.fillRect(0,0,320,84);
     g.fillStyle='white'; g.textAlign='center';
     g.font='bold 36px sans-serif'; g.fillText(H.rented?'DOM GRACZA':'DO WYNAJĘCIA',160,41);
-    g.font='22px sans-serif'; g.fillText(H.owned?(H.label+' • twój na stałe'):H.rented?(H.label+' • wynajęty'):(RENT_PRICE+' / dobę • kup: '+BUY_PRICE+' monet'),160,70);
+    g.font='22px sans-serif'; g.fillText(H.owned?(H.label+' • twój na stałe'):H.rented?(H.label+' • wynajęty'):(rentOf(H)+' / dobę • kup: '+buyOf(H)+' monet'),160,70);
     H.signTex.needsUpdate=true;
   }
   function buildHome(H){
     setActiveHome(H);
     const homeExterior=H.exterior, homeDoor=H.door={pivot:null, rect:null, open:false, angle:0, blocking:false};   // drzwi domu: do czasu wynajmu zamknięte
     let homeCharger=null, chargerLed=null, homePhone=null, phoneScreenMat=null;
-    const {x:X,z:Z,w,h,d}=HOME, t=.28, gap=1.4, doorH=2.2;   // otwór dopasowany do drzwi
+    const {x:X,z:Z,w,h,d}=HOME, t=.28, gap=1.4, doorH=2.2, L=HOME.lay, OZ=(L.wallZ!==undefined?L.wallZ:-d/2+t);   // otwór dopasowany do drzwi
     const grp=new THREE.Group(); grp.position.set(X,0,Z); grp.rotation.y=HOME.rot; scene.add(grp);
     const mat=c=>new THREE.MeshPhongMaterial({color:c, shininess:8, specular:0x151515});
     const put=(geo,m,px,py,pz)=>{const o=new THREE.Mesh(geo,m);o.position.set(px,py,pz);o.castShadow=o.receiveShadow=true;grp.add(o);return o;};
-    const wall=(bw,bh,bd,px,py,pz,collide=true)=>{if(collide)WALLS.push(homeRect(px,pz,bw,bd));return put(new THREE.BoxGeometry(bw,bh,bd,Math.min(10,Math.max(1,Math.ceil(bw))),Math.min(4,Math.max(1,Math.ceil(bh))),Math.min(10,Math.max(1,Math.ceil(bd)))),homeWallMat,px,py,pz);};
+    const wall=(bw,bh,bd,px,py,pz,collide=true)=>{if(collide){const wr=homeRect(px,pz,bw,bd); wr.struct=true; WALLS.push(wr);}return put(new THREE.BoxGeometry(bw,bh,bd,Math.min(10,Math.max(1,Math.ceil(bw))),Math.min(4,Math.max(1,Math.ceil(bh))),Math.min(10,Math.max(1,Math.ceil(bd)))),homeWallMat,px,py,pz);};
     wall(w,h,t,0,h/2,-d/2+t/2); wall(t,h,d,-w/2+t/2,h/2,0); wall(t,h,d,w/2-t/2,h/2,0);
     const seg=(w-gap)/2; wall(seg,h,t,-(gap/2+seg/2),h/2,d/2-t/2); wall(seg,h,t,(gap/2+seg/2),h/2,d/2-t/2); wall(gap,h-doorH,t,0,doorH+(h-doorH)/2,d/2-t/2,false);
+    if(L.rooms){
+      // Ściana działowa z = 0 (dwa przejścia 1,6 m na x = ∓3,5) i ściana x = 0 między sypialnią a łazienką
+      const iw=w/2-t, dg=1.6, lintelH=h-doorH, dz=d/2-t;
+      wall(iw-dg/2-3.5,h,t,-(iw+3.5+dg/2)/2,h/2,0); wall(2*(3.5-dg/2),h,t,0,h/2,0); wall(iw-dg/2-3.5,h,t,(iw+3.5+dg/2)/2,h/2,0);
+      [-3.5,3.5].forEach(px=>wall(dg,lintelH,t,px,doorH+lintelH/2,0,false));
+      wall(t,h,dz,0,h/2,-dz/2);
+      const tile=mat(0xcfd8dc), white=mat(0xf4f6f7), chrome=mat(0xaab4ba);
+      put(new THREE.BoxGeometry(iw-t/2,.02,dz-t/2),tile,iw/2+t/4,.09,-dz/2-t/4);                       // płytki w łazience
+      // (wanna, sedes, umywalka i lustro: wyposażenie łazienki kupisz w Dom i AGD i ustawisz samemu)
+    }
     homeExterior.push(put(new THREE.BoxGeometry(w+.5,.35,d+.5),mat(0x69452f),0,h+.17,0));
     const floor=put(new THREE.BoxGeometry(w-t,.12,d-t,Math.ceil(w-t),1,Math.ceil(d-t)),mat(0xb98d61),0,.02,0);   // gęsta siatka – światło lampy (Lambert = per wierzchołek) widać na podłodze
     // Ościeżnica (bez szpar wokół otworu) i otwarte drzwi odchylone do wnętrza
@@ -3801,30 +4381,31 @@
     hinge.rotation.y=homeDoor.angle;
     homeDoor.pivot=hinge; homeDoor.rect=homeRect(0,fz,gap,t);
     [-1,1].forEach(sd=>put(new THREE.BoxGeometry(1.7,1.2,.08),mat(0x9fd3f0),sd*3.1,2,d/2+.03));
+    if(L.rooms){ [-1,1].forEach(sd=>{ put(new THREE.BoxGeometry(1.7,1.2,.08),mat(0x9fd3f0),sd*5.4,2,d/2+.03); put(new THREE.BoxGeometry(1.7,1.2,.08),mat(0x9fd3f0),sd*3.5,2,-d/2-.03); }); }
     // Kolizje mebli – nie da się przez nie przejść (łóżko, lodówka)
     // Łóżko i wezgłowie to platformy: blokują z podłogi, ale można na nie wskoczyć
-    const bedW = Object.assign(homeRect(-2.4,-1.5,2.2,3.1), {top:0.745, enter:0.6});
-    const headW = Object.assign(homeRect(-2.4,-2.55,2.05,.65), {top:1.055, enter:0.9});
-    WALLS.push(bedW, headW, homeRect(2.8,-2.5,1.15,.9)); PLATFORMS.push(bedW, headW);
+    const bedW = Object.assign(homeRect(L.bed.x,L.bed.z,2.2,3.1), {top:0.745, enter:0.6});
+    const headW = Object.assign(homeRect(L.bed.x,L.bed.z-1.05,2.05,.65), {top:1.055, enter:0.9});
+    WALLS.push(bedW, headW, homeRect(L.fridge.x,L.fridge.z,1.15,.9)); PLATFORMS.push(bedW, headW);
     // Łóżko
-    put(new THREE.BoxGeometry(2.2,.35,3.1),mat(0x65432b),-2.4,.35,-1.5);
-    put(new THREE.BoxGeometry(2.05,.25,2.9),mat(0xf2f0e8),-2.4,.62,-1.5);
-    put(new THREE.BoxGeometry(2.05,.35,.65),mat(0x5878ad),-2.4,.88,-2.55);
+    put(new THREE.BoxGeometry(2.2,.35,3.1),mat(0x65432b),L.bed.x,.35,L.bed.z);
+    put(new THREE.BoxGeometry(2.05,.25,2.9),mat(0xf2f0e8),L.bed.x,.62,L.bed.z);
+    put(new THREE.BoxGeometry(2.05,.35,.65),mat(0x5878ad),L.bed.x,.88,L.bed.z-1.05);
     // Lodówka z przodu pokoju
-    put(new THREE.BoxGeometry(1.15,2.35,.9),mat(0xe8edf0),2.8,1.18,-2.5);
-    put(new THREE.BoxGeometry(.06,2.1,.04),mat(0x9aa5ad),2.8,1.18,-2.03);
-    put(new THREE.BoxGeometry(.08,.55,.08),mat(0x555f66),3.18,1.2,-2.0);
+    put(new THREE.BoxGeometry(1.15,2.35,.9),mat(0xe8edf0),L.fridge.x,1.18,L.fridge.z);
+    put(new THREE.BoxGeometry(.06,2.1,.04),mat(0x9aa5ad),L.fridge.x,1.18,L.fridge.z+.47);
+    put(new THREE.BoxGeometry(.08,.55,.08),mat(0x555f66),L.fridge.x+.38,1.2,L.fridge.z+.5);
     const sign=document.createElement('canvas');sign.width=320;sign.height=84;H.signCtx=sign.getContext('2d');H.signTex=new THREE.CanvasTexture(sign);drawHomeSign(H);
     const label=new THREE.Mesh(new THREE.PlaneGeometry(3.2,.84),new THREE.MeshBasicMaterial({map:H.signTex}));label.position.set(0,2.95,d/2+.05);grp.add(label);homeExterior.push(label);
     // Gniazdko elektryczne na tylnej ścianie (między łóżkiem a lodówką)
     const plateMat=mat(0xfafafa), holeMat=mat(0x222222);
-    const plate=new THREE.Mesh(new THREE.BoxGeometry(.16,.16,.03),plateMat); plate.position.set(OUTLET_LOCAL.x,.55,-d/2+t+.015); grp.add(plate);
-    [-.035,.035].forEach(ox=>{const hole=new THREE.Mesh(new THREE.BoxGeometry(.022,.04,.012),holeMat); hole.position.set(OUTLET_LOCAL.x+ox,.55,-d/2+t+.032); grp.add(hole);});
+    const plate=new THREE.Mesh(new THREE.BoxGeometry(.16,.16,.03),plateMat); plate.position.set(L.outlet.x,.55,OZ+.015); grp.add(plate);
+    [-.035,.035].forEach(ox=>{const hole=new THREE.Mesh(new THREE.BoxGeometry(.022,.04,.012),holeMat); hole.position.set(L.outlet.x+ox,.55,OZ+.032); grp.add(hole);});
     // Ładowarka wpięta w gniazdko (widoczna tylko, gdy jest podłączona)
     homeCharger=new THREE.Group(); homeCharger.visible=false;
-    const chBody=new THREE.Mesh(new THREE.BoxGeometry(.12,.17,.1),mat(0xf2f2f2)); chBody.position.set(OUTLET_LOCAL.x,.55,-d/2+t+.08);
-    const chCable=new THREE.Mesh(new THREE.BoxGeometry(.025,.5,.025),mat(0xf2f2f2)); chCable.position.set(OUTLET_LOCAL.x,.2,-d/2+t+.12);
-    chargerLed=new THREE.Mesh(new THREE.BoxGeometry(.03,.03,.012),new THREE.MeshBasicMaterial({color:0xffa000})); chargerLed.position.set(OUTLET_LOCAL.x,.6,-d/2+t+.134);
+    const chBody=new THREE.Mesh(new THREE.BoxGeometry(.12,.17,.1),mat(0xf2f2f2)); chBody.position.set(L.outlet.x,.55,OZ+.08);
+    const chCable=new THREE.Mesh(new THREE.BoxGeometry(.025,.5,.025),mat(0xf2f2f2)); chCable.position.set(L.outlet.x,.2,OZ+.12);
+    chargerLed=new THREE.Mesh(new THREE.BoxGeometry(.03,.03,.012),new THREE.MeshBasicMaterial({color:0xffa000})); chargerLed.position.set(L.outlet.x,.6,OZ+.134);
     homeCharger.add(chBody,chCable,chargerLed); grp.add(homeCharger);
     // Telefon podłączony do ładowarki – leży na podłodze przy gniazdku
     homePhone=new THREE.Group(); homePhone.visible=false;
@@ -3832,7 +4413,7 @@
     phoneScreenMat=new THREE.MeshBasicMaterial({color:0x4fc3f7});
     const phScreen=new THREE.Mesh(new THREE.BoxGeometry(.07,.004,.15),phoneScreenMat); phScreen.position.y=.008;
     const phPlug=new THREE.Mesh(new THREE.BoxGeometry(.02,.01,.1),mat(0xf2f2f2)); phPlug.position.set(0,0,-.13);
-    homePhone.add(phBody,phScreen,phPlug); homePhone.position.set(OUTLET_LOCAL.x,.09,-d/2+t+.3); grp.add(homePhone);
+    homePhone.add(phBody,phScreen,phPlug); homePhone.position.set(L.outlet.x,.09,OZ+.3); grp.add(homePhone);
     chCable.scale.y=.76; chCable.position.y=.28;
     BUILDINGS.push({x:X,z:Z,w:HOME.ww,d:HOME.wd,open:true});
     H.charger=homeCharger; H.chargerLed=chargerLed; H.phone=homePhone; H.phoneMat=phoneScreenMat;
@@ -3856,7 +4437,7 @@
       }
     }
   }
-  const homeDoorPos = H => ({x: H.x + HOME.d/2*Math.sin(H.rot), z: H.z + HOME.d/2*Math.cos(H.rot)});
+  const homeDoorPos = H => { const hd = (H.d || 8)/2; return {x: H.x + hd*Math.sin(H.rot), z: H.z + hd*Math.cos(H.rot)}; };
   function playerInDoorway(H){
     const r = H.door.rect;
     return Math.abs(player.position.x-r.x) < r.w/2+0.6 && Math.abs(player.position.z-r.z) < r.d/2+0.6;
@@ -3866,16 +4447,16 @@
     H.door.open = !H.door.open;
     toast(H.door.open ? 'Otworzyłeś drzwi 🚪' : 'Zamknąłeś drzwi 🚪');
   }
-  // Wynajem: 30 monet za dobę gry. Czynsz jest pobierany automatycznie z monet w ekwipunku; gdy ich brakuje, umowa wygasa.
+  // Wynajem: 30 monet za dobę gry (Dom B) lub 20 (pozostałe domy). Czynsz jest pobierany automatycznie z monet w ekwipunku; gdy ich brakuje, umowa wygasa.
   function payCoins(n){
     if(coins() < n) return false;
     for(let i=0;i<n;i++) removeOne(inv.findIndex(x => x && x.id === 'coin'));
     renderInv(); renderShop(); return true;
   }
   function rentHome(H){
-    if(!payCoins(RENT_PRICE)){ toast(`Wynajem ${H.label}: ${RENT_PRICE} 🪙 za dobę – masz ${coins()} 🪙`); return; }
+    if(!payCoins(rentOf(H))){ toast(`Wynajem ${H.label}: ${rentOf(H)} 🪙 za dobę – masz ${coins()} 🪙`); return; }
     H.rented = true; H.paidUntil = gameElapsed + DAY_SECONDS; H.door.open = true; drawHomeSign(H);
-    toast(`Wynająłeś ${H.label} za ${RENT_PRICE} 🪙 na dobę. Czynsz pobierany co dobę 🔑`);
+    toast(`Wynająłeś ${H.label} za ${rentOf(H)} 🪙 na dobę. Czynsz pobierany co dobę 🔑`);
   }
   function endRent(H, msg){
     H.rented = false; H.door.open = false; drawHomeSign(H);
@@ -3887,13 +4468,13 @@
       setActiveHome(H); const p = homeW(0, HOME.d/2 + 1.8);
       player.position.set(p.x, 0, p.z); vy = 0;
     }
-    toast(msg || `Brak ${RENT_PRICE} 🪙 na czynsz – umowa najmu ${H.label} wygasła 🔒`);
+    toast(msg || `Brak ${rentOf(H)} 🪙 na czynsz – umowa najmu ${H.label} wygasła 🔒`);
     refreshPhoneDom();
   }
   function updateRent(){
     for(const H of HOMES){
       while(H.rented && gameElapsed >= H.paidUntil){
-        if(payCoins(RENT_PRICE)){ H.paidUntil += DAY_SECONDS; toast(`Pobrano czynsz ${RENT_PRICE} 🪙 za ${H.label}`); }
+        if(payCoins(rentOf(H))){ H.paidUntil += DAY_SECONDS; toast(`Pobrano czynsz ${rentOf(H)} 🪙 za ${H.label}`); }
         else endRent(H);
       }
     }
@@ -3910,40 +4491,40 @@
   function sellHome(H){
     if(!bank.opened) return false;
     H.owned = false; H.paidUntil = 0;
-    endRent(H, `Sprzedałeś ${H.label} za ${SELL_PRICE} 🪙`);
-    bank.balance += SELL_PRICE; logTx(`+${SELL_PRICE} 🪙 sprzedaż domu`); refreshPhoneBank();
+    endRent(H, `Sprzedałeś ${H.label} za ${sellOf(H)} 🪙`);
+    bank.balance += sellOf(H); logTx(`+${sellOf(H)} 🪙 sprzedaż domu`); refreshPhoneBank();
     refreshPhoneDom(); return true;
   }
   function buyHome(H){
-    if(!payAny(BUY_PRICE, 'zakup domu')){ toast(`Dom ${H.label} kosztuje ${BUY_PRICE} 🪙 – masz ${coins()} 🪙${bank.opened?` + ${bank.balance} 🪙 na koncie`:''}`); return; }
+    if(!payAny(buyOf(H), 'zakup domu')){ toast(`Dom ${H.label} kosztuje ${buyOf(H)} 🪙 – masz ${coins()} 🪙${bank.opened?` + ${bank.balance} 🪙 na koncie`:''}`); return; }
     H.owned = true; H.rented = true; H.paidUntil = Infinity; H.door.open = true; drawHomeSign(H);
     closeDialog(); renderInv(); renderShop(); refreshPhoneDom();
-    toast(`Kupiłeś ${H.label} na stałe za ${BUY_PRICE} 🪙 – żadnego czynszu 🔑`);
+    toast(`Kupiłeś ${H.label} na stałe za ${buyOf(H)} 🪙 – żadnego czynszu 🔑`);
   }
   function openHomeOffer(H){
     dlgHome = H;
     const btns = [];
     if(H.rented){
       btns.push({label: H.door.open ? 'Zamknij drzwi 🚪' : 'Otwórz drzwi 🚪', fn:() => { closeDialog(); toggleHomeDoor(H); }});
-      btns.push({label:`Kup na stałe (${BUY_PRICE} 🪙)`, fn:() => buyHome(H)});
+      btns.push({label:`Kup na stałe (${buyOf(H)} 🪙)`, fn:() => buyHome(H)});
       btns.push({label:'Zamknij', fn:closeDialog});
-      say(`${H.label} masz wynajęty (${RENT_PRICE} 🪙 / dobę). Możesz go wykupić na stałe za ${BUY_PRICE} 🪙 – wtedy koniec z czynszem. Płatność z monet przy sobie, a brakującą część pobierzemy z konta bankowego.`, btns, '🏠 Oferta domu', 'home');
+      say(`${H.label} masz wynajęty (${rentOf(H)} 🪙 / dobę). Możesz go wykupić na stałe za ${buyOf(H)} 🪙 – wtedy koniec z czynszem. Płatność z monet przy sobie, a brakującą część pobierzemy z konta bankowego.`, btns, '🏠 Oferta domu', 'home');
     } else {
-      btns.push({label:`Wynajmij (${RENT_PRICE} 🪙 / dobę)`, fn:() => { closeDialog(); rentHome(H); }});
-      btns.push({label:`Kup na stałe (${BUY_PRICE} 🪙)`, fn:() => buyHome(H)});
+      btns.push({label:`Wynajmij (${rentOf(H)} 🪙 / dobę)`, fn:() => { closeDialog(); rentHome(H); }});
+      btns.push({label:`Kup na stałe (${buyOf(H)} 🪙)`, fn:() => buyHome(H)});
       btns.push({label:'Anuluj', fn:closeDialog});
-      say(`${H.label} jest do wzięcia. Wynajem: ${RENT_PRICE} 🪙 za dobę. Kupno na stałe: ${BUY_PRICE} 🪙 jednorazowo, bez czynszu. Masz przy sobie ${coins()} 🪙${bank.opened?` i ${bank.balance} 🪙 na koncie`:''}.`, btns, '🏠 Oferta domu', 'home');
+      say(`${H.label} jest do wzięcia. Wynajem: ${rentOf(H)} 🪙 za dobę. Kupno na stałe: ${buyOf(H)} 🪙 jednorazowo, bez czynszu. Masz przy sobie ${coins()} 🪙${bank.opened?` i ${bank.balance} 🪙 na koncie`:''}.`, btns, '🏠 Oferta domu', 'home');
     }
   }
   function homeDoorAction(H){
     if(H.owned) return {text: H.door.open ? 'F – zamknij drzwi 🚪' : 'F – otwórz drzwi 🚪', run:() => toggleHomeDoor(H)};
-    if(!H.rented) return {text:`F – ${H.label}: wynajmij (${RENT_PRICE}/dobę) lub kup (${BUY_PRICE} 🪙)`, run:() => openHomeOffer(H)};
-    return {text:`F – drzwi / kup ${H.label} na stałe (${BUY_PRICE} 🪙)`, run:() => openHomeOffer(H)};
+    if(!H.rented) return {text:`F – ${H.label}: wynajmij (${rentOf(H)}/dobę) lub kup (${buyOf(H)} 🪙)`, run:() => openHomeOffer(H)};
+    return {text:`F – drzwi / kup ${H.label} na stałe (${buyOf(H)} 🪙)`, run:() => openHomeOffer(H)};
   }
   let homeInside=false, homeIn=null;
   function updateHomeInterior(){
     let cur = null;
-    for(const H of HOMES) if(Math.abs(player.position.x-H.x)<HOME.ww/2-.2 && Math.abs(player.position.z-H.z)<HOME.wd/2-.2){ cur = H; break; }
+    for(const H of HOMES){ const D = homeDimsOf(H); if(Math.abs(player.position.x-H.x)<D.ww/2-.2 && Math.abs(player.position.z-H.z)<D.wd/2-.2){ cur = H; break; } }
     if(cur===homeIn)return; homeIn=cur; homeInside=!!cur;
     if(cur) setActiveHome(cur);
     HOMES.forEach(H=>H.exterior.forEach(o=>o.visible=H!==cur));
@@ -3971,16 +4552,16 @@
   };
   const toParking = () => {                                                  // zjazd z ronda na parking i zaparkowanie przodem do budynku
     const sl = parkSlot(), pts = [[LANE_SOUTH,-27],[LANE_SOUTH,-50]];
-    if(sl.agd) pts.push([131,-53],[110,-53.5],[sl.x+6,-53.8],[sl.x+2.2,-55],[sl.x,-57.4],[sl.x,-59.3]);   // przez parking Pandy na plac AGD (jazda na zachód po południowej stronie)
+    if(sl.agd) pts.push([131,-52.8],[125,-54.2],[110,-54.2],[sl.x+6,-54.2],[sl.x+2.2,-55.6],[sl.x,-57.6],[sl.x,-59.3]);   // przez parking Pandy na plac AGD – pas na zachód (z = -54,2), przy miejscach postojowych
     else if(sl.west) pts.push([131,-53],[sl.x+2.2,-55],[sl.x,-57.4],[sl.x,-59.3]);
     else pts.push([133.5,-52.5],[sl.x-2.2,-54.3],[sl.x,-57.2],[sl.x,-59.3]);
     return pts;
   };
   const fromParking = () => {                                                // odjazd z miejsca parkingowego na północ, do ronda
     const sl = parkSlot();
-    return (sl.agd ? [[sl.x,-59.3],[sl.x,-56.6],[sl.x+2.2,-54],[sl.x+6,-52.4],[110,-51.2],[LANE_NORTH,-50.5]]     // odjazd z placu AGD na wschód, do ronda
-          : sl.west ? [[sl.x,-59.3],[sl.x,-56.6],[sl.x+2.2,-54],[LANE_NORTH,-50.5]]
-                    : [[sl.x,-59.3],[sl.x,-57.3],[sl.x-2.2,-55],[129.5,-53.5],[LANE_NORTH,-50.5]]).concat([[LANE_NORTH,-27]]);
+    return (sl.agd ? [[sl.x,-59.3],[sl.x,-56.8],[sl.x+2.2,-52.4],[sl.x+6,-49.4],[110,-49.2],[123,-49.2],[126.4,-47.8],[LANE_NORTH,-45.5]]     // odjazd z placu AGD – pas na wschód (z = -49,2), do ronda
+          : sl.west ? [[sl.x,-59.3],[sl.x,-56.8],[sl.x+2.0,-52.6],[Math.min(sl.x+4.5,125.5),-49.3],[LANE_NORTH,-46]]
+                    : [[sl.x,-59.3],[sl.x,-57.3],[sl.x-2.2,-54.2],[131,-54.2],[128.6,-52.4],[LANE_NORTH,-48.5]]).concat([[LANE_NORTH,-27]]);
   };
   const westExit = () => [[118,TRAFFIC_LANE_W],[112,TRAFFIC_LANE_W],[-68,TRAFFIC_LANE_W]].concat(wTurn());
   const SPOL_CAR_END = 82;                                                  // koniec trasy aut na Społecznej (jezdnia kończy się na 84)
@@ -4083,20 +4664,20 @@
     pts.push([RB.x + 2.5, 44.25, 'SPOŁECZNA']);                       // przystanek po wschodniej stronie Społecznej (między Domem G a sklepem z ubraniami)
     pts.push([RB.x + 2.5, 0]);
     flat(circ(1.3, -0.7));                                                  // rondo → zjazd do supermarketu
-    pts.push([136, -23], [LANE_SOUTH, -27], [LANE_SOUTH, -49], [131.5, -52.2], [128, -53.7], [112, -53.7]);
-    pts.push([105.5, -53.7, 'PASAŻ']);                                // przystanek w przerwie między sklepem AGD a supermarketem Pandy (autobus staje na placu przed nimi)
-    pts.push([100, -53.6], [96, -53.3], [93, -52.2], [92, -50.2], [94.5, -48.6], [99, -48.6], [104, -49.8], [110, -51.2]);   // nawrót na placu
-    pts.push([LANE_NORTH, -50.5], [LANE_NORTH, -27]);
+    pts.push([136, -23], [LANE_SOUTH, -27], [LANE_SOUTH, -47], [131.6, -50.6], [128.8, -53.3], [124, -54.2], [112, -54.2]);
+    pts.push([105.5, -54.2, 'PASAŻ']);                                // przystanek w przerwie między sklepem AGD a supermarketem Pandy (autobus staje na placu przed nimi)
+    pts.push([100, -54.2], [95, -54.0], [91.5, -53.2], [89.6, -51.4], [89.4, -49.4], [91, -47.8], [94, -47.2], [98, -47.6], [103, -48.8], [110, -49.2]);   // nawrót na placu (cały na asfalcie)
+    pts.push([123, -49.2], [126.4, -47.8], [LANE_NORTH, -45.5], [LANE_NORTH, -27]);   // pas na wschód (z = -49,2), potem na rondo
     flat(circ(-1.9, -2.4));                                                 // rondo → Długa na zachód
     pts.push([118, TRAFFIC_LANE_W], [112, TRAFFIC_LANE_W], [-33.25, TRAFFIC_LANE_W, 'DŁUGA'], [-68, TRAFFIC_LANE_W]);
     flat(wcirc(-0.2, -5.8));                                                // objazd zachodniego ronda – nawrót
     // ----- powrót na PKS tą samą trasą, po przeciwnej stronie ulic: Długa → Pasaż → Społeczna → Górna -----
     pts.push([-65, TRAFFIC_LANE_E, 'DŁUGA'], [113, TRAFFIC_LANE_E]);        // przystanek równoległy Długa (południowa strona), potem na wschód do ronda
     flat(circ(2.6, -0.9));                                                  // rondo → zjazd do supermarketu
-    pts.push([136, -23], [LANE_SOUTH, -27], [LANE_SOUTH, -49], [131.5, -52.2], [128, -53.7], [112, -53.7]);
-    pts.push([105.5, -53.7, 'PASAŻ']);                                      // ten sam przystanek co w drodze tam (plac przed AGD i Pandy)
-    pts.push([100, -53.6], [96, -53.3], [93, -52.2], [92, -50.2], [94.5, -48.6], [99, -48.6], [104, -49.8], [110, -51.2]);   // nawrót na placu
-    pts.push([LANE_NORTH, -50.5], [LANE_NORTH, -27]);
+    pts.push([136, -23], [LANE_SOUTH, -27], [LANE_SOUTH, -47], [131.6, -50.6], [128.8, -53.3], [124, -54.2], [112, -54.2]);
+    pts.push([105.5, -54.2, 'PASAŻ']);                                      // ten sam przystanek co w drodze tam (plac przed AGD i Pandy)
+    pts.push([100, -54.2], [95, -54.0], [91.5, -53.2], [89.6, -51.4], [89.4, -49.4], [91, -47.8], [94, -47.2], [98, -47.6], [103, -48.8], [110, -49.2]);   // nawrót na placu (cały na asfalcie)
+    pts.push([123, -49.2], [126.4, -47.8], [LANE_NORTH, -45.5], [LANE_NORTH, -27]);   // pas na wschód (z = -49,2), potem na rondo
     flat(circ(-1.9, -4.4));                                                 // rondo → w Społeczną (pas w stronę wzgórza)
     pts.push([RB.x - 2.5, -1], [RB.x - 2.5, 42.5, 'SPOŁECZNA']);            // przystanek równoległy Społeczna (zachodnia strona, między Domem D a E)
     for(let i = 0; i <= n-2; i++){                                          // pas „z ronda” (po drugiej stronie niż w drodze tam): prosta, łuk i Górna na zachód
@@ -4204,7 +4785,7 @@
   function boardBus(dx){
     if(!BUS.active || busRide) return;
     busRide = true; busLocal.x = dx; busLocal.z = 0.55; busPrevH = BUS.heading; busPrevFP = firstPerson;
-    if(!firstPerson){ firstPerson = true; body.visible = false; refreshInteriorWallVisibility(); }   // w środku domyślnie widok z oczu
+    if(!firstPerson){ firstPerson = true; body.visible = true; refreshInteriorWallVisibility(); }   // w środku domyślnie widok z oczu
     yaw = -BUS.heading - Math.PI/2; pitch = 0; facing = Math.PI/2 - BUS.heading; player.rotation.y = facing;   // patrzysz w stronę jazdy
     vy = 0;
     toast('Jedziesz autobusem 🚌  WASD – chodź po autobusie, F przy otwartych drzwiach – wysiądź, V – kamera');
@@ -4446,10 +5027,12 @@
   const pcar = buildCarModel(PLAYER_CAR_COLOR);
   pcar.group.rotation.order = 'YXZ';                                   // najpierw kierunek jazdy, potem przechył (nos góra/dół) w układzie auta
   let carPitch = 0;                                                    // aktualny przechył auta (rad; ujemny = nos w górę)
+  let carBank = 0;                                                     // przechył boczny auta (rad; dodatni = prawa strona wyżej), gdy stoi bokiem do stoku
   function carTilt(x, z, h){                                           // przechył i wysokość środka auta wg nachylenia drogi pod osiami
     const L = 2.0, sn = Math.sin(h), cs = Math.cos(h);
-    const hf = terrainH(x + sn*L, z + cs*L), hb = terrainH(x - sn*L, z - cs*L);
-    return {pitch: -Math.atan2(hf - hb, 2*L), y: (hf + hb)/2};
+    const W = 0.95, hf = terrainH(x + sn*L, z + cs*L), hb = terrainH(x - sn*L, z - cs*L);
+    const hr = terrainH(x + cs*W, z - sn*W), hl = terrainH(x - cs*W, z + sn*W);   // teren pod prawym i lewym bokiem auta
+    return {pitch: -Math.atan2(hf - hb, 2*L), roll: Math.atan2(hr - hl, 2*W), y: (hf + hb + hr + hl)/4};
   }
   pcar.group.visible = false; scene.add(pcar.group);
   // Wnętrze: bez niego w widoku pierwszoosobowym kamera jest w pustej bryle (ściany są jednostronne) i auto wygląda na przezroczyste.
@@ -4462,9 +5045,9 @@
     bx(0.5,0.16,1.62,0x2f343a,0.7,1.11,0);                                              // deska rozdzielcza
     bx(0.2,0.1,0.5,0x15181c,0.78,1.22,-0.42);                                           // zegary przed kierowcą
     bx(2.1,0.2,0.05,0x3b4046,-0.3,1.13,-0.8); bx(2.1,0.2,0.05,0x3b4046,-0.3,1.13,0.8);  // wnętrza drzwi (dolna część)
-    bx(0.5,0.13,0.46,0x4a3f36,-0.2,1.09,-0.42); bx(0.1,0.52,0.46,0x4a3f36,-0.48,1.33,-0.42);   // fotel kierowcy
-    bx(0.5,0.13,0.46,0x4a3f36,-0.2,1.09,0.42);  bx(0.1,0.52,0.46,0x4a3f36,-0.48,1.33,0.42);    // fotel pasażera
-    bx(0.5,0.13,1.5,0x4a3f36,-0.95,1.09,0); bx(0.1,0.5,1.5,0x4a3f36,-1.22,1.32,0);              // tylna kanapa
+    bx(0.5,0.13,0.46,0x4a3f36,-0.2,0.99,-0.42); bx(0.1,0.52,0.46,0x4a3f36,-0.48,1.21,-0.42);   // fotel kierowcy
+    bx(0.5,0.13,0.46,0x4a3f36,-0.2,0.99,0.42);  bx(0.1,0.52,0.46,0x4a3f36,-0.48,1.21,0.42);    // fotel pasażera
+    bx(0.5,0.13,1.5,0x4a3f36,-0.95,0.99,0); bx(0.1,0.5,1.5,0x4a3f36,-1.22,1.2,0);              // tylna kanapa
     bx(0.06,0.06,0.3,0x20242a,0.82,1.5,0);                                              // lusterko wsteczne
     const steer = new THREE.Group(); steer.position.set(0.5,1.22,-0.42); g.add(steer);
     const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.17,0.022,8,22), lm(0x15181c)); wheel.rotation.y = Math.PI/2; steer.add(wheel);   // koło skierowane do kierowcy
@@ -4473,7 +5056,7 @@
     g.visible = false; pcar.root.add(g);
     pcar.interior = g; pcar.steer = steer;
   })();
-  function placeCar(x, z, h){ hasCar = true; handbrake = true; carHeading = h; carV = 0; const tt = carTilt(x, z, h); carPitch = tt.pitch; pcar.group.position.set(x, tt.y + 0.02, z); pcar.group.rotation.y = h; pcar.group.rotation.x = carPitch; pcar.group.visible = true; }
+  function placeCar(x, z, h){ hasCar = true; handbrake = true; carHeading = h; carV = 0; const tt = carTilt(x, z, h); carPitch = tt.pitch; carBank = tt.roll; pcar.group.position.set(x, tt.y + 0.02, z); pcar.group.rotation.y = h; pcar.group.rotation.x = carPitch; pcar.group.rotation.z = carBank; pcar.group.visible = true; }
   // Kierunkowskazy gracza: Z – lewy, C – prawy, X – awaryjne. Skręt wyłącza się sam po wykonaniu manewru (jak w prawdziwym aucie).
   let pSig = 0, pHazard = false, pSigStart = 0, pSigTurned = false;
   function setPlayerSignal(v){ pSig = (pSig === v) ? 0 : v; pSigStart = carHeading; pSigTurned = false; }
@@ -4519,10 +5102,10 @@
     }catch(err){ return null; }
   }
   let playerHorn = null;
-  // Przycisk „Dźwięk” w ekranie pauzy (obok Multiplayer): wycisza klakson, kliknięcia kierunkowskazów i nagrania w Plikach komputera
+  // Przycisk „Dźwięk” w Ustawieniach (menu pauzy): wycisza klakson, kliknięcia kierunkowskazów i nagrania w Plikach komputera
   const soundBtn = document.createElement('button');
   soundBtn.id = 'soundBtn'; soundBtn.type = 'button';
-  soundBtn.style.cssText = 'display:block;width:100%;margin-top:10px;border:0;border-radius:8px;padding:10px 20px;color:#fff;font-size:15px;font-weight:600;cursor:pointer';
+  soundBtn.style.cssText = 'display:block;width:100%;margin-top:0;border:0;border-radius:8px;padding:10px 20px;color:#fff;font-size:15px;font-weight:600;cursor:pointer';
   function applySound(){
     if(!soundOn && playerHorn){ playerHorn.stop(); playerHorn = null; }
     try{ if(audioCtx){ if(soundOn) audioCtx.resume(); else audioCtx.suspend(); } }catch(err){}
@@ -4536,7 +5119,7 @@
     applySound();
     if(soundOn) signalClick(true, 0.09);                                             // krótki klik na potwierdzenie
   });
-  { const mpB = document.getElementById('mpBtn'); if(mpB) mpB.after(soundBtn); else document.getElementById('pauseCard').appendChild(soundBtn); }
+  { const slot = document.getElementById('stSoundSlot'); if(slot) slot.appendChild(soundBtn); else document.getElementById('pauseCard').appendChild(soundBtn); }
   applySound();
   addEventListener('keydown', e => {
     if(e.code !== 'KeyH' || e.repeat || isDead || isPaused || !carDriving || playerHorn) return;
@@ -4601,14 +5184,16 @@
     if(!hasCar || carDriving) return;
     if(bikeMounted) dismountBike();
     carDriving = true; carV = 0; player.visible = false; vy = 0;
+    if(nightLevel > 0.45 && !headOn){ headOn = true; }                                // po zmroku światła zapalają się same
     player.position.set(pcar.group.position.x, 0, pcar.group.position.z);
-    toast('Jedziesz autem 🚗  W/S – gaz i hamulec, A/D – skręt, Spacja – hamulec, B – hamulec ręczny, Z / C – kierunkowskazy, X – awaryjne, H – klakson, Shift – wysiądź');
+    toast('Jedziesz autem 🚗  W/S – gaz i hamulec, A/D – skręt, Spacja – hamulec, B – hamulec ręczny, Z / C – kierunkowskazy, X – awaryjne, L – światła, H – klakson, Shift – wysiądź');
   }
   function exitCar(){
     if(!carDriving) return;
     carDriving = false; carV = 0; player.visible = true; pSig = 0;                    // awaryjne zostają włączone po wysiadce
     const side = 2.4, c = Math.cos(carHeading), sn = Math.sin(carHeading);          // wysiadasz z lewej strony auta
-    player.position.set(pcar.group.position.x + c*side, 0, pcar.group.position.z - sn*side);
+    const sp = safeExitSpot(pcar.group.position.x, pcar.group.position.z, c*side, -sn*side, null, 1.8);
+    player.position.set(sp.x, 0, sp.z);
     facing = carHeading; player.rotation.y = facing; vy = 0;
     toast(handbrake ? 'Wysiadłeś z auta' : 'Wysiadłeś z auta – hamulec ręczny nie jest zaciągnięty! ⚠️ Auto może się stoczyć');
   }
@@ -4660,8 +5245,8 @@
     if(Math.abs(carV) < 0.005) return;
     const nx = p.x + sn*carV*dt, nz = p.z + cs*carV*dt;
     if(rollBlocked(nx, nz, carHeading)){ carV = 0; return; }                                    // uderzyło w przeszkodę – staje
-    const tt = carTilt(nx, nz, carHeading); carPitch += (tt.pitch - carPitch)*Math.min(1, dt*8);
-    p.set(nx, tt.y + 0.02, nz); pcar.group.rotation.x = carPitch;
+    const tt = carTilt(nx, nz, carHeading); carPitch += (tt.pitch - carPitch)*Math.min(1, dt*8); carBank += (tt.roll - carBank)*Math.min(1, dt*8);
+    p.set(nx, tt.y + 0.02, nz); pcar.group.rotation.x = carPitch; pcar.group.rotation.z = carBank;
     pcar.wheels.forEach(w => { w.rotation.z -= carV*dt/0.36; });
   }
   // ===== Paliwo: wskaźnik w aucie, zużycie i tankowanie na stacji (F przy dystrybutorze) =====
@@ -4894,11 +5479,12 @@
     a=pt(-ROAD_W/2,SIDE_ROAD_END);b=pt(ROAD_W/2,SIDE_ROAD_START);ctx.fillStyle='#454b50';ctx.fillRect(Math.min(a.x,b.x),b.y,Math.abs(b.x-a.x),a.y-b.y);
     // Przedłużenie Długiej, rondo, zjazd i parking supermarketu
     const mrect=(x0,z0,x1,z1,color)=>{const p0=pt(x0,z0),p1=pt(x1,z1);ctx.fillStyle=color;ctx.fillRect(Math.min(p0.x,p1.x),Math.min(p0.y,p1.y),Math.abs(p1.x-p0.x),Math.abs(p1.y-p0.y));};
-    mrect(80,ROAD_Z-11,RB.x-14,ROAD_Z+11,'#c4c1b5'); mrect(RB.x-11,RB.z-12,RB.x+11,-52,'#c4c1b5');
-    mrect(80,ROAD_Z-ROAD_W/2,RB.x-12,ROAD_Z+ROAD_W/2,'#454b50'); mrect(RB.x-ROAD_W/2,RB.z-12,RB.x+ROAD_W/2,-52,'#454b50');
-    mrect(SUPER.x-SUPER.w/2,-52,SUPER.x+SUPER.w/2,-64,'#454b50');
+    mrect(80,ROAD_Z-11,RB.x-14,ROAD_Z+11,'#c4c1b5'); mrect(RB.x-11,RB.z-12,RB.x+11,-44,'#c4c1b5');
+    mrect(80,ROAD_Z-ROAD_W/2,RB.x-12,ROAD_Z+ROAD_W/2,'#454b50'); mrect(RB.x-ROAD_W/2,RB.z-12,RB.x+ROAD_W/2,-44,'#454b50');
+    mrect(SUPER.x-SUPER.w/2,-44,SUPER.x+SUPER.w/2,-64,'#454b50'); mrect(AGD.x+2-16,-44,AGD.x+2+16,-64,'#454b50');
     mrect(GORN_X-GORN_EDGE,GORN_START,GORN_X+GORN_EDGE,GORN_END,'#c4c1b5'); mrect(GORN_X-GORN_W/2,GORN_START,GORN_X+GORN_W/2,GORN_END,'#454b50'); mrect(MINE.x-31.5,MINE.z-11.4,MINE.x,MINE.z+11.4,'#7a746c'); mrect(MINE.x-MINE.depth,MINE.z-1.8,MINE.x,MINE.z+1.8,'#25221f'); mrect(MINE.x-31,MINE.z-6.5,MINE.x-MINE.depth,MINE.z+6.5,'#3a3631'); mrect(MINE.x,MINE.z-4.5,GORN_X-GORN_EDGE,MINE.z+4.5,'#8a8170');   // ulica Górnicza i kopalnia
     mrect(POP_X-POP_EDGE,SIDE_ROAD_START,POP_X+POP_EDGE,POP_END,'#c4c1b5'); mrect(POP_X-ROAD_W/2,SIDE_ROAD_START,POP_X+ROAD_W/2,POP_END,'#454b50');   // ulica Poprzeczna
+    { const c0=pt(FOUNT.x,FOUNT.z), c1=pt(FOUNT.x+4,FOUNT.z); ctx.fillStyle='#4aa8e8'; ctx.beginPath(); ctx.arc(c0.x,c0.y,Math.max(2,Math.abs(c1.x-c0.x)),0,Math.PI*2); ctx.fill(); }   // fontanna
     { // wzgórze: obraz policzony raz (jaśniejsza zieleń = wyżej), rysowany w skali mapy
       if(!window.__hillMapImg){
         const B=HILL_BOX, cw=Math.round((B.maxX-B.minX)/2), ch=Math.round((B.maxZ-B.minZ)/2), hc=document.createElement('canvas'); hc.width=cw; hc.height=ch;
@@ -4930,7 +5516,7 @@
       ctx.fillRect(Math.min(q.x,r.x),r.y,Math.abs(r.x-q.x),q.y-r.y);ctx.strokeRect(Math.min(q.x,r.x),r.y,Math.abs(r.x-q.x),q.y-r.y);
     }
     // Podpisy najważniejszych miejsc
-    const labels=[['Real Shop',SHOP.x,SHOP.z],['Restauracja',REST.x,REST.z],['Bank',BANK.x,BANK.z],['Mebelek',FURN.x,FURN.z],...HOMES.map(H=>[H.owned?H.label+' (twój)':H.label,H.x,H.z]),['Supermarket Pandy (8–22)',SUPER.x,SUPER.z],['Sklep AGD',AGD.x,AGD.z],['Kopalnia ⛏️',MINE.x-9,MINE.z],['Ubrania',CLOTH.x,CLOTH.z],['Salon samochodowy',CAR.x,CAR.z],['Lakiernik',PAINT.x,PAINT.z],['Mechanik',MECH.x,MECH.z],['Stacja paliw',STATION.x,STATION.z],['PKS',PKS_BLD.x,PKS_BLD.z],...BUS_STOPS.map(b=>['Przystanek',b.x,b.z])];
+    const labels=[['Real Shop',SHOP.x,SHOP.z],['Restauracja',REST.x,REST.z],['Bank',BANK.x,BANK.z],['Mebelek',FURN.x,FURN.z],...HOMES.map(H=>[H.owned?H.label+' (twój)':H.label,H.x,H.z]),['Supermarket Pandy (8–22)',SUPER.x,SUPER.z],['Dom i AGD',AGD.x,AGD.z],['Kopalnia ⛏️',MINE.x-9,MINE.z],['ZARA\'Z',CLOTH.x,CLOTH.z],['Salon samochodowy',CAR.x,CAR.z],['Lakiernik',PAINT.x,PAINT.z],['Mechanik',MECH.x,MECH.z],['Stacja paliw',STATION.x,STATION.z],['PKS',PKS_BLD.x,PKS_BLD.z],...BUS_STOPS.map(b=>['Przystanek',b.x,b.z])];
     const scaleUI=Math.max(.62,Math.min(1.35,w/660)), scale=scaleUI*(view?1.4/k:1);
     ctx.font=`bold ${12*scale}px system-ui`;ctx.textAlign='center';ctx.textBaseline='middle';
     for(const [name,x,z] of labels){const q=pt(x,z);ctx.fillStyle='#fff';ctx.shadowColor='#18232c';ctx.shadowBlur=4;ctx.fillText(name,q.x,q.y-10*scale);}
@@ -5034,13 +5620,18 @@
   });
 
   // Głód i energia
-  const stats = {hunger:100, energy:100};
-  const hungerFill = document.getElementById('hungerFill'), energyFill = document.getElementById('energyFill');
+  const stats = {hunger:100, energy:100, hygiene:100};
+  const hungerFill = document.getElementById('hungerFill'), energyFill = document.getElementById('energyFill'), hygieneFill = document.getElementById('hygieneFill');
+  // Higiena: spada powoli, a podczas pracy w kopalni (kilof w ręku, gracz w sztolni / na polu kopania) znacznie szybciej – punkty na sekundę
+  const HYGIENE_DRAIN = 0.04, HYGIENE_DRAIN_RUN = 0.10, HYGIENE_DRAIN_MINE = 1.00, HYGIENE_BATH = 8;   // w wannie higiena rośnie o 8 pkt/s (pełny pasek ≈ 12 s)
+  let dirtyWarned = false, bathDoneToast = false;
   let hungryWarned = false, tiredWarned = false;
   function statColor(v, hue){ return v < 20 ? '#e53935' : hue; }
   function renderStats(){
-    const h = Math.round(stats.hunger), e = Math.round(stats.energy);
-    hungerFill.style.width = h + '%'; energyFill.style.width = e + '%';
+    const h = Math.round(stats.hunger), e = Math.round(stats.energy), y = Math.round(stats.hygiene);
+    hungerFill.style.width = h + '%'; energyFill.style.width = e + '%'; hygieneFill.style.width = y + '%';
+    hygieneFill.style.background = statColor(y, '#2196f3');
+    document.getElementById('hygieneVal').textContent = y; document.getElementById('stHygiene').classList.toggle('low', y < 20);
     hungerFill.style.background = statColor(h, '#ff9800'); energyFill.style.background = statColor(e, '#ffd54a');
     document.getElementById('hungerVal').textContent = h; document.getElementById('energyVal').textContent = e;
     document.getElementById('stHunger').classList.toggle('low', h < 20);
@@ -5082,6 +5673,9 @@
     wood:{n:'Drewno', i:'🪵', color:0x8d5a2b},
     hat:{n:'Kapelusz', i:'🎩', color:0x222222, use:'Załóż / zdejmij'},
     cap:{n:'Czapka z daszkiem', i:'🧢', color:0xc62828, use:'Załóż / zdejmij'},
+    shirt:{n:'Koszulka', i:'👕', color:0x2d6cdf, use:'Załóż'},
+    shoes:{n:'Buty', i:'👟', color:0x1d1d1f, use:'Załóż'},
+    pants:{n:'Spodnie', i:'👖', color:0x333333, use:'Załóż'},
     phone:{n:'Telefon', i:'📱', color:0x2b2b30, use:'Otwórz'},
     charger:{n:'Ładowarka', i:'🔌', color:0xf2f2f2, use:'Podłącz do gniazdka'},
     computer:{n:'Komputer', i:'🖥️', color:0x343a40, use:'Ustaw na biurku'},
@@ -5096,6 +5690,9 @@
     chair:{n:'Krzesło', i:'🪑', color:0xb07a43, use:'Ustaw w domu'},
     wardrobe:{n:'Szafa', i:'🚪', color:0x7a4e2a, use:'Ustaw w domu'},
     lamp:{n:'Lampa sufitowa', i:'💡', color:0xe07b39, use:'Zamontuj na suficie'},
+    toilet:{n:'Toaleta', i:'🚽', color:0xf4f6f7, use:'Ustaw w domu'},
+    bathtub:{n:'Wanna', i:'🛁', color:0xdfe9ee, use:'Ustaw w domu'},
+    mirror:{n:'Lustro stojące', i:'🪞', color:0x9fd3f0, use:'Ustaw w domu'},
     kettle:{n:'Czajnik elektryczny', i:'☕', color:0xb8c2ca},
     toaster:{n:'Toster', i:'🥪', color:0x9aa5ae},
     blender:{n:'Blender', i:'🍹', color:0x2b2f35},
@@ -5133,17 +5730,147 @@
   }
   function openFridge(){renderFridge();$('fridge').style.display='block';promptEl.style.display='none';}
   function closeFridge(){$('fridge').style.display='none';}
-  // Szafa: na razie pusta – w przyszłości będą w niej ubrania
-  const wardrobeClothes = [];
+  // Szafa: przechowuje ubrania (kapelusze i czapki, z zachowaniem koloru)
+  const WARDROBE_MAX = 40;
+  const wardrobeClothes = [];                                      // {id:'hat'|'cap', color, count}
+  const isClothing = id => id === 'hat' || id === 'cap' || id === 'shirt' || id === 'shoes' || id === 'pants';
+  const clothColor = c => c.color !== undefined ? c.color : ITEMS[c.id].color;
+  // ===== Szafa: podgląd postaci + 4 sloty (nakrycie głowy, koszulka, spodnie, buty) z wymianą ubrań =====
+  const WD_SLOTS = [
+    {key:'head',  label:'Nakrycie głowy', ids:['hat','cap']},
+    {key:'shirt', label:'Koszulka', ids:['shirt']},
+    {key:'pants', label:'Spodnie', ids:['pants']},
+    {key:'shoes', label:'Buty', ids:['shoes']}
+  ];
+  let wdSel = 'head';
+  const wdCurrent = key => key === 'head' ? (worn ? {id:worn.id, color:worn.color} : null)
+    : key === 'shirt' ? {id:'shirt', color:wornShirt ? wornShirt.color : accShirtCol, def:!wornShirt}
+    : key === 'pants' ? {id:'pants', color:wornPants ? wornPants.color : PANTS_DEF, def:!wornPants}
+    : {id:'shoes', color:wornShoes ? wornShoes.color : shoeEnc(SH_DEF_UP, SH_DEF_SOLE), def:!wornShoes};
+  const wdSw = h => `<span style="display:inline-block;width:13px;height:13px;border-radius:50%;border:1px solid rgba(255,255,255,.8);vertical-align:middle;margin-left:4px;background:#${h}"></span>`;
+  const wdDots = it => !it || it.color === undefined ? '' : it.id === 'shoes' ? wdSw(hex6(shoeUp(it.color))) + wdSw(hex6(shoeSole(it.color))) : wdSw(hex6(it.color));
+  const wdSet = (key, color) => key === 'shirt' ? setShirt({color}) : key === 'pants' ? setPants({color}) : setShoes({color});
+  function wdStore(id, color){                                     // dodaje sztukę do szafy
+    const w = wardrobeClothes.find(c => c.id === id && c.color === color);
+    if(w) w.count++; else wardrobeClothes.push(color === undefined ? {id, count:1} : {id, color, count:1});
+  }
+  const wdCount = () => wardrobeClothes.reduce((a, c) => a + c.count, 0);
+  function wdWearInv(key, k){                                      // koszulka / spodnie / buty z ekwipunku; zdjęte wracają do ekwipunku
+    const s = inv[k]; if(!s || s.id !== key) return;
+    const cur = wdCurrent(key), c = s.color;
+    removeOne(k);
+    if(!addItem(key, cur.color)){ addItem(key, c); renderInv(); toast('Brak miejsca w ekwipunku na zdjęte ubranie'); return; }
+    wdSet(key, c); toast('Założono: ' + ITEMS[key].n); renderInv(); renderWardrobe();
+  }
+  function wdWearStore(key, w){                                    // koszulka / spodnie / buty z szafy; zdjęte trafiają do szafy
+    const cur = wdCurrent(key), c = w.color;
+    if(--w.count <= 0) wardrobeClothes.splice(wardrobeClothes.indexOf(w), 1);
+    wdStore(key, cur.color);
+    wdSet(key, c); toast('Założono: ' + ITEMS[key].n); renderInv(); renderWardrobe();
+  }
+  function wdWearHead(src){                                        // nakrycia głowy zostają w ekwipunku (jak dotąd), z szafy trafiają do ekwipunku
+    if(src.w){
+      const w = src.w;
+      if(!addItem(w.id, w.color)){ toast('Brak miejsca w ekwipunku'); return; }
+      if(--w.count <= 0) wardrobeClothes.splice(wardrobeClothes.indexOf(w), 1);
+      setWorn({id:w.id, color:w.color}); toast('Założono: ' + ITEMS[w.id].n);
+    }else{
+      const s = inv[src.k]; if(!s) return;
+      setWorn({id:s.id, color:s.color}); toast('Założono: ' + ITEMS[s.id].n);
+    }
+    renderInv(); renderWardrobe();
+  }
+  // Podgląd postaci w szafie: własny mały renderer, klon modelu gracza (materiały są wspólne, więc kolory są aktualne)
+  let wdR = null, wdScene = null, wdCam = null, wdClone = null;
+  function wdPreview(){
+    try{
+      if(!wdR){
+        wdR = new THREE.WebGLRenderer({antialias:true, alpha:true});
+        wdR.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); wdR.setSize(150, 225, false); wdR.setClearColor(0x000000, 0);
+        wdR.domElement.style.cssText = 'width:150px;height:225px;border-radius:10px;background:linear-gradient(#cfe8ff,#6fa8e0);flex:none';
+        wdScene = new THREE.Scene(); wdScene.add(new THREE.AmbientLight(0xffffff, 0.8));
+        const dl = new THREE.DirectionalLight(0xfff2d8, 0.85); dl.position.set(1.5, 2.5, 3); wdScene.add(dl);
+        wdCam = new THREE.OrthographicCamera(-0.93, 0.93, 2.7, -0.1, 0.1, 20); wdCam.layers.enable(1);
+        wdCam.position.set(0, 0, 5); wdCam.lookAt(0, 0, 0);
+      }
+      if(wdClone) wdScene.remove(wdClone);
+      const bi = player.children.indexOf(body), ui = body.children.indexOf(upper);
+      wdClone = player.clone(true);
+      wdClone.position.set(0, 0, 0); wdClone.rotation.set(0.0, 0.45, 0); wdClone.scale.set(1, 1, 1); wdClone.visible = true;
+      const rm = []; wdClone.traverse(o => { if(o.isLight || o.isSprite || o.isPoints || o.isLine) rm.push(o); });
+      rm.forEach(o => o.parent && o.parent.remove(o));
+      wdClone.children.forEach((c, i) => { if(i !== bi) c.visible = false; });     // tylko postać
+      const cb = wdClone.children[bi];
+      if(cb){
+        cb.position.set(0, 0, 0); cb.rotation.set(0, 0, 0);
+        cb.traverse(o => { if(o.isGroup){ o.rotation.set(0, 0, 0); o.scale.set(1, 1, 1); } });   // bez pozy chodu / siedzenia
+        const cu = cb.children[ui]; if(cu) cu.position.set(0, 0.8, 0);
+      }
+      wdScene.add(wdClone); wdR.render(wdScene, wdCam);
+      return wdR.domElement;
+    }catch(err){ return null; }
+  }
   function renderWardrobe(){
     const list = $('wardrobeList'); list.innerHTML = '';
-    if(!wardrobeClothes.length){
-      list.innerHTML = '<div class="empty">Szafa jest pusta 👕<br>Wkrótce znajdą się tu ubrania.</div>';
-      return;
-    }
-    wardrobeClothes.forEach(c => { const r = document.createElement('div'); r.className = 'cloth'; r.textContent = c.i + ' ' + c.n; list.appendChild(r); });
+    const sec = t => { const h = document.createElement('div'); h.className = 'wsub'; h.textContent = t; list.appendChild(h); };
+    const empty = t => list.insertAdjacentHTML('beforeend', '<div class="empty">' + t + '</div>');
+    const row = (it, tag, label, fn) => {
+      const r = document.createElement('div'); r.className = 'cloth';
+      const sp = document.createElement('span'); sp.innerHTML = ITEMS[it.id].i + ' ' + ITEMS[it.id].n + wdDots(it) + (it.count > 1 ? ' ×' + it.count : '') + (tag ? ' <small style="opacity:.65">' + tag + '</small>' : '');
+      const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.onclick = fn;
+      r.appendChild(sp); r.appendChild(b); list.appendChild(r);
+    };
+    // 1) postać + 4 sloty z tym, co masz na sobie
+    const top = document.createElement('div'); top.style.cssText = 'display:flex;gap:10px;align-items:stretch';
+    const cv = wdPreview(); if(cv) top.appendChild(cv);
+    const col = document.createElement('div'); col.style.cssText = 'flex:1;display:grid;gap:6px;min-width:0';
+    WD_SLOTS.forEach(sl => {
+      const it = wdCurrent(sl.key), on = wdSel === sl.key;
+      const b = document.createElement('button'); b.type = 'button';
+      b.style.cssText = 'text-align:left;color:#fff;border-radius:10px;padding:6px 9px;cursor:pointer;font-size:13px;line-height:1.3;border:2px solid ' + (on ? '#fff' : 'transparent') + ';background:' + (on ? '#3a7bd5' : 'rgba(255,255,255,.1)');
+      b.innerHTML = '<div style="opacity:.75;font-size:10px;text-transform:uppercase;letter-spacing:.04em">' + sl.label + '</div>' +
+        (it ? ITEMS[it.id].i + ' ' + ITEMS[it.id].n + wdDots(it) + (it.def ? ' <small style="opacity:.65">· startowe</small>' : '') : '<span style="opacity:.6">— brak —</span>');
+      b.onclick = () => { wdSel = sl.key; renderWardrobe(); };
+      col.appendChild(b);
+    });
+    top.appendChild(col); list.appendChild(top);
+    // 2) wymiana w wybranym slocie
+    const sl = WD_SLOTS.find(x => x.key === wdSel), cur = wdCurrent(sl.key);
+    sec('Zmień: ' + sl.label);
+    let any = false;
+    if(sl.key === 'head' && cur){ any = true; row(cur, 'masz na sobie', 'Zdejmij', () => { setWorn(null); toast('Zdjęto: ' + ITEMS[cur.id].n); renderInv(); renderWardrobe(); }); }
+    inv.forEach((s, k) => {
+      if(!s || sl.ids.indexOf(s.id) < 0) return;
+      if(sl.key === 'head' && isWorn(s)) return;
+      any = true; row(s, 'ekwipunek', 'Załóż', () => sl.key === 'head' ? wdWearHead({k}) : wdWearInv(sl.key, k));
+    });
+    wardrobeClothes.slice().forEach(w => {
+      if(sl.ids.indexOf(w.id) < 0) return;
+      any = true; row(w, 'szafa', 'Załóż', () => sl.key === 'head' ? wdWearHead({w}) : wdWearStore(sl.key, w));
+    });
+    if(!any) empty('Nie masz nic innego do założenia w tym miejscu.<br>Kup nowe ubrania w ZARA\'Z.');
+    // 3) przechowywanie
+    sec('W szafie (' + wdCount() + '/' + WARDROBE_MAX + ')');
+    if(!wardrobeClothes.length) empty('Szafa jest pusta 👕<br>Włóż tu ubrania z ekwipunku.');
+    wardrobeClothes.slice().forEach(c => row(c, '', 'Wyjmij', () => {
+      if(!addItem(c.id, c.color)){ toast('Brak miejsca w ekwipunku'); return; }
+      if(--c.count <= 0) wardrobeClothes.splice(wardrobeClothes.indexOf(c), 1);
+      renderWardrobe(); renderInv(); toast('Wyjęto z szafy: ' + ITEMS[c.id].n);
+    }));
+    sec('W twoim ekwipunku');
+    const mine = inv.map((s, k) => ({s, k})).filter(o => o.s && isClothing(o.s.id));
+    if(!mine.length) empty('Nie masz przy sobie żadnych ubrań.');
+    mine.forEach(o => row(o.s, '', 'Włóż', () => {
+      if(wdCount() >= WARDROBE_MAX){ toast('Szafa jest pełna'); return; }
+      const s = inv[o.k]; if(!s || !isClothing(s.id)) return;
+      const id = s.id, color = s.color;
+      const wasWorn = isWorn(s);
+      if(wasWorn && s.count <= 1) unwear(s);                       // zdejmij, jeśli to ostatnia sztuka i jest na głowie
+      removeOne(o.k); wdStore(id, color);
+      renderWardrobe(); renderInv(); toast('Włożono do szafy: ' + ITEMS[id].n);
+    }));
   }
-  function openWardrobe(){ renderWardrobe(); $('wardrobe').style.display='block'; promptEl.style.display='none'; }
+  function openWardrobe(){ $('wardrobe').style.width = 'min(440px,calc(100vw - 28px))'; renderWardrobe(); $('wardrobe').style.display='block'; promptEl.style.display='none'; }
   function closeWardrobe(){ $('wardrobe').style.display='none'; }
   $('wardrobeClose').onclick = closeWardrobe;
   $('fridgeClose').onclick=closeFridge;
@@ -5157,15 +5884,18 @@
     clearTimeout(toast.h); toast.h = setTimeout(() => t.style.opacity = 0, 1800);
   }
   function addItem(id, color){
-    color = ((id === 'hat' || id === 'cap') && typeof color === 'number') ? color : undefined;   // kolor mają tylko nakrycia głowy
-    const s = inv.find(x => x && x.id === id && x.color === color);
+    color = ((id === 'hat' || id === 'cap' || id === 'shirt' || id === 'shoes' || id === 'pants') && typeof color === 'number') ? color : undefined;   // kolor mają tylko ubrania
+    const s = NOSTACK(id) ? null : inv.find(x => x && x.id === id && x.color === color);   // każda koszulka = osobny slot
     if(s){ s.count++; return true; }
     const k = inv.indexOf(null);
     if(k < 0) return false;
     inv[k] = color === undefined ? {id, count:1} : {id, count:1, color}; return true;
   }
   const hex6 = c => (c >>> 0).toString(16).padStart(6, '0');
-  const colorDot = s => s && s.color !== undefined ? `<span class="cdot" style="background:#${hex6(s.color)}"></span>` : '';
+  const colorDot = s => !s || s.color === undefined ? '' : s.id === 'shoes'
+    ? `<span class="cdot" style="background:#${hex6(shoeUp(s.color))}"></span><span class="cdot" style="background:#${hex6(shoeSole(s.color))};left:17px"></span>`
+    : `<span class="cdot" style="background:#${hex6(s.color)}"></span>`;
+  const colTxt = s => s.id === 'shoes' ? ' #' + hex6(shoeUp(s.color)).toUpperCase() + ' / #' + hex6(shoeSole(s.color)).toUpperCase() : ' #' + hex6(s.color).toUpperCase();
   const DESK_SLOTS = 10, OVEN_SLOTS = 8;
   const BIG = {desk:{slots:DESK_SLOTS, part:'deskpart'}, oven:{slots:OVEN_SLOTS, part:'ovenpart'}};   // przedmioty zajmujące wiele slotów
   const freeSlots = () => inv.filter(x => !x).length;
@@ -5184,7 +5914,7 @@
     if(BIG[s.id]){ inv.forEach((q,i) => { if(q && q.main === k) inv[i] = null; }); inv[k] = null; return; }
     if(--s.count <= 0){
       inv[k] = null;
-      if(isWorn(s)) setWorn(null);
+      if(isWorn(s)) unwear(s);
       if(s.id === 'phone') closePhone();
     }
   }
@@ -5211,7 +5941,7 @@
     const d = document.createElement('div'); d.className = 'slot' + (s && (s.id === 'deskpart' || s.id === 'ovenpart') ? ' part' : '');
     if(s){
       if(s.id === 'coin') d.innerHTML = '<i class="coin inventory-coin" aria-label="Monety"></i>'; else d.textContent = ITEMS[s.id].i;
-      d.title = ITEMS[s.id].n + (s.color !== undefined ? ' #' + hex6(s.color).toUpperCase() : '') + (s.count > 1 ? ' ×' + s.count : '');
+      d.title = ITEMS[s.id].n + (s.color !== undefined ? colTxt(s) : '') + (s.count > 1 ? ' ×' + s.count : '');
       if(s.count > 1) d.insertAdjacentHTML('beforeend', `<span class="n">${s.count}</span>`);
       if(inInv && isWorn(s)) d.insertAdjacentHTML('beforeend', '<span class="eq">✓</span>');
       d.insertAdjacentHTML('beforeend', colorDot(s));
@@ -5236,7 +5966,7 @@
       toast(`Schowano do bagażnika: ${ITEMS[s.id].i} ${ITEMS[s.id].n}`); return;
     }
     if(!trunkAdd(s.id, s.count, s.color)){ toast('Bagażnik pełny 🧳'); return; }
-    if(isWorn(s)) setWorn(null);
+    if(isWorn(s)) unwear(s);
     if(s.id === 'phone') closePhone();
     inv[k] = null; renderTrunk(); renderInv();
     toast(`Schowano do bagażnika: ${ITEMS[s.id].i} ${ITEMS[s.id].n}${s.count > 1 ? ' ×' + s.count : ''}`);
@@ -5250,7 +5980,7 @@
       addBig(s.id); trunk.forEach((q,i) => { if(q && q.main === k) trunk[i] = null; }); trunk[k] = null;
       renderTrunk(); renderInv(); toast(`Wyjęto z bagażnika: ${ITEMS[s.id].i} ${ITEMS[s.id].n}`); return;
     }
-    if(!canAddItem(s.id, s.color)){ toast('Ekwipunek pełny – zrób miejsce'); return; }
+    if(!canAddItem(s.id, s.color) || (NOSTACK(s.id) && freeSlots() < s.count)){ toast('Ekwipunek pełny – zrób miejsce'); return; }
     for(let i = 0; i < s.count; i++) addItem(s.id, s.color);
     trunk[k] = null; renderTrunk(); renderInv();
     toast(`Wyjęto z bagażnika: ${ITEMS[s.id].i} ${ITEMS[s.id].n}${s.count > 1 ? ' ×' + s.count : ''}`);
@@ -5290,7 +6020,7 @@
       gridEl.appendChild(d);
     });
     const s = inv[sel];
-    infoEl.textContent = s ? (BIG[s.id] ? `${ITEMS[s.id].n} – zajmuje ${BIG[s.id].slots} slotów` : `${ITEMS[s.id].n}${s.color !== undefined ? ' #' + hex6(s.color).toUpperCase() : ''} ×${s.count}`) : 'Wybierz przedmiot';
+    infoEl.textContent = s ? (BIG[s.id] ? `${ITEMS[s.id].n} – zajmuje ${BIG[s.id].slots} slotów` : `${ITEMS[s.id].n}${s.color !== undefined ? colTxt(s) : ''} ×${s.count}`) : 'Wybierz przedmiot';
     useBtn.disabled = !(s && ITEMS[s.id].use);
     useBtn.textContent = s && ITEMS[s.id].use ? ITEMS[s.id].use : 'Użyj';
     dropBtn.disabled = !s;
@@ -5305,8 +6035,26 @@
     else if(s.id === 'cola'){ removeOne(sel); addStats(5, 15); toast('Orzeźwiająca cola! 🥤 +15 energii, +5 sytości'); }
     else if(s.id === 'phone'){ openPhone(); }
     else if(s.id === 'charger'){ if(homeInside && nearOutlet() < 2.2) plugCharger(); else toast('Podłącz ładowarkę do gniazdka w swoim domu 🏠'); }
-    else if(s.id === 'desk' || s.id === 'chair' || s.id === 'wardrobe' || s.id === 'computer' || s.id === 'lamp' || s.id === 'oven'){ startPlacement(sel); }
-    else if(s.id === 'hat' || s.id === 'cap'){ if(isWorn(s)){ setWorn(null); toast('Zdjęto: ' + ITEMS[s.id].n); } else { setWorn({id:s.id, color:s.color}); toast('Założono: ' + ITEMS[s.id].n); } }
+    else if(s.id === 'desk' || s.id === 'chair' || s.id === 'wardrobe' || s.id === 'computer' || s.id === 'lamp' || s.id === 'oven' || FIXT.includes(s.id)){ startPlacement(sel); }
+    else if(s.id === 'shirt'){
+      const c = s.color, old = wornShirt || {color:accShirtCol};   // pierwsza koszulka (w kolorze konta) też trafia do ekwipunku
+      removeOne(sel);
+      if(old && !addItem('shirt', old.color)){ addItem('shirt', c); renderInv(); toast('Brak miejsca w ekwipunku na zdjętą koszulkę'); return; }   // stara koszulka wraca do ekwipunku
+      setShirt({color:c}); toast(old ? 'Założono koszulkę – poprzednia wróciła do ekwipunku' : 'Założono: Koszulka');
+    }
+    else if(s.id === 'pants'){
+      const c = s.color, old = wornPants || {color:PANTS_DEF};   // pierwsze spodnie (ciemnoszare) też trafiają do ekwipunku
+      removeOne(sel);
+      if(!addItem('pants', old.color)){ addItem('pants', c); renderInv(); toast('Brak miejsca w ekwipunku na zdjęte spodnie'); return; }
+      setPants({color:c}); toast('Założono spodnie – poprzednie wróciły do ekwipunku');
+    }
+    else if(s.id === 'shoes'){
+      const c = s.color, old = wornShoes || {color:shoeEnc(SH_DEF_UP, SH_DEF_SOLE)};   // pierwsze buty (czarne z białą podeszwą) też trafiają do ekwipunku
+      removeOne(sel);
+      if(old && !addItem('shoes', old.color)){ addItem('shoes', c); renderInv(); toast('Brak miejsca w ekwipunku na zdjęte buty'); return; }   // stare buty wracają do ekwipunku
+      setShoes({color:c}); toast(old ? 'Założono buty – poprzednie wróciły do ekwipunku' : 'Założono: Buty');
+    }
+    else if(s.id === 'hat' || s.id === 'cap'){ if(isWorn(s)){ unwear(s); toast('Zdjęto: ' + ITEMS[s.id].n); } else { setWorn({id:s.id, color:s.color}); toast('Założono: ' + ITEMS[s.id].n); } }
     renderInv();
   };
   dropBtn.onclick = () => {
@@ -5316,6 +6064,7 @@
     if(s.id === 'oven'){ toast('Piekarnika nie wyrzucisz – ustaw go w swoim domu 🏠'); return; }
     if(s.id === 'chair'){ toast('Krzesła nie wyrzucisz – ustaw je w swoim domu 🏠'); return; }
     if(s.id === 'wardrobe'){ toast('Szafy nie wyrzucisz – ustaw ją w swoim domu 🏠'); return; }
+    if(FIXT.includes(s.id)){ toast(`${ITEMS[s.id].n} – nie wyrzucisz, ustaw w swoim domu 🏠`); return; }
     if(s.id === 'lamp'){ toast('Lampy nie wyrzucisz – zamontuj ją na suficie w swoim domu 🏠'); return; }
     if(s.id === 'computer'){ toast('Komputer ustawisz bezpośrednio na biurku 🖥️'); return; }
     const id = s.id, dcol = s.color; removeOne(sel);
@@ -5373,7 +6122,7 @@
         prScene = new THREE.Scene();
         prScene.add(new THREE.AmbientLight(0xffffff, 0.75));
         const dl = new THREE.DirectionalLight(0xfff2d8, 0.85); dl.position.set(1.5, 2.5, 3); prScene.add(dl);
-        prCam = new THREE.OrthographicCamera(-0.95, 0.95, 2.75, 0.85, 0.1, 20);   // kadr: głowa, czapka i tułów
+        prCam = new THREE.OrthographicCamera(-0.95, 0.95, 2.75, 0.85, 0.1, 20); prCam.layers.enable(1);   // kadr: głowa, czapka i tułów
         prCam.position.set(0, 0, 5); prCam.lookAt(0, 0, 0);
       }catch(err){ pr = null; }
     }
@@ -5451,7 +6200,7 @@
   // Bateria telefonu i ładowarka: telefon trzeba podłączyć do ładowarki w gniazdku i zostawić – ładuje się, dopóki go nie zabierzesz
   let chargerHome = null, phoneBattery = 100, chargerPlugged = false, phoneDocked = false, batFlag20 = false, batFlag10 = false, batFull = true;
   const hasCharger = () => chargerPlugged || inv.some(s => s && s.id === 'charger');
-  const outletPos = () => homeW(OUTLET_LOCAL.x, OUTLET_LOCAL.z);
+  const outletPos = () => homeW(HOME.lay.outlet.x, HOME.lay.outlet.z);
   function nearOutlet(){ const o = outletPos(); return Math.hypot(player.position.x - o.x, player.position.z - o.z); }
   const isCharging = () => phoneDocked && phoneBattery < 100;
   function plugCharger(){
@@ -5572,16 +6321,16 @@
         if(H.owned){
           status = '🔑 Twój na stałe – bez czynszu';
           actions = domConfirm === H.id
-            ? `<div style="font-size:11px;opacity:.85;margin-top:8px">Na pewno sprzedać ${H.label} za ${SELL_PRICE} 🪙? Pieniądze trafią na konto, a ty stracisz dostęp do domu.</div><button data-act="sellyes" data-id="${H.id}" style="${bs('#c0392b')}">Potwierdź sprzedaż (+${SELL_PRICE} 🪙)</button><button data-act="sellno" data-id="${H.id}" style="${bs('rgba(255,255,255,.2)')}">Anuluj</button>`
-            : `<button data-act="sell" data-id="${H.id}" style="${bs('#c0392b')}">Sprzedaj dom (+${SELL_PRICE} 🪙 na konto)</button>`;
+            ? `<div style="font-size:11px;opacity:.85;margin-top:8px">Na pewno sprzedać ${H.label} za ${sellOf(H)} 🪙? Pieniądze trafią na konto, a ty stracisz dostęp do domu.</div><button data-act="sellyes" data-id="${H.id}" style="${bs('#c0392b')}">Potwierdź sprzedaż (+${sellOf(H)} 🪙)</button><button data-act="sellno" data-id="${H.id}" style="${bs('rgba(255,255,255,.2)')}">Anuluj</button>`
+            : `<button data-act="sell" data-id="${H.id}" style="${bs('#c0392b')}">Sprzedaj dom (+${sellOf(H)} 🪙 na konto)</button>`;
         } else if(H.rented){
           const left = Math.max(0, (H.paidUntil - gameElapsed) / DAY_SECONDS);
           status = `🔓 Wynajęty • opłacony jeszcze ${left.toFixed(1)} doby`;
           const can = left + 1 <= MAX_PREPAID_DAYS;
-          actions = `<button data-act="extend" data-id="${H.id}" style="${bs(can ? '#3a7bd5' : '#666')}" ${can ? '' : 'disabled'}>${can ? `Przedłuż o dobę (${RENT_PRICE} 🪙 z konta)` : `Maks. ${MAX_PREPAID_DAYS} dób z góry`}</button>`;
+          actions = `<button data-act="extend" data-id="${H.id}" style="${bs(can ? '#3a7bd5' : '#666')}" ${can ? '' : 'disabled'}>${can ? `Przedłuż o dobę (${rentOf(H)} 🪙 z konta)` : `Maks. ${MAX_PREPAID_DAYS} dób z góry`}</button>`;
         } else {
           status = '🔒 Nie masz tego domu';
-          actions = `<div style="font-size:11px;opacity:.75;margin-top:8px">Podejdź do drzwi, żeby wynająć (${RENT_PRICE} 🪙 / dobę) lub kupić (${BUY_PRICE} 🪙).</div>`;
+          actions = `<div style="font-size:11px;opacity:.75;margin-top:8px">Podejdź do drzwi, żeby wynająć (${rentOf(H)} 🪙 / dobę) lub kupić (${buyOf(H)} 🪙).</div>`;
         }
         if(!bank.opened && (H.owned || H.rented)) actions = `<button disabled style="${bs('#666')}">🔒 Wymaga konta bankowego</button>`;
         return `<div style="background:rgba(255,255,255,.12);border-radius:12px;padding:12px;margin-bottom:10px"><div style="font-weight:700;font-size:15px">🏠 ${H.label}</div><div style="font-size:12px;opacity:.9;margin-top:2px">${status}</div>${actions}</div>`;
@@ -5595,8 +6344,8 @@
         else if(act === 'sellyes'){ domConfirm = null; sellHome(H); }
         else if(act === 'extend'){
           if(!H.rented || H.owned) return;
-          if(bank.balance < RENT_PRICE) toast(`Brak środków na koncie: przedłużenie to ${RENT_PRICE} 🪙 (saldo: ${bank.balance} 🪙)`);
-          else { bank.balance -= RENT_PRICE; logTx(`−${RENT_PRICE} 🪙 przedłużenie najmu ${H.label}`); refreshPhoneBank(); H.paidUntil += DAY_SECONDS; toast(`Przedłużono najem ${H.label} o dobę za ${RENT_PRICE} 🪙 z konta`); }
+          if(bank.balance < rentOf(H)) toast(`Brak środków na koncie: przedłużenie to ${rentOf(H)} 🪙 (saldo: ${bank.balance} 🪙)`);
+          else { bank.balance -= rentOf(H); logTx(`−${rentOf(H)} 🪙 przedłużenie najmu ${H.label}`); refreshPhoneBank(); H.paidUntil += DAY_SECONDS; toast(`Przedłużono najem ${H.label} o dobę za ${rentOf(H)} 🪙 z konta`); }
         }
         showScreen('dom');
       });
@@ -5625,8 +6374,8 @@
       body.visible = true;
     } else {
       const vp = firstPerson ? pitch : -pitch*0.35, cp = Math.cos(vp);
-      cam.position.set(p.x, p.y + 1.62, p.z);
-      cam.lookAt(p.x + dx*cp, p.y + 1.62 + Math.sin(vp), p.z + dz*cp);
+      cam.position.set(p.x, p.y + 1.96, p.z);
+      cam.lookAt(p.x + dx*cp, p.y + 1.96 + Math.sin(vp), p.z + dz*cp);
       body.visible = false;
     }
     sky.position.copy(cam.position);
@@ -5648,7 +6397,7 @@
       phoneCamRT = new THREE.WebGLRenderTarget(PCW, PCH);
       phoneCamBuf = new Uint8Array(PCW*PCH*4);
       phoneCamImg = phoneCamCtx.createImageData(PCW, PCH);
-      phoneCamObj = new THREE.PerspectiveCamera(65, PCW/PCH, 0.1, 600);
+      phoneCamObj = new THREE.PerspectiveCamera(65, PCW/PCH, 0.1, 600); phoneCamObj.layers.enable(1);
     }
     if(!phoneCamCv.captureStream){ $('cameraHint').textContent = 'Ta przeglądarka nie obsługuje nagrywania obrazu z gry.'; return; }
     try{
@@ -5718,7 +6467,7 @@
       else if(carDriving) return;                                               // z auta wysiada się Shiftem
       else if(curAct && !bikeMounted) curAct.run();
     }
-    if(e.code === 'KeyG' && homeInside && !sitting && !placing){ const pc = nearDesk('chair') || nearDesk('wardrobe') || nearDesk('oven') || nearLamp(); if(pc) pickupDesk(pc); }
+    if(e.code === 'KeyG' && homeInside && !sitting && !placing){ const pc = nearDesk('chair') || nearDesk('wardrobe') || nearDesk('oven') || FIXT.map(k => nearDesk(k)).find(Boolean) || nearLamp(); if(pc) pickupDesk(pc); }
     if(e.code === 'KeyP') phoneEl.style.display === 'flex' ? closePhone() : openPhone();
     if(e.code === 'Escape'){ closeShop(); closePhone(); closeDialog(); closeFridge(); closeWardrobe(); cancelPlacement(); closePaintUI(true); closeHeadUI(true); }
   });
@@ -5760,6 +6509,7 @@
   scene.add(beacon);
 
   function say(text, buttons, who, key){
+    const oldGrid = $('dlgGrid'); if(oldGrid) oldGrid.remove();     // siatka towarów (Dom i AGD) z poprzedniej rozmowy
     dlgWho = key || (who ? 'shop' : 'chef');
     $('dlgName').textContent = who || '👨‍🍳 Marek, kucharz';
     $('dlgText').innerHTML = coinHTML(text);
@@ -5989,15 +6739,15 @@
     mineMark.visible = !!mineAimC;
     if(mineAimC){ mineMark.position.set(mineAimC.x, mineAimC.y, mineAimC.z).addScaledVector(mineAimC.n, 0.03); mineMark.quaternion.setFromUnitVectors(_zAx, mineAimC.n); }
   }
-  const pickGroup = new THREE.Group(); armR.add(pickGroup); pickGroup.visible = false;
+  const pickGroup = new THREE.Group(); armL.add(pickGroup); pickGroup.visible = false;   // armL (x = -0,48) to anatomicznie PRAWA ręka postaci (patrzy w +Z)
   box(0.07,0.07,0.9,0x6b4a2a,0,-0.78,0.35,pickGroup); box(0.07,0.6,0.09,0x9aa5ae,0,-0.78,0.78,pickGroup);   // kilof w ręce gracza
   function mineAnimate(time){
     const px = player.position.x, inMine = px < MINE.x + 1.2 && px > MD.x1 - MD.nx - 1 && Math.abs(player.position.z - MINE.z) < 8;
     pickGroup.visible = hasPick() && (mining.t > 0 || inMine) && !bikeMounted && !carDriving && !sitting && !busRide;
     if(mining.t > 0){
       facing = Math.atan2(mining.ax - px, mining.az - player.position.z); player.rotation.y = facing;
-      armR.rotation.x = -1.45 - 0.95*Math.sin((1 - mining.t/SWING_T)*Math.PI); armL.rotation.x = -0.5;   // jeden zamach = jedno uderzenie
-    } else if(pickGroup.visible) armR.rotation.x = -0.35;
+      armL.rotation.x = -1.45 - 0.95*Math.sin((1 - mining.t/SWING_T)*Math.PI); armR.rotation.x = -0.5;   // jeden zamach = jedno uderzenie
+    } else if(pickGroup.visible) armL.rotation.x = -0.35;
   }
   function takePickaxe(){ if(!addItem('pickaxe')){ toast('Ekwipunek pełny!'); return; } closeDialog(); renderInv(); toast('Dostałeś kilof ⛏️ – w głębi sztolni celuj w ziemię i klikaj lewym przyciskiem myszy'); }
   function returnPickaxe(){ const k = inv.findIndex(s => s && s.id === 'pickaxe'); if(k >= 0) inv[k] = null; stopMining(); closeDialog(); renderInv(); toast('Oddałeś kilof'); }
@@ -6029,8 +6779,8 @@
     ['ul. Długa (zachód)',-68,-7.4], ['ul. Długa (zachód)',-56,-20.6], ['ul. Długa (środek)',40,-20.6],
     ['ul. Krótka',6.65,20], ['ul. Krótka',-6.65,52],
     ['ul. Poprzeczna',71.35,8], ['Mechanik',71.35,42], ['Salon samochodowy',84.65,25], ['Lakiernik',84.65,46], ['ul. Poprzeczna',84.65,58],
-    ['Rondo',112,-7.4], ['ul. Społeczna',123.35,30], ['ul. Społeczna',136.65,18], ['Sklep z ubraniami',136.65,56],
-    ['Supermarket Pandy',124,-61], ['Sklep AGD',92,-61],
+    ['Rondo',112,-7.4], ['ul. Społeczna',123.35,30], ['ul. Społeczna',136.65,18], ['ZARA\'Z',136.65,56],
+    ['Supermarket Pandy',124,-61], ['Dom i AGD',92,-61],
     // --- nowe miejsca ---
     ['Dom A',6.65,10], ['Dom B',-6.65,19],                                  // Krótka: domy do wynajęcia (chodnik przed drzwiami)
     ['Dom C',123.35,14], ['Dom D',123.35,33], ['Dom E',123.35,52],          // Społeczna, strona zachodnia
@@ -6207,8 +6957,9 @@
   function renderBasket(){
     basketMesh.visible = !!basket;
     if(!basket){ basketHud.style.display = 'none'; return; }
-    const lines = Object.entries(basket).map(([id,n]) => `${SUP_PRODUCTS[id].i} ${SUP_PRODUCTS[id].n} ×${n}`);
-    basketHud.innerHTML = '<b>🧺 Koszyk</b><br>' + (lines.length ? lines.join('<br>') + `<br><b>Razem: ${basketTotal()} <i class="coin"></i></b>` : 'pusty');
+    const entries = Object.entries(basket);                           // podgląd koszyka: kwadraty z ikonkami jak w ekwipunku
+    const slots = entries.map(([id,n]) => `<div class="slot" title="${SUP_PRODUCTS[id].n} (${SUP_PRODUCTS[id].p * n} monet)">${SUP_PRODUCTS[id].i}<span class="n">×${n}</span><span class="pr">${SUP_PRODUCTS[id].p * n}<i class="coin"></i></span></div>`).join('');
+    basketHud.innerHTML = '<b>🧺 Koszyk</b>' + (entries.length ? `<div class="bgrid">${slots}</div><b>Razem: ${basketTotal()} <i class="coin"></i></b>` : '<div>pusty</div>');
     basketHud.style.display = 'block';
   }
   function takeBasket(){ basket = {}; renderBasket(); toast('Wziąłeś koszyk 🧺 – dodawaj towary z regałów i zapłać przy kasie'); }
@@ -6262,6 +7013,7 @@
       if(BUS.door > 0.6) return {text:'F – wysiądź z autobusu 🚌', run:() => leaveBus(false)};
       return {text:'🚌 Autobus jedzie – wysiądziesz na przystanku', run:() => {}};
     }
+    if(sitting && sitting.kind === 'bathtub') return {text:'F – wyjdź z wanny  •  rośnie higiena 🛁', run:standUp};
     if(sitting){
       let pcDesk = null, bestPc = 3.6;
       for(const pd of placedDesks){
@@ -6270,7 +7022,7 @@
         if(d < bestPc){ bestPc = d; pcDesk = pd; }
       }
       if(pcDesk) return {text:computerUiOpen ? 'F – zamknij komputer' : 'F – włącz komputer 🖥️', run:turnOnComputer};
-      return {text:sitting.kind === 'bench' ? 'F – wstań z ławki' : 'F – wstań z krzesła', run:standUp};
+      return {text:sitting.kind === 'bathtub' ? 'F – wyjdź z wanny' : sitting.kind === 'bench' ? 'F – wstań z ławki' : 'F – wstań z krzesła', run:standUp};
     }
     if(carDriving) return {text:'Shift – wysiądź z auta 🚗', run:()=>{}};
     { const ba = busBoardAction(); if(ba) return ba; }                           // F przy otwartych drzwiach autobusu
@@ -6292,7 +7044,7 @@
       if(Math.hypot(player.position.x-dp.x, player.position.z-dp.z) < 2.2) return homeDoorAction(H);
     }
     if(homeInside){
-      const fp = homeW(2.8,-2.5), bp = homeW(-2.4,-1.5);
+      const fp = homeW(HOME.lay.fridge.x, HOME.lay.fridge.z), bp = homeW(HOME.lay.bed.x, HOME.lay.bed.z);
       const fridgeDist=Math.hypot(player.position.x-fp.x,player.position.z-fp.z);
       const bedDist=Math.hypot(player.position.x-bp.x,player.position.z-bp.z);
       if(nearOutlet()<1.8){
@@ -6310,7 +7062,7 @@
         keys.ShiftRight = false;
         joy.x = 0; joy.y = 0;
         // położenie postaci w łóżku: na plecach, głową przy wezgłowiu
-        const bp = homeW(-2.4, -0.7);
+        const bp = homeW(HOME.lay.sleep.x, HOME.lay.sleep.z);
         player.position.set(bp.x, 0, bp.z); vy = 0;
         player.rotation.y = HOME.rot; facing = HOME.rot;
         body.rotation.x = -Math.PI/2; body.position.set(0, 1.0, 0);
@@ -6321,6 +7073,8 @@
       const pch = nearDesk('chair'); if(pch) return {text:'F – usiądź na krześle  •  G – podnieś', run:() => sitOn(pch)};
       const pwd = nearDesk('wardrobe'); if(pwd) return {text:'F – otwórz szafę  •  G – podnieś', run:openWardrobe};
       const pov = nearDesk('oven'); if(pov) return {text:'F – użyj piekarnika 🍳  •  G – podnieś', run:() => openOven(pov)};
+      const pbt = nearDesk('bathtub'); if(pbt) return {text:'F – wejdź do wanny 🛁 (higiena)  •  G – podnieś', run:() => sitOn(pbt)};
+      const pfx = FIXT.map(k => nearDesk(k)).find(Boolean); if(pfx) return {text:`F – podnieś: ${ITEMS[pfx.kind].n} ${ITEMS[pfx.kind].i}`, run:() => pickupDesk(pfx)};
       const plp = nearLamp(); if(plp) return {text:'F – zdejmij lampę 💡', run:() => pickupDesk(plp)};
       const pdk = nearDesk(); if(pdk && pdk.computer) return {text:'F – podnieś komputer 🖥️', run:() => pickupComputer(pdk)};
       if(pdk) return {text: pdk.kind === 'chair' ? 'F – podnieś krzesło' : 'F – podnieś biurko', run:() => pickupDesk(pdk)};
@@ -6362,12 +7116,18 @@
   const nbH7 = HOUSES.find(h => h.no === 7);
   const NB_DOOR = {x:nbH7.dx, z:nbH7.dz - 0.55};
   const NB_LANE = -6.5;                                   // pas chodnika, którym chodzi (chodnik: z -8,85 … -5,85)
+  // Wyjazd autobusem: czeka na przystanku DŁUGA (południowa strona Długiej, kilka metrów od jego domu), wsiada do autobusu linii 1
+  // i wysiada na losowym przystanku trasy; po chwili „wraca innym autobusem” (znika), a po jakimś czasie jest znów w domu.
+  const NB_BUS_STOP = BUS_STOPS.find(s => s.name === 'DŁUGA' && s.x < -60);
+  const NB_BUS_WAIT = {x:NB_BUS_STOP.x - 0.3, z:-7.4};          // chodnik tuż przy jezdni, naprzeciwko drzwi stojącego autobusu
+  const NB_BUS_MAX_WAIT = 480, NB_BUS_AWAY = [70, 120];          // s: jak długo czeka na autobus zanim zrezygnuje; jak długo go nie ma po wysiadce
   const NB_TRIPS = [
+    {id:'bus',   from:11,   to:17.4, goal:NB_BUS_WAIT, bus:true, what:'czekam na autobus – chcę się gdzieś przejechać'},
     {id:'shop',  from:8.5,  to:11,   goal:{x:SHOP.x, z:NB_LANE}, enter:{x:SHOP.x, z:SHOP.z - SHOP.d/2 - 0.1}, stay:18, bag:true,  what:'idę na zakupy do Real Shop'},
     {id:'walk1', from:12.5, to:15,   goal:{x:-16, z:NB_LANE}, stay:10, what:'wyszedłem na spacer'},
     {id:'walk2', from:17.5, to:19.5, goal:{x:8,   z:NB_LANE}, stay:10, what:'wyszedłem na wieczorny spacer'}
   ];
-  const NB = {state:'home', trip:null, route:[], trail:[], pi:0, wait:0, done:{}, bag:false, apples:2, chats:0, chatDay:-1, giftDay:-1, tip:0, ph:0, baseYaw:0};
+  const NB = {state:'home', rideIdx:-1, target:null, trip:null, route:[], trail:[], pi:0, wait:0, done:{}, bag:false, apples:2, chats:0, chatDay:-1, giftDay:-1, tip:0, ph:0, baseYaw:0};
   const nbr = new THREE.Group(), nbParts = {};
   (function(){
     const box = (w,h,d,c,x,y,z,parent) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), new THREE.MeshLambertMaterial({color:c})); m.position.set(x,y,z); m.castShadow = true; (parent||nbr).add(m); return m; };
@@ -6419,6 +7179,19 @@
     NB.trail = [{x:NB_DOOR.x, z:NB_DOOR.z}]; NB.pi = 0; NB.state = 'out';
   }
   function nbBack(){ NB.route = NB.trail.slice().reverse(); NB.pi = 0; NB.state = 'back'; }
+  // autobus linii 1 stoi na przystanku DŁUGA (południowa strona, jazda na wschód) z otwartymi drzwiami
+  const nbBusAtStop = () => BUS.active && BUS.dwell > 1.6 && BUS.door > 0.5 && Math.abs(BUS.group.position.x - NB_BUS_STOP.x) < 9
+    && Math.abs(BUS.group.position.z - TRAFFIC_LANE_E) < 4 && Math.cos(BUS.heading) > 0.5;
+  function nbAlight(forced){                          // wysiada tylnymi drzwiami (lub tam, gdzie kurs się skończył) i idzie do najbliższego przystanku
+    const d = forced ? {x:nbr.position.x, z:nbr.position.z} : busToWorld(BUS_DOORS_X[1], 2.4);
+    nbr.position.set(d.x, terrainH(d.x, d.z), d.z); nbShow(true);
+    let best = null, bd = Infinity;
+    for(const s of BUS_STOPS){
+      const rot = s.rot || 0, q = {x:s.x + 1.7*Math.sin(rot), z:s.z + 1.7*Math.cos(rot)}, dd = Math.hypot(q.x - d.x, q.z - d.z);
+      if(dd < bd){ bd = dd; best = q; }
+    }
+    NB.target = best || d; NB.state = 'alight';
+  }
   function updateNeighbor(dt, time){
     const hour = nbHour(), day = nbDay();
     const talking = dlgEl.style.display === 'flex' && dlgWho === 'nbr';
@@ -6439,7 +7212,8 @@
           NB.trail.push(NB.route[NB.pi]); NB.pi++;
           if(NB.pi >= NB.route.length){
             NB.wait = NB.trip.stay; NB.baseYaw = nbr.rotation.y;
-            if(NB.trip.enter){ nbShow(false); NB.state = 'inside'; } else NB.state = 'idle';
+            if(NB.trip.bus){ NB.wait = NB_BUS_MAX_WAIT; NB.state = 'busWait'; }
+            else if(NB.trip.enter){ nbShow(false); NB.state = 'inside'; } else NB.state = 'idle';
           }
         }
         break;
@@ -6449,6 +7223,44 @@
         break;
       case 'inside':                                      // w sklepie
         if((NB.wait -= dt) <= 0){ NB.bag = !!NB.trip.bag; nbShow(true); nbBack(); }
+        break;
+      case 'busWait':                                     // stoi na przystanku i czeka na autobus linii 1
+        if(late){ nbBack(); break; }
+        if(talking){ nbFacePlayer(dt); break; }
+        if(!nbStep(dt, NB_BUS_WAIT)) break;
+        nbTurn(Math.PI + Math.sin(time*0.6)*0.5, dt, 3);          // patrzy w stronę jezdni, skąd nadjeżdża autobus
+        if(nbBusAtStop()){ NB.state = 'toBus'; break; }
+        if((NB.wait -= dt) <= 0) nbBack();                         // za długo – rezygnuje i wraca do domu
+        break;
+      case 'toBus': {                                     // autobus stoi z otwartymi drzwiami – idzie do drzwi i wsiada
+        if(!nbBusAtStop()){ NB.state = 'busWait'; break; }
+        const d = busToWorld(BUS_DOORS_X[0], 2.3);
+        nbStep(dt, d);
+        if(Math.hypot(d.x - nbr.position.x, d.z - nbr.position.z) < 0.9){
+          const stops = []; for(let i = BUS.wp; i < BUS_ROUTE.length; i++) if(BUS_ROUTE[i][2]) stops.push(i);
+          NB.rideIdx = stops.length ? stops[Math.floor(Math.random()*stops.length)] : -1;   // losowy przystanek z reszty trasy
+          NB.state = 'ride';
+        }
+        break; }
+      case 'ride':                                        // jedzie w środku autobusu (stoi przy tylnych drzwiach)
+        if(!BUS.active){ nbAlight(true); break; }
+        { const w = busToWorld(-1.6, 0.9);
+          nbr.position.set(w.x, BUS.group.position.y + BUS_YF*Math.cos(BUS.pitch) - 1.6*Math.sin(BUS.pitch), w.z);
+          nbr.rotation.y = Math.PI/2 - BUS.heading; }
+        if(BUS.dwell > 0 && BUS.door > 0.5 && BUS.wp - 1 >= NB.rideIdx) nbAlight(false);
+        break;
+      case 'alight':                                      // wysiadł – idzie pod wiatę przystanku
+        if(talking){ nbFacePlayer(dt); break; }
+        if(nbStep(dt, NB.target)){ NB.state = 'busIdle'; NB.wait = 14 + Math.random()*10; NB.baseYaw = nbr.rotation.y; }
+        nbr.position.y = terrainH(nbr.position.x, nbr.position.z);
+        break;
+      case 'busIdle':                                     // rozgląda się po okolicy, a potem odjeżdża innym autobusem
+        if(talking) nbFacePlayer(dt); else { nbTurn(NB.baseYaw + Math.sin(time*0.8)*0.9, dt, 3); NB.wait -= dt; }
+        nbr.position.y = terrainH(nbr.position.x, nbr.position.z);
+        if(NB.wait <= 0){ nbShow(false); NB.state = 'away'; NB.wait = NB_BUS_AWAY[0] + Math.random()*(NB_BUS_AWAY[1] - NB_BUS_AWAY[0]); }
+        break;
+      case 'away':                                        // wraca „innym autobusem” – w tym czasie nie ma go w domu
+        if((NB.wait -= dt) <= 0) NB.state = 'home';
         break;
       case 'back':
         if(talking){ nbFacePlayer(dt); break; }
@@ -6469,7 +7281,7 @@
     nbParts.armL.rotation.x += (-sw*0.5 - nbParts.armL.rotation.x)*k;
     nbParts.armR.rotation.x += ((NB.bag ? -0.25 : sw*0.5) - nbParts.armR.rotation.x)*k;
     nbParts.bag.visible = NB.bag;
-    if(nbr.visible) nbLabel.position.set(nbr.position.x, 2.85, nbr.position.z);
+    if(nbr.visible) nbLabel.position.set(nbr.position.x, 2.85 + nbr.position.y, nbr.position.z);
   }
   // --- rozmowa ---
   const nbCanTalk = () => nbr.visible && nbrDist() < 3.2;
@@ -6478,6 +7290,7 @@
     if(!nbOutdoors()) return null;
     if(nbCanTalk()) return {text:'F – porozmawiaj z Henrykiem 👋', run:() => openNbrTalk(false)};
     if(NB.state === 'home' && Math.hypot(player.position.x - nbH7.dx, player.position.z - nbH7.dz) < 2.4) return {text:'F – zapukaj do domu nr 7 🚪', run:knockNbr};
+    if(NB.state === 'away' && Math.hypot(player.position.x - nbH7.dx, player.position.z - nbH7.dz) < 2.4) return {text:'F – zapukaj do domu nr 7 🚪', run:() => toast('Pukasz… nikt nie otwiera. Henryk pojechał autobusem 🚌')};
     return null;
   }
   function knockNbr(){
@@ -6527,6 +7340,9 @@
     if(atDoor || NB.state === 'door') act = 'Akurat byłem w domu.';
     else if(NB.state === 'out') act = NB.trip && NB.trip.what ? `Właśnie ${NB.trip.what}.` : '';
     else if(NB.state === 'idle') act = 'Postanowiłem zaczerpnąć trochę świeżego powietrza.';
+    else if(NB.state === 'busWait' || NB.state === 'toBus') act = 'Czekam na autobus – wybieram się na małą przejażdżkę.';
+    else if(NB.state === 'ride') act = 'Jadę autobusem. Sam jeszcze nie wiem, na którym przystanku wysiądę – lubię niespodzianki!';
+    else if(NB.state === 'alight' || NB.state === 'busIdle') act = 'Wysiadłem sobie na przystanku, rozglądam się po okolicy.';
     else if(NB.state === 'back') act = NB.bag ? 'Wracam ze sklepu – kupiłem trochę zapasów.' : 'Wracam już do domu.';
     nbMenu(first ? `${hello} Jestem Henryk, mieszkam pod siódemką – to ten dom z numerem nad drzwiami. ${act} Ty chyba tu nowy?`
                  : `${hello} Miło cię widzieć! ${act}`);
@@ -6543,6 +7359,26 @@
     else if(id === 'wood') mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.12,0.12,0.6,8), m);
     else if(id === 'phone') mesh = new THREE.Mesh(new THREE.BoxGeometry(0.25,0.45,0.04), m);
     else if(id === 'cap'){ mesh = buildCapGroup(ccol); mesh.scale.setScalar(1.1); }
+    else if(id === 'pants'){
+      mesh = new THREE.Group();
+      const pw2 = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.1,0.18), m); pw2.position.y = 0.3;
+      const pl = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.4,0.16), m), pr = pl.clone();
+      pl.position.set(-0.1,0.1,0); pr.position.set(0.1,0.1,0); mesh.add(pw2, pl, pr);
+    }
+    else if(id === 'shoes'){
+      mesh = new THREE.Group(); const sm = new THREE.MeshLambertMaterial({color:shoeSole(ccol)});
+      [-0.13, 0.13].forEach(ox => {
+        const t1 = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.12,0.38), m); t1.position.set(ox, 0.11, 0);
+        const s1 = new THREE.Mesh(new THREE.BoxGeometry(0.21,0.05,0.4), sm); s1.position.set(ox, 0.025, 0); mesh.add(t1, s1);
+      });
+    }
+    else if(id === 'shirt'){
+      mesh = new THREE.Group();
+      const st = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.45,0.2), m); st.position.y = 0.25;
+      const sl = new THREE.Mesh(new THREE.BoxGeometry(0.13,0.3,0.16), m), sr = sl.clone();
+      sl.position.set(-0.26,0.3,0); sr.position.set(0.26,0.3,0); sl.rotation.z = 0.5; sr.rotation.z = -0.5;
+      mesh.add(st, sl, sr);
+    }
     else { mesh = new THREE.Group(); const b = new THREE.Mesh(new THREE.CylinderGeometry(0.3,0.3,0.04,12), m), t = new THREE.Mesh(new THREE.CylinderGeometry(0.17,0.19,0.25,12), m); t.position.y = 0.14; mesh.add(b, t); }
     const holder = new THREE.Group(); holder.add(mesh);
     // jasna poświata pod przedmiotem
@@ -6589,6 +7425,33 @@
   const starGeo = new THREE.BufferGeometry(); starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
   const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({color:0xffffff, size:2, sizeAttenuation:false, transparent:true, opacity:0, fog:false, depthWrite:false}));
   stars.frustumCulled = false; scene.add(stars);
+  // ===== Światła auta gracza: L – reflektory (przód: realne światło na drodze + jaśniejsze lampy), tył: pozycyjne / hamowania / cofania =====
+  let nightLevel = 0, headOn = false, headK = 0;
+  const headSpot = new THREE.SpotLight(0xfff1cf, 0, 60, 0.6, 0.55, 1);        // jedno światło tworzone raz (liczba świateł w scenie jest stała)
+  headSpot.castShadow = false; scene.add(headSpot, headSpot.target);
+  const HEAD_OFF = new THREE.Color(0xb9b08a), HEAD_ON = new THREE.Color(0xffffff);
+  const TAIL_OFF = new THREE.Color(0x7a1010), TAIL_POS = new THREE.Color(0xc01818), TAIL_BRAKE = new THREE.Color(0xff3a3a), TAIL_REV = new THREE.Color(0xf2f2f2);
+  function setHeadlights(v){ headOn = v; toast(v ? 'Światła włączone 💡 (L)' : 'Światła wyłączone (L)'); }
+  addEventListener('keydown', e => {
+    if(e.code !== 'KeyL' || e.repeat || isDead || isPaused || !carDriving) return;
+    setHeadlights(!headOn);
+  });
+  function updateCarLights(dt){
+    const vis = hasCar && pcar.group.visible;
+    headK += ((vis && headOn ? 1 : 0) - headK)*Math.min(1, dt*10);                // płynne zapalanie
+    const p = pcar.group.position, sn = Math.sin(carHeading), cs = Math.cos(carHeading);
+    headSpot.intensity = headK*(2.4 + 1.2*nightLevel);
+    if(headK > 0.01){
+      headSpot.position.set(p.x + sn*2.1, p.y + 0.85, p.z + cs*2.1);
+      headSpot.target.position.set(p.x + sn*16, p.y + 0.35 - carPitch*16, p.z + cs*16);
+      headSpot.target.updateMatrixWorld();
+    }
+    pcar.headMat.color.copy(HEAD_OFF).lerp(HEAD_ON, headK);
+    const braking = carDriving && (keys.Space || handbrake || ((keys.KeyS || keys.ArrowDown) && carV > 0.3));
+    const reversing = carDriving && carV < -0.2;
+    const tc = braking ? TAIL_BRAKE : headOn ? TAIL_POS : TAIL_OFF;
+    pcar.tailMat.color.copy(reversing && !braking ? TAIL_REV : tc);
+  }
   // nocne światła we wnętrzach
   const restLight = new THREE.PointLight(0xffd9a0, 0, 13); restLight.position.set(REST.x, 3.0, REST.z);
   const shopLight = new THREE.PointLight(0xfff0d0, 0, 12); shopLight.position.set(SHOP.x, 3.0, SHOP.z);
@@ -6607,6 +7470,7 @@
     const phase = (START_HOUR/24 + time/DAY_SECONDS) % 1;
     const a = (phase - 0.25) * Math.PI * 2, elev = Math.sin(a), cosA = Math.cos(a);
     const x = clamp01((elev + 0.1)/0.4), day = x*x*(3 - 2*x), night = 1 - day;
+    nightLevel = night;                                                           // używane przez światła auta gracza
     const dusk = clamp01(1 - Math.abs(elev)/0.3);
     const p = player.position, cp = camera.position;
 
@@ -6664,7 +7528,7 @@
     if(e.code==='Space') e.preventDefault();
     if(e.code==='KeyV' && !e.repeat && !isPaused && !isDead){
       firstPerson = !firstPerson;
-      body.visible = !firstPerson;
+      body.visible = true;
       refreshInteriorWallVisibility();
       toast(firstPerson ? 'Kamera pierwszoosobowa' : 'Kamera trzecioosobowa');
     }
@@ -6801,19 +7665,26 @@
   let shiftPrev = false;
   const SLEEP_TIME_MULTIPLIER = 20;
   // Kamera pierwszo- lub trzecioosobowa (także podczas snu)
+  const eyeTmp = new THREE.Vector3();
   function updateCamera(){
     const p = player.position;
     const inCab = firstPerson && carDriving && hasCar;
     if(pcar.interior){ pcar.cabin.visible = pcar.glassBand.visible = !inCab; pcar.interior.visible = inCab; }
+    if(firstPerson) camera.layers.disable(1); else camera.layers.enable(1);   // w 1. osobie bez głowy
+    body.visible = !(firstPerson && isSleeping);                              // podczas snu w 1. osobie ciała nie pokazujemy (kamera byłaby w łóżku)
     if(inCab){
       const c = Math.cos(carHeading), sn = Math.sin(carHeading), lx = 0.42, lz = -0.12;         // oczy kierowcy: lewa strona, lekko za środkiem
       const ex = p.x + lx*c + lz*sn, ez = p.z - lx*sn + lz*c;
-      const ey = p.y + 1.28, tl = carPitch*Math.cos(yaw - carHeading);   // przechył auta pochyla widok, gdy patrzysz do przodu
+      const ey = p.y + 1.5, tl = carPitch*Math.cos(yaw - carHeading);   // przechył auta pochyla widok, gdy patrzysz do przodu
       camera.position.set(ex, ey, ez);
       camera.lookAt(ex - Math.sin(yaw)*Math.cos(pitch), ey + Math.sin(pitch + tl), ez - Math.cos(yaw)*Math.cos(pitch));
     } else if(firstPerson){
-      camera.position.set(p.x, p.y + 1.62, p.z);
-      camera.lookAt(p.x - Math.sin(yaw)*Math.cos(pitch), p.y + 1.62 + Math.sin(pitch), p.z - Math.cos(yaw)*Math.cos(pitch));
+      const fx = -Math.sin(yaw), fz = -Math.cos(yaw), fo = 0.22;                 // oczy na płaszczyźnie twarzy, lekko przed tułowiem
+      let eyeY = p.y + 1.96;                                                    // wysokość oczu awatara na stojąco (oczy modelu: 0,8 + 1,18)
+      if(!isSleeping){ player.updateMatrixWorld(true); eyeY = upper.localToWorld(eyeTmp.set(0, 1.18, 0)).y; }   // dokładnie na wysokości oczu – także na siedząco i na rowerze
+      const ex = p.x + fx*fo, ez = p.z + fz*fo;
+      camera.position.set(ex, eyeY, ez);
+      camera.lookAt(ex + fx*Math.cos(pitch), eyeY + Math.sin(pitch), ez + fz*Math.cos(pitch));
     } else {
       pitch = Math.max(pitch, minPitch());                                         // także po zmianie zoomu / przełączeniu kamery
       const cx3 = p.x + Math.sin(yaw)*Math.cos(pitch)*dist, cz3 = p.z + Math.cos(yaw)*Math.cos(pitch)*dist;
@@ -6839,6 +7710,20 @@
   function mpBridge(){ try{ return window.parent && window.parent !== window ? window.parent.IMP_BRIDGE : null; }catch(e){ return null; } }
   function mpMsg(t){ mpEl.msg.textContent = t || ''; }
   function mpTorsoCol(){ try{ return '#'+upper.children[0].material.color.getHexString(); }catch(e){ return '#2d6cdf'; } }
+  // Domyślny kolor koszulki (tułów + ramiona) = kolor konta gracza z IMP_BRIDGE.acc(); kupiona koszulka go przesłania
+  let accShirtKey = null;
+  function applyAccountShirt(){
+    try{
+      const B = mpBridge(); const a = (B && B.acc && B.acc()) || {};
+      const v = a.color !== undefined ? a.color : (a.col !== undefined ? a.col : (a.colour !== undefined ? a.colour : (a.kolor !== undefined ? a.kolor : (a.avatarColor !== undefined ? a.avatarColor : a.accountColor))));
+      if(v === undefined || v === null || v === '') return;
+      const key = String(v); if(key === accShirtKey) return;
+      accShirtCol = new THREE.Color(typeof v === 'number' ? v : String(v).trim()).getHex();
+      accShirtKey = key;
+      refreshShirt();
+    }catch(e){}
+  }
+  applyAccountShirt(); setInterval(applyAccountShirt, 2000);   // most bywa gotowy chwilę po starcie; reaguje też na zmianę koloru konta
   function mpMakeRemote(){
     const g = new THREE.Group(), m = c => new THREE.MeshLambertMaterial({color:c});
     const add = (w,h,d,c,x,y,z,p) => { const b = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), m(c)); b.position.set(x,y,z); b.castShadow = true; (p||g).add(b); return b; };
@@ -6847,6 +7732,7 @@
     add(0.08,0.08,0.02,0,-0.12,1.98,0.26); add(0.08,0.08,0.02,0,0.12,1.98,0.26);
     const limb = (x,y,c) => { const p = new THREE.Group(); p.position.set(x,y,0); g.add(p); add(0.25,0.8,0.25,c,0,-0.4,0,p); return p; };
     const armL = limb(-0.48,1.65,0x2d6cdf), armR = limb(0.48,1.65,0x2d6cdf), legL = limb(-0.18,0.8,0x333333), legR = limb(0.18,0.8,0x333333);
+    [legL, legR].forEach(l => { add(0.29,0.12,0.4,0x1d1d1f,0,-0.73,0.06,l); add(0.3,0.05,0.42,0xe8e8e8,0,-0.775,0.06,l); });   // buty
     const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64;
     const tag = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv), transparent:true, depthTest:false}));
     tag.scale.set(2.4,0.6,1); tag.position.y = 2.9; tag.renderOrder = 10; g.add(tag);
@@ -6891,6 +7777,7 @@
       const db = B.db(); if(!db){ mpMsg('Brak połączenia z serwerem.'); return; }
       const uid = await B.ensureAuth(); if(!uid){ mpMsg('Zaloguj się, żeby grać online.'); return; }
       const a = (B.acc && B.acc()) || {};
+      applyAccountShirt();
       let code = create ? '' : (forced || mpEl.code.value.trim().toUpperCase());
       const perm = !create && MP_SERVERS.some(sv => sv.code === code);
       if(!create && code.length !== 4){ mpMsg('Kod pokoju ma 4 znaki.'); return; }
@@ -6992,7 +7879,11 @@
     return {x:+x.toFixed(2), z:+z.toFixed(2), f:+facing.toFixed(2), yaw:+yaw.toFixed(2)};
   }
   function svSlot(s){ return s ? Object.assign({id:s.id, count:s.count}, s.main != null ? {main:s.main} : {}, s.color !== undefined ? {col:s.color} : {}) : null; }
-  function svColOf(s){ return (s.id === 'hat' || s.id === 'cap') && s.col != null && isFinite(+s.col) ? {color:Math.max(0, Math.min(0xffffff, +s.col | 0))} : {}; }
+  function svColOf(s){
+    if(!s || s.col == null || !isFinite(+s.col)) return {};
+    if(s.id === 'shoes') return {color:Math.max(0, Math.min(0xffffffffffff, Math.floor(+s.col)))};   // 2 kolory w jednej liczbie
+    return (s.id === 'hat' || s.id === 'cap' || s.id === 'shirt' || s.id === 'pants') ? {color:Math.max(0, Math.min(0xffffff, +s.col | 0))} : {};
+  }
   function svSnapshot(){
     return {
       v: SAVE_VER,
@@ -7000,10 +7891,15 @@
       inv: JSON.stringify(inv.map(svSlot)),
       hunger: +stats.hunger.toFixed(1),
       energy: +stats.energy.toFixed(1),
+      hygiene: +stats.hygiene.toFixed(1),
       elapsed: Math.round(gameElapsed),
       bank: JSON.stringify({opened:!!bank.opened, balance:bank.balance|0, number:String(bank.number||''), tx:(bank.tx||[]).slice(-40)}),
       trunk: JSON.stringify(trunk.map(svSlot)),
       fridge: JSON.stringify(fridgeStock),
+      shirt: wornShirt ? String(wornShirt.color) : '',
+      shoes: wornShoes ? String(wornShoes.color) : '',
+      pants: wornPants ? String(wornPants.color) : '',
+      wardrobe: JSON.stringify(wardrobeClothes.map(c => Object.assign({id:c.id, count:c.count}, c.color !== undefined ? {col:c.color} : {}))),
       homes: JSON.stringify(HOMES.map(H => ({id:H.id, rented:!!H.rented, owned:!!H.owned, paid:H.owned ? 0 : Math.round(H.paidUntil||0), open:!!(H.door && H.door.open)}))),
       furn: JSON.stringify(placedDesks.slice(0,40).map(pd => ({k:pd.kind||'desk', x:+pd.wall.x.toFixed(2), z:+pd.wall.z.toFixed(2), r:svRot4(pd.mesh.rotation.y), c:pd.computer ? (Math.round(pd.computer.rotation.y/Math.PI) & 1) : -1, p:pd.pizza ? +pd.pizza.t.toFixed(1) : -1}))),
       car: JSON.stringify(hasCar ? {has:true, x:+pcar.group.position.x.toFixed(2), z:+pcar.group.position.z.toFixed(2), r:+carHeading.toFixed(3), c:pcar.bodyMat.color.getHex(), s:steerLvl, f:+carFuel.toFixed(1), hb:handbrake ? 1 : 0} : {has:false}),
@@ -7038,7 +7934,7 @@
   function svFresh(){
     if(bikeMounted){ bikeMounted = false; player.visible = true; riderBlend = 0; }   // zsiadamy bez przenoszenia postaci przy rowerze
     bikePurchased = false; bike.visible = false;
-    svApplyCar({has:false}); svApplyUpper(null);
+    svApplyCar({has:false}); svApplyUpper(null); setShirt(null); setShoes(null); setPants(null);
     job.accepted = false; job.order = null; job.carrying = false; job.delivered = 0;
     try{ closeDialog(); }catch(e){}
     svResetHomes();
@@ -7054,10 +7950,10 @@
     }
   }
   function svApplyFurn(arr){
-    for(const pd of placedDesks.splice(0)){ scene.remove(pd.mesh); const i = WALLS.indexOf(pd.wall); if(i >= 0) WALLS.splice(i, 1); }
+    for(const pd of placedDesks.splice(0)){ disposeFurnMesh(pd.mesh); scene.remove(pd.mesh); const i = WALLS.indexOf(pd.wall); if(i >= 0) WALLS.splice(i, 1); }
     for(const f of arr.slice(0,40)){
-      const kind = ['desk','chair','wardrobe','lamp','oven'].includes(f.k) ? f.k : 'desk', x = +f.x, z = +f.z, r = ((f.r|0) % 4 + 4) % 4;
-      if(!isFinite(x) || !isFinite(z) || !HOMES.some(H => Math.abs(x-H.x) < 6 && Math.abs(z-H.z) < 6)) continue;   // tylko wewnątrz domów
+      const kind = ['desk','chair','wardrobe','lamp','oven','toilet','bathtub','mirror'].includes(f.k) ? f.k : 'desk', x = +f.x, z = +f.z, r = ((f.r|0) % 4 + 4) % 4;
+      if(!isFinite(x) || !isFinite(z) || !HOMES.some(H => { const D = homeDimsOf(H); return Math.abs(x-H.x) < Math.max(6, D.ww/2) && Math.abs(z-H.z) < Math.max(6, D.wd/2); })) continue;   // tylko wewnątrz domów
       if(kind === 'lamp'){
         const lm = makeLamp(false); lm.position.set(x, HOME.h, z); scene.add(lm);
         const lpd = {mesh:lm, wall:{x, z, w:0.5, d:0.5}, kind}; attachLampLight(lpd); placedDesks.push(lpd); continue;
@@ -7082,7 +7978,7 @@
     const x = +p.x, z = +p.z;
     if(!isFinite(x) || !isFinite(z) || Math.abs(x) > 1000 || Math.abs(z) > 1000) return;
     if(WALLS.some(b => overlap(x, z, 0.6, 0.6, b))) return;                                  // zapisane miejsce zajęte – zostajesz na starcie
-    for(const H of HOMES) if(!H.rented && Math.abs(x-H.x) < HOME.ww/2 && Math.abs(z-H.z) < HOME.wd/2) return;   // dom już niewynajęty
+    for(const H of HOMES){ const D = homeDimsOf(H); if(!H.rented && Math.abs(x-H.x) < D.ww/2 && Math.abs(z-H.z) < D.wd/2) return; }   // dom już niewynajęty
     player.position.set(x, 0, z); vy = 0;
     if(isFinite(+p.f)){ facing = +p.f; player.rotation.y = facing; }
     if(isFinite(+p.yaw)) yaw = +p.yaw;
@@ -7095,7 +7991,7 @@
         inv[i] = (s && ITEMS[s.id]) ? Object.assign({id:s.id, count:Math.max(1, s.count|0)}, s.main != null ? {main:s.main|0} : {}, svColOf(s)) : null;
       }
       const cl = (v, def) => isFinite(+v) ? Math.min(100, Math.max(0, +v)) : def;
-      stats.hunger = Math.max(1, cl(d.hunger, 100)); stats.energy = Math.max(1, cl(d.energy, 100));
+      stats.hunger = Math.max(1, cl(d.hunger, 100)); stats.energy = Math.max(1, cl(d.energy, 100)); stats.hygiene = cl(d.hygiene, 100);
       if(isFinite(+d.elapsed) && +d.elapsed >= 0) gameElapsed = +d.elapsed;
       try{ const b = JSON.parse(d.bank || '{}'); bank.opened = !!b.opened; bank.balance = Math.max(0, b.balance|0); bank.number = String(b.number || ''); bank.tx = Array.isArray(b.tx) ? b.tx.slice(-40) : []; }catch(e){}
       try{
@@ -7111,6 +8007,10 @@
         for(let i = 0; i < TRUNK_SLOTS; i++){ const q = trunk[i]; if(q && q.main !== undefined && !(trunk[q.main] && BIG[trunk[q.main].id])) trunk[i] = null; }
       }catch(e){}
       try{ const f = JSON.parse(d.fridge || '{}'); for(const k in fridgeStock) if(isFinite(+f[k])) fridgeStock[k] = Math.max(0, f[k]|0); }catch(e){}
+      try{ const sc = d.shirt !== undefined && d.shirt !== '' ? +d.shirt : NaN; setShirt(isFinite(sc) ? {color:Math.max(0, Math.min(0xffffff, sc | 0))} : null); }catch(e){}
+      try{ const hc = d.shoes !== undefined && d.shoes !== '' ? +d.shoes : NaN; setShoes(isFinite(hc) ? {color:Math.max(0, Math.min(0xffffffffffff, Math.floor(hc)))} : null); }catch(e){}
+      try{ const pc = d.pants !== undefined && d.pants !== '' ? +d.pants : NaN; setPants(isFinite(pc) ? {color:Math.max(0, Math.min(0xffffff, pc | 0))} : null); }catch(e){}
+      try{ wardrobeClothes.length = 0; (JSON.parse(d.wardrobe || '[]') || []).forEach(q => { if(q && isClothing(q.id)){ const c = svColOf(q); wardrobeClothes.push(Object.assign({id:q.id, count:Math.max(1, q.count|0)}, c)); } }); }catch(e){}
       if(d.homes) try{ svApplyHomes(JSON.parse(d.homes)); }catch(e){}
       if(d.furn) try{ svApplyFurn(JSON.parse(d.furn)); }catch(e){}
       if(d.car) try{ svApplyCar(JSON.parse(d.car)); }catch(e){}
@@ -7218,7 +8118,7 @@
         keys.ShiftLeft = false;
         keys.ShiftRight = false;
         body.rotation.x = 0; body.position.set(0, 0, 0);
-        const wp = homeW(-0.6, -1.0);
+        const wp = homeW(HOME.lay.wake.x, HOME.lay.wake.z);
         player.position.set(wp.x, 0, wp.z);
         facing = Math.atan2(Math.cos(HOME.rot), -Math.sin(HOME.rot));   // twarzą do pokoju
         player.rotation.y = facing;
@@ -7230,6 +8130,7 @@
         gameElapsed += sleepDt;
         stats.hunger = Math.max(0, stats.hunger * Math.exp(-0.0032 * sleepDt));
         stats.energy = Math.min(100, 100 - (100 - stats.energy) * Math.exp(-0.004 * sleepDt));
+        stats.hygiene = Math.max(0, stats.hygiene * Math.exp(-0.0005 * sleepDt));
         renderStats();
         updateRent();
         if(checkDeath()) return;
@@ -7393,6 +8294,7 @@
     updateOvens(dt);
     updateUpper(dt, gameElapsed);
     updatePlayerSignals(typeof drvX === 'number' ? drvX : 0);
+    updateCarLights(dt);
     updateJob(dt, gameElapsed);
     updateMine(dt, gameElapsed);
     updateNeighbor(dt, gameElapsed);
@@ -7414,8 +8316,8 @@
       walkT += dt*speed*1.6;
     }
     if(carDriving){
-      const tt = carTilt(player.position.x, player.position.z, carHeading); carPitch += (tt.pitch - carPitch)*Math.min(1, dt*8);   // płynne wychylanie nosa
-      pcar.group.position.set(player.position.x, tt.y + 0.02, player.position.z); pcar.group.rotation.y = carHeading; pcar.group.rotation.x = carPitch;
+      const tt = carTilt(player.position.x, player.position.z, carHeading); carPitch += (tt.pitch - carPitch)*Math.min(1, dt*8); carBank += (tt.roll - carBank)*Math.min(1, dt*8);   // płynne wychylanie nosa i boków
+      pcar.group.position.set(player.position.x, tt.y + 0.02, player.position.z); pcar.group.rotation.y = carHeading; pcar.group.rotation.x = carPitch; pcar.group.rotation.z = carBank;
       pcar.wheels.forEach(w => { w.rotation.z -= carV*dt/0.36; });
       if(pcar.steer) pcar.steer.rotation.x = -(typeof drvX === 'number' ? drvX : 0)*0.9;
       if(carV > 2 && camPtr === null){                                          // kamera sama ustawia się za autem
@@ -7445,12 +8347,12 @@
     // animacja
     riderBlend += ((bikeMounted ? 1 : 0) - riderBlend) * Math.min(1, dt*10);
     const sw = moving ? Math.sin(walkT)*0.8 : 0;
-    if(!sitting){ legL.scale.y = legR.scale.y = 1; shinL.visible = shinR.visible = false; }
+    if(!sitting){ legL.scale.y = legR.scale.y = 1; shinL.visible = shinR.visible = false; legShoeL.visible = legShoeR.visible = true; }
     if(sitting){
       // siedzi na krześle: uda poziomo, podudzia w dół, ręce na kolanach
       body.position.set(0, -0.125, 0); upper.rotation.x = 0;
       legL.scale.y = legR.scale.y = 0.55; legL.rotation.x = legR.rotation.x = -Math.PI/2;
-      shinL.visible = shinR.visible = true;
+      shinL.visible = shinR.visible = true; legShoeL.visible = legShoeR.visible = false;   // na siedząco buty są na podudziach
       armL.rotation.x = armR.rotation.x = -0.9;
     } else if(riderBlend > 0.01){
       // postać siedzi na siodełku: biodra na wysokości siedzenia, tułów pochylony, ręce na kierownicy, nogi pedałują
@@ -7472,6 +8374,16 @@
 
     // głód i energia
     stats.hunger = Math.max(0, stats.hunger - dt*(0.12 + (running && moving ? 0.05 : 0)));
+    { const px = player.position.x, workingInMine = hasPick() && px < MINE.x + 1.2 && px > MD.x1 - MD.nx - 1 && Math.abs(player.position.z - MINE.z) < 8;
+      if(sitting && sitting.kind === 'bathtub'){
+        stats.hygiene = Math.min(100, stats.hygiene + dt*HYGIENE_BATH);
+        if(stats.hygiene >= 100 && !bathDoneToast){ bathDoneToast = true; toast('Jesteś czysty 🧼 Możesz wyjść z wanny'); }
+      } else {
+        bathDoneToast = false;
+        stats.hygiene = Math.max(0, stats.hygiene - dt*(workingInMine ? HYGIENE_DRAIN_MINE : (running && moving ? HYGIENE_DRAIN_RUN : HYGIENE_DRAIN)));
+      }
+      if(stats.hygiene < 20 && !dirtyWarned){ dirtyWarned = true; toast('Jesteś brudny 🧼 Pora się umyć'); }
+      if(stats.hygiene > 30) dirtyWarned = false; }
     let dE;
     if(carDriving) dE = 0;                                                           // jazda autem nie męczy
     else if(!moving) dE = stats.hunger > 15 ? 1.2 : 0;                                    // odpoczynek regeneruje energię
@@ -7491,12 +8403,14 @@
     // obrót kamery klawiszami Q / E
     yaw += ((keys.KeyQ?1:0) - (keys.KeyE?1:0)) * 1.8 * dt;
     updateItems(dt, gameElapsed);
+    updateFountain(gameElapsed);
 
     updateCamera();
     drawCityMap(miniMapCtx,miniMapCanvas);
     if(fullMapOpen) drawCityMap(bigMapCtx,bigMapCanvas,mapView);
     updateDayNight(gameElapsed);
 
+    updateMirror();
     renderer.render(scene, camera);
   }
   loop();
