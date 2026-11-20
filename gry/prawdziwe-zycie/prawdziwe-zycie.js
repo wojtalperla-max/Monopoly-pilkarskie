@@ -878,8 +878,39 @@
   const REST = {x:-4, z:-26.5, w:14, d:8, h:3.6};
   const WALLS = [];                       // prostokątne kolizje ścian i mebli
   const PLATFORMS = [];                   // powierzchnie, na które można wskoczyć (łóżko): {x,z,w,d,top,enter}
+  // Chodniki: gracz wchodzi na ich blat (a nie zapada się w nie po kostki). Zbieramy siatki chodników (pudełka z walkMat
+  // oraz wstęgi z krawężnikiem) i raycastem w dół sprawdzamy ich górną powierzchnię pod graczem.
+  let SIDEWALK_MESHES = null;
+  const SW_RAY = new THREE.Raycaster(), SW_DOWN = new THREE.Vector3(0, -1, 0), SW_ORG = new THREE.Vector3();
+  const SW_STEP = 0.45;                       // maks. wysokość, na którą gracz „wchodzi” z poziomu, na którym stoi
+  function sidewalkTop(x, z, y){
+    if(!SIDEWALK_MESHES){
+      SIDEWALK_MESHES = [];
+      scene.updateMatrixWorld(true);
+      scene.traverse(o => {
+        if(!o.isMesh || !o.material || Array.isArray(o.material)) return;
+        const m = o.material, isBox = o.geometry && o.geometry.type === 'BoxGeometry';
+        const ribbon = !isBox && m.side === THREE.DoubleSide && !m.map && m.color && m.color.getHex() === 0xb8b8b0;
+        if(m !== walkMat && !ribbon) return;
+        o.geometry.computeBoundingBox();
+        o.userData.swBox = o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld).expandByScalar(0.05);
+        SIDEWALK_MESHES.push(o);
+      });
+    }
+    let top = -Infinity;
+    SW_ORG.set(x, y + SW_STEP, z);
+    SW_RAY.set(SW_ORG, SW_DOWN); SW_RAY.far = SW_STEP + 0.6;
+    for(const o of SIDEWALK_MESHES){
+      const b = o.userData.swBox;
+      if(x < b.min.x || x > b.max.x || z < b.min.z || z > b.max.z) continue;
+      const hit = SW_RAY.intersectObject(o, false)[0];
+      if(hit && hit.point.y > top) top = hit.point.y;
+    }
+    return top;
+  }
   function groundAt(x, z, y){                // wysokość podłoża pod graczem (0 albo blat platformy, jeśli już jest nad jej krawędzią)
     let g = terrainH(x, z);
+    { const st = sidewalkTop(x, z, Math.max(y, g)); if(st > g) g = st; }
     if(MINE_GROUND){ const mg = MINE_GROUND(x, z); if(mg !== null) g = mg; }
     for(const p of PLATFORMS) if(y >= p.enter && Math.abs(x-p.x) < p.w/2-0.05 && Math.abs(z-p.z) < p.d/2-0.05 && p.top > g) g = p.top;
     return g;
@@ -2046,9 +2077,26 @@
     furn.bought++; renderInv(); renderShop(); openFurnTalk('Dziękuję za zakup lampy! Czy mogę jeszcze w czymś pomóc?');
     toast('Kupiono lampę 💡 – zamontujesz ją na suficie w swoim domu');
   }
+  const FURN_GOODS = [
+    {id:'desk',     p:DESK_PRICE,     n:'Biurko', buy:() => buyDesk(),     get slots(){ return DESK_SLOTS; }},
+    {id:'chair',    p:CHAIR_PRICE,    n:'Krzesło', buy:() => buyChair()},
+    {id:'wardrobe', p:WARDROBE_PRICE, n:'Szafa',   buy:() => buyWardrobe()},
+    {id:'lamp',     p:LAMP_PRICE,     n:'Lampa sufitowa', buy:() => buyLamp()}
+  ];
   function openFurnTalk(msg){
-    say(msg || `Witaj w Mebelku! Mam solidne biurko z szufladami za ${DESK_PRICE} monet 🪙 (w ekwipunku zajmie ${DESK_SLOTS} slotów) wygodne krzesło za ${CHAIR_PRICE} monet 🪙 (1 slot), pojemną szafę za ${WARDROBE_PRICE} monet 🪙 (1 slot) i lampę sufitową za ${LAMP_PRICE} monet 🪙 (1 slot). Meble postawisz w dowolnym miejscu w swoim domu, a lampę zamontujesz na jego suficie.`,
-      [{label:`Kup biurko (${DESK_PRICE} 🪙)`, fn:buyDesk}, {label:`Kup krzesło (${CHAIR_PRICE} 🪙)`, fn:buyChair}, {label:`Kup szafę (${WARDROBE_PRICE} 🪙)`, fn:buyWardrobe}, {label:`Kup lampę (${LAMP_PRICE} 🪙)`, fn:buyLamp}, {label:'Wyjdź', fn:closeDialog}], '🪑 Janusz, sprzedawca mebli', 'furn');
+    say(msg || 'Witaj w Mebelku! Kliknij kwadrat z towarem, żeby go kupić. Meble postawisz w dowolnym miejscu w swoim domu, a lampę zamontujesz na jego suficie; biurko zajmie w ekwipunku ' + DESK_SLOTS + ' slotów.',
+      [{label:'Wyjdź', fn:closeDialog}], '🪑 Janusz, sprzedawca mebli', 'furn');
+    const grid = document.createElement('div');                       // kwadraty z ikonkami – jak w Dom i AGD
+    grid.id = 'dlgGrid';
+    FURN_GOODS.forEach(g => {
+      const it = ITEMS[g.id], el = document.createElement('div');
+      el.className = 'slot';
+      el.title = `${g.n} – ${g.p} monet` + (g.slots ? ` (zajmuje ${g.slots} slotów)` : '');
+      el.innerHTML = `<span class="nm">${g.n}</span>${it.i}<span class="n">${coinHTML(g.p + ' 🪙')}</span>`;
+      el.onclick = g.buy;
+      grid.appendChild(el);
+    });
+    $('dlgText').insertAdjacentElement('afterend', grid);
   }
 
   // ===== Sklep z ubraniami przy ulicy Społecznej (wschodnia strona, drzwi na zachód – w stronę jezdni) =====
