@@ -133,3 +133,53 @@ body:has(#v-home:not(.hid)) #msg:not(:empty){position:fixed;left:50%;bottom:calc
 /* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
 html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
 html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
+
+/* ===== animacja kompletu (4 karty wyjeżdżają z ręki, potem liczy się punkt) ===== */
+.bkfx{position:fixed;inset:0;z-index:160;pointer-events:none;background:radial-gradient(circle at 50% 42%,#000b,#0000 75%)}
+.bkfx .c.f{box-shadow:0 0 0 .03em var(--gold),0 0 .35em #f6c445cc,0 .06em .2em #000c}
+.bkl{position:absolute;left:0;right:0;text-align:center;font:900 clamp(30px,9vw,54px)/1 Impact,"Arial Black",sans-serif;color:var(--gold);-webkit-text-stroke:.06em #3a2208;paint-order:stroke fill;filter:drop-shadow(0 .06em 0 #3a2208);opacity:0}
+.bkl small{display:block;font:800 17px/1.4 "Trebuchet MS",system-ui,sans-serif;color:#fff;-webkit-text-stroke:0;filter:none;margin-top:8px;text-shadow:0 2px 4px #000}
+.hand .c.gh{pointer-events:none}
+
+/* ===== stół: przeciwnicy siedzą przy każdej ścianie, karty w rozmiarze moich ===== */
+.midrow{grid-template-columns:var(--sc,72px) 1fr var(--sc,72px);align-items:start;gap:0}
+.midrow .center{align-self:center;padding:0 4px}
+.sh{position:relative;overflow:hidden;margin-top:6px}
+.th{position:relative;overflow:hidden;margin:-14px auto 0}
+.top .opp .tm{margin-top:4px}
+
+/* stół: środkowy rząd rośnie, żeby stos do dobierania był na środku ekranu */
+#v-game .midrow{flex:1;min-height:0}
+#v-game .midrow .center{padding-top:clamp(16px,7vh,70px)}
+#v-game .midrow>.opp{padding-top:clamp(16px,9vh,90px)}
+
+/* ===== rewers kart z gry „Kim jestem” ===== */
+.c.k{background:radial-gradient(circle at 28% 18%,#ffffff66,transparent 55%),repeating-linear-gradient(45deg,#ffffff22 0 .05em,transparent .05em .1em),repeating-linear-gradient(-45deg,#0000001a 0 .05em,transparent .05em .1em),linear-gradient(150deg,var(--bc,#ff5fa2),color-mix(in srgb,var(--bc,#ff5fa2) 62%,#000));border:.03em solid #1a1033;border-radius:.12em;box-shadow:0 .03em 0 #0006,0 .01em .06em #000b;overflow:hidden;color:var(--bi,#fff)}
+.c.k::before{content:"✦\A DGW\A ✦";white-space:pre;position:absolute;inset:6%;border:.025em solid var(--bi,#fff);border-radius:.08em;opacity:.9;display:flex;align-items:center;justify-content:center;text-align:center;font:400 .2em/1.25 "Bowlby One","Impact",sans-serif;letter-spacing:.04em;text-shadow:0 .01em 0 #0006}
+.c.k::after{content:"";position:absolute;inset:11%;border:.012em dashed var(--bi,#fff);border-radius:.05em;opacity:.45;background:none;display:block}
+.pile .c{background:radial-gradient(circle at 28% 18%,#ffffff66,transparent 55%),repeating-linear-gradient(45deg,#ffffff22 0 .05em,transparent .05em .1em),repeating-linear-gradient(-45deg,#0000001a 0 .05em,transparent .05em .1em),linear-gradient(150deg,var(--bc,#ff5fa2),color-mix(in srgb,var(--bc,#ff5fa2) 62%,#000))}
+.pile .c::after{inset:11%;background:none}
+
+/* ===== bez scrollowania, bez kwadratu i bez ucinania kart ===== */
+html:has(#v-game:not(.hid)),body:has(#v-game:not(.hid)){height:100%;overflow:hidden}
+body:has(#v-game:not(.hid)) main{height:100dvh;min-height:0;padding-top:max(6px,env(safe-area-inset-top,0px));padding-bottom:max(4px,env(safe-area-inset-bottom,0px));overflow:visible}
+body:has(#v-game:not(.hid)) #msg:empty{display:none}
+#v-game{min-height:0;overflow:visible;transform-origin:50% 0}
+#v-game .top{flex:none}
+.sh,.th{overflow:visible!important}
+.th{margin-top:clamp(2px,1.2vh,12px)!important}
+#v-game .midrow{flex:1 0 auto;min-height:0;margin:4px 0}
+#v-game .midrow .center{padding-top:0}
+#v-game .midrow>.opp{padding-top:clamp(4px,2vh,24px)}
+#v-game .hint{flex:none;margin:2px 0;min-height:22px}
+#v-game .hand{flex:none;margin-top:0}
+#v-game .me{flex:none;margin-top:0}
+#v-game .msg{min-height:0;font-size:clamp(13px,2.2vh,17px)}
+#v-game .msg div{font-size:clamp(11px,1.8vh,14px)}
+@media(max-height:760px){
+ .ring{width:44px;height:44px;font-size:23px;margin:1px auto}
+ .midrow .opp .ring{width:40px;height:40px;font-size:20px}
+ .me .ring{width:40px;height:40px;font-size:21px}
+ .tm{height:7px;margin:1px auto}
+ .on{font-size:13px}.bkc{font-size:13px}
+}

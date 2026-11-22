@@ -294,13 +294,29 @@ function onState(m){
 /* ---------- widok ---------- */
 function face(c,extra,style){const r=c%13,su=Math.floor(c/13),red=su===1||su===2;
  return `<div class="c f ${red?"r":""} ${extra||""}" data-c="${c}" style="${style||""}"><div class="rk">${RK[r]}<small>${SU[su]}</small></div><div class="an">${AN[r]}</div></div>`}
+const bInk=c=>{const h=String(c).replace('#',''),r=parseInt(h.substr(0,2),16),g=parseInt(h.substr(2,2),16),b=parseInt(h.substr(4,2),16);return(0.299*r+0.587*g+0.114*b)>150?'#1a1033':'#ffffff'};
+const bv=c=>`--bc:${c};--bi:${bInk(c)};`;
 const back=()=>`<div class="c k"></div>`;
-const chips=(s,id)=>(s.books[id]||[]).slice().sort((a,b)=>a-b).map(r=>`<span>${RK[r]}</span>`).join("");
+const chips=(s,id)=>vb(s,id).slice().sort((a,b)=>a-b).map(r=>`<span>${RK[r]}</span>`).join("");
 const colOf=(s,id)=>{const c=s.cols&&s.cols[id];return HEX.test(c||"")?c:CL[Math.max(0,s.seats.indexOf(id))%4]};
-function oppHtml(s,id,top,pick){const i=s.seats.indexOf(id),n=s.hands[id].length,t=s.turn===id;
- const bks=`<div class="bks">${back().repeat(Math.min(n,top?10:7))}</div>`;
+let OW=90,SD=84;
+/* ręka przeciwnika siedzącego z boku stołu: karty tego samego rozmiaru co moje, obrócone ku środkowi, częściowo schowane za krawędzią */
+function sideHand(n,dir,col){const cn=Math.min(n,12);if(!cn)return"";
+ /* karty botów z boku w całości widoczne (zmniejszone tak, by mieściły się w kolumnie), przy zewnętrznej stronie stołu */
+ const cw=SD-12,vw=document.documentElement.clientWidth||innerWidth,r=$(dir>0?"o1":"o3").getBoundingClientRect(),room=r.width?Math.max(0,dir>0?r.left:vw-r.right):12,ext=Math.round(Math.max(0,Math.min(room-(dir>0?10:24),12+1.1*OW)));
+ const W=cw+ext,ow=Math.round(Math.min(OW,(W-6)/1.4)),vwid=1.4*ow,gap=3;
+ const step=cn>1?Math.min(ow*.4,ow*1.9/(cn-1)):0,L=ow+(cn-1)*step,bx=(dir>0?gap:W-vwid-gap)+.2*ow;let c="";
+ for(let i=0;i<cn;i++)c+=`<div class="c k" style="--w:${ow}px;position:absolute;left:${bx.toFixed(1)}px;top:${(i*step-.2*ow).toFixed(1)}px;transform:rotate(${dir>0?90:-90}deg);z-index:${i}"></div>`;
+ return `<div class="sh" style="${bv(col)}width:${W}px;height:${Math.round(L)}px;${dir>0?"margin-left:-"+ext+"px":""}">${c}</div>`}
+/* ręka przeciwnika naprzeciwko: karty w całości widoczne, trochę niżej od górnej krawędzi */
+function topHand(n,col){const cn=Math.min(n,14);if(!cn)return"";
+ const w=Math.round(OW*.7),av=Math.max(($("hand").clientWidth||340)-2*(SD-12),w*1.6),step=cn>1?Math.min(w*.7,(av-w)/(cn-1)):0,off=(av-(w+step*(cn-1)))/2;let c="";
+ for(let i=0;i<cn;i++)c+=`<div class="c k" style="--w:${w}px;position:absolute;left:${(off+i*step).toFixed(1)}px;top:0;z-index:${i}"></div>`;
+ return `<div class="th" style="${bv(col)}width:${av}px;height:${Math.round(1.4*w)}px;margin-top:clamp(64px,11vh,120px)">${c}</div>`}
+function oppHtml(s,id,top,pick,dir){const i=s.seats.indexOf(id),n=s.hands[id].length,t=s.turn===id;
+ const bks=top?topHand(n,colOf(s,id)):sideHand(n,dir,colOf(s,id));
  const tm=t?`<div class="tm"><i style="animation-delay:-${Math.max(0,Date.now()-tmStart)}ms"></i></div>`:`<div class="tm" style="visibility:hidden"></div>`;
- return `${top?bks:""}${tm}<div class="ring" style="--cl:${colOf(s,id)}">${AV[i%4]}</div><div class="on">${esc(nm(s,id))}</div><div class="bkc"><b>★</b> Komplety: ${s.books[id].length}</div><div class="chips">${chips(s,id)}</div>${top?"":bks}${top?"":`<div class="cnt">${n} kart</div>`}`}
+ return `${top?bks:""}${tm}<div class="ring" style="--cl:${colOf(s,id)}">${AV[i%4]}</div><div class="on">${esc(nm(s,id))}</div><div class="bkc"><b>★</b> ${top?"Komplety: ":""}${vb(s,id).length}</div><div class="chips">${chips(s,id)}</div>${top?"":bks}${top?"":`<div class="cnt">${n} kart</div>`}`}
 function evText(s){const e=s.ev;if(!e)return"";
  const q=e.from===myId?"Pytasz gracza "+esc(nm(s,e.to))+" o "+RK[e.r]:e.to===myId?esc(nm(s,e.from))+" pyta Ciebie o "+RK[e.r]:esc(nm(s,e.from))+" pyta gracza "+esc(nm(s,e.to))+" o "+RK[e.r];
  const res=e.t==="got"?(e.from===myId?"Dostajesz "+e.k+" ✔":esc(nm(s,e.from))+" dostaje "+e.k+" ✔"):"Go Fish! 🐟";
@@ -333,17 +349,77 @@ const sb=()=>{$("snd").textContent=muted?"🔇":"🔊"};sb();
 $("snd").onclick=()=>{muted=!muted;try{localStorage.setItem("gfm",muted?"1":"0")}catch(e){}sb();if(!muted)SND.pick()};
 document.addEventListener("pointerdown",()=>{if(!muted)ac()});
 function anchor(x){if(x instanceof Element)return x;if(x===myId)return $("hand");return document.querySelector('#v-game .opp[data-id="'+x+'"] .ring')}
-function fly(a,b,delay){const A=anchor(a),B=anchor(b);if(!A||!B)return;const r1=A.getBoundingClientRect(),r2=B.getBoundingClientRect();
- const e=document.createElement("div");e.className="c k";e.style.cssText="--w:56px;position:fixed;z-index:150;pointer-events:none;left:"+(r1.left+r1.width/2-28)+"px;top:"+(r1.top+r1.height/2-39)+"px";document.body.appendChild(e);
+function fly(a,b,delay,col){const A=anchor(a),B=anchor(b);if(!A||!B)return;const r1=A.getBoundingClientRect(),r2=B.getBoundingClientRect();
+ const e=document.createElement("div");e.className="c k";e.style.cssText=(col?bv(col):"")+"--w:56px;position:fixed;z-index:150;pointer-events:none;left:"+(r1.left+r1.width/2-28)+"px;top:"+(r1.top+r1.height/2-39)+"px";document.body.appendChild(e);
  const dx=r2.left+r2.width/2-(r1.left+r1.width/2),dy=r2.top+r2.height/2-(r1.top+r1.height/2);
  e.animate([{transform:"translate(0,0) rotate(0)"},{transform:`translate(${dx}px,${dy}px) rotate(${dx>0?20:-20}deg) scale(.7)`}],{duration:750,delay,easing:"ease-in-out",fill:"both"}).onfinish=()=>e.remove()}
 function splash(){const e=$("splash");e.classList.remove("show");void e.offsetWidth;e.classList.add("show")}
 
+/* ---------- animacja kompletu: karty wyjeżdżają z ręki, punkt dopiero po niej ---------- */
+let shownB={},bookQ=[],bookKeys=new Set(),bookBusy=false,bookTimer=0;
+const vb=(s,id)=>s.status==="done"?(s.books[id]||[]):(shownB[id]||[]);
+function scanBooks(s,delay){
+ s.seats.forEach(id=>(s.books[id]||[]).forEach(r=>{
+  const k=id+":"+r;if(bookKeys.has(k))return;bookKeys.add(k);
+  if((shownB[id]||[]).includes(r))return;
+  bookQ.push({id,r,s:false})}));
+ if(bookQ.length&&!bookBusy&&!bookTimer)bookTimer=setTimeout(()=>{bookTimer=0;nextBook()},delay);
+ return bookBusy||bookQ.length>0}
+const bkSel=(s,id,q)=>(id===myId&&s.seats.includes(myId))?(q==="ring"?$("hand"):document.querySelector("#me .bkc")):document.querySelector('#v-game .opp[data-id="'+id+'"] '+(q==="ring"?".ring":".bkc"));
+function nextBook(){
+ if(bookBusy||!bookQ.length)return;
+ if(!st){bookQ=[];return}
+ const it=bookQ[0],s=st,g=s.gid;bookBusy=true;it.s=true;render();
+ playBook(s,it,()=>{
+  bookBusy=false;bookQ.shift();
+  if(st&&st.gid===g){(shownB[it.id]=shownB[it.id]||[]).push(it.r);render();popBook(st,it)}
+  if(bookQ.length)setTimeout(nextBook,250)})}
+function popBook(s,it){
+ const T=bkSel(s,it.id,"bkc");if(!T)return;
+ T.animate([{transform:"scale(1)"},{transform:"scale(1.7)",color:"#fff"},{transform:"scale(1)"}],{duration:550,easing:"ease-out"});
+ const P=T.parentElement;if(!P)return;
+ [...P.querySelectorAll(".chips span")].filter(x=>x.textContent===RK[it.r]).forEach(x=>x.animate([{transform:"scale(0)"},{transform:"scale(1.5)"},{transform:"scale(1)"}],{duration:500,easing:"ease-out"}))}
+function playBook(s,it,done){
+ const id=it.id,r=it.r,w=Math.round(Math.min(88,innerWidth*.2)),ch=w*1.4,cx=innerWidth/2,cy=innerHeight*.42,D=2100;
+ const pt=el=>{if(!el)return null;const b=el.getBoundingClientRect();return{x:b.left+b.width/2,y:b.top+b.height/2}};
+ const o=pt(bkSel(s,id,"ring"))||{x:cx,y:cy},t=pt(bkSel(s,id,"bkc"))||o;
+ const root=document.createElement("div");root.className="bkfx";
+ const lab=document.createElement("div");lab.className="bkl";lab.style.top=(cy-ch/2-84)+"px";
+ lab.innerHTML="📚 KOMPLET!<small>"+esc(nm(s,id))+" · "+RK[r]+"</small>";root.appendChild(lab);
+ const cards=[0,1,2,3].map(k=>{const t0=document.createElement("div");
+  t0.innerHTML=face(r+13*k,"",`--w:${w}px;position:fixed;left:${cx-w/2}px;top:${cy-ch/2}px;z-index:2`);
+  const e=t0.firstChild;root.appendChild(e);return e});
+ document.body.appendChild(root);
+ root.animate([{opacity:0},{opacity:1,offset:.15},{opacity:1,offset:.72},{opacity:0}],{duration:D,fill:"both"});
+ lab.animate([{opacity:0,transform:"scale(.3)"},{opacity:0,transform:"scale(.3)",offset:.22},{opacity:1,transform:"scale(1.15)",offset:.34},{opacity:1,transform:"scale(1)",offset:.4},{opacity:1,transform:"scale(1)",offset:.68},{opacity:0,transform:"scale(1.1)"}],{duration:D,fill:"both"});
+ cards.forEach((e,k)=>{const fx=(k-1.5)*w*.68,rot=(k-1.5)*9,A=`translate(${o.x-cx}px,${o.y-cy}px)`;
+  e.animate([
+   {transform:A+" scale(.45) rotate(0deg)",opacity:0,offset:0},
+   {transform:A+" scale(.5) rotate(0deg)",opacity:1,offset:.04,easing:"cubic-bezier(.2,1.4,.4,1)"},
+   {transform:`translate(${fx}px,0) scale(1.05) rotate(${rot}deg)`,opacity:1,offset:.3},
+   {transform:`translate(${fx}px,-12px) scale(1.14) rotate(${rot}deg)`,opacity:1,offset:.5,easing:"ease-in-out"},
+   {transform:`translate(${fx}px,0) scale(1.05) rotate(${rot}deg)`,opacity:1,offset:.72,easing:"ease-in"},
+   {transform:`translate(${t.x-cx}px,${t.y-cy}px) scale(.16) rotate(${rot*3}deg)`,opacity:.15,offset:1}
+  ],{duration:D,delay:k*40,fill:"both"})});
+ setTimeout(SND.book,520);
+ setTimeout(()=>{root.remove();done()},D+200)}
+
+/* stół ma być kwadratem: pole między graczami (góra, lewo, prawo, ja) ma równą szerokość i wysokość */
+let sqRe=false;
+function sq(){return false}
+/* całość planszy ma się mieścić na ekranie bez przewijania: jeśli naturalna wysokość jest większa niż dostępna, skalujemy widok */
+function fit(){const g=$("v-game");if(!g||!g.offsetParent)return;
+ g.style.cssText="flex:none;height:auto;overflow:visible";
+ const N=g.offsetHeight,cs=getComputedStyle(g.parentElement),A=innerHeight-g.getBoundingClientRect().top-Math.max(parseFloat(cs.paddingBottom)||0,4);
+ const k=N>A&&A>0?Math.max(.4,A/N):1;
+ g.style.cssText=k<1?`flex:none;height:${N}px;overflow:visible;transform:scale(${k.toFixed(4)});transform-origin:50% 0;margin-bottom:${(-(N*(1-k))).toFixed(1)}px`:""}
 function render(){
  if(!st)return;
  const s=st;
- if(s.gid!==lastGame){lastGame=s.gid;seen=new Set();fresh=new Map();lastTurn=null;sel=null;lastEv=-1;doneRec=""}
- if(s.status==="done"){
+ if(s.gid!==lastGame){lastGame=s.gid;seen=new Set();fresh=new Map();lastTurn=null;sel=null;lastEv=-1;doneRec="";shownB={};bookQ=[];bookKeys=new Set();
+  if(s.ev){s.seats.forEach(i=>{shownB[i]=(s.books[i]||[]).slice()})}}
+ const ev0=(s.ev&&s.ev.n!==lastEv)?s.ev:null,pend=scanBooks(s,(ev0&&lastEv!==-1)?(ev0.t==="fish"&&ev0.d?2250:ev0.t==="got"?1300:450):450);
+ if(s.status==="done"&&!pend){
   if(view!=="end"){show("end");view="end";const mx=Math.max(...s.seats.map(i=>s.books[i].length));setTimeout(()=>(s.books[myId]&&s.books[myId].length===mx)?SND.win():SND.lose(),1200)}
   const ids=s.seats.slice().sort((a,b)=>s.books[b].length-s.books[a].length);
   const mx=ids.length?s.books[ids[0]].length:0;
@@ -354,29 +430,33 @@ function render(){
  if(tmKey!==s.turnAt){tmKey=s.turnAt;tmStart=Date.now()}
  if(lastTurn!==s.turn){if(lastTurn!==null&&s.turn===myId)setTimeout(()=>{if(st&&st.status==="play"&&st.turn===myId)SND.turn()},(s.ev&&s.ev.t==="fish"&&s.ev.d)?2000:900);lastTurn=s.turn}
  const inGame=s.seats.includes(myId),mi=Math.max(0,s.seats.indexOf(myId)),N=s.seats.length,O=k=>s.seats[(mi+k)%N],my=s.turn===myId&&inGame,pk=my&&sel!==null;
+ {const av0=$("hand").clientWidth||340;const vh=innerHeight||700;OW=Math.round(Math.max(50,Math.min(118,av0*.27,vh*.125)));SD=Math.max(64,Math.round(OW*.9));$("v-game").style.setProperty("--sc",(SD-12)+"px")}
+ sq();
  const slots=N<=2?["o2"]:N===3?["o1","o3"]:["o1","o2","o3"];
  ["o1","o2","o3"].forEach(sl=>{const el=$(sl),k=slots.indexOf(sl);
   if(k<0){el.className="opp";el.innerHTML="";el.removeAttribute("data-id");return}
-  const id=O(k+1);el.className="opp"+(s.turn===id?" turn":"")+(pk?" pick":"");el.dataset.id=id;el.innerHTML=oppHtml(s,id,sl==="o2",pk)});
+  const id=O(k+1);el.className="opp"+(s.turn===id?" turn":"")+(pk?" pick":"");el.dataset.id=id;el.innerHTML=oppHtml(s,id,sl==="o2",pk,sl==="o1"?1:-1)});
  const pc=Math.max(1,Math.min(4,Math.ceil(s.deck.length/8)));
- $("pile").innerHTML=back().repeat(pc)+`<b>${s.deck.length}</b>`;
- [...$("pile").querySelectorAll(".c")].forEach((e,i)=>{e.style.top=(pc-1-i)*-3+6+"px";e.style.left=(i*1)+"px"});
+ $("pile").style.cssText=bv(colOf(s,myId));$("pile").innerHTML=back().repeat(pc)+`<b>${s.deck.length}</b>`;
+ [...$("pile").querySelectorAll(".c")].forEach((e,i)=>{e.style.top=(pc-1-i)*-3+6+"px";e.style.left=(3+i)+"px"});
  $("mm").innerHTML=evText(s);
  const eT=(s.ev&&s.ev.n!==lastEv)?s.ev:null;
- if(eT){if(lastEv!==-1){SND.ask();if(eT.t==="fish"){splash();SND.fish();if(eT.d){fly($("pile"),eT.from,900);setTimeout(SND.draw,900)}}else{fly(eT.to,eT.from,0);SND.got();setTimeout(SND.draw,150)}if((s.note||[]).some(x=>x.includes("📚")))setTimeout(SND.book,1500)}lastEv=eT.n}
+ if(eT){if(lastEv!==-1){SND.ask();if(eT.t==="fish"){splash();SND.fish();if(eT.d){fly($("pile"),eT.from,900,colOf(s,myId));setTimeout(SND.draw,900)}}else{fly(eT.to,eT.from,0,colOf(s,eT.to));SND.got();setTimeout(SND.draw,150)}}lastEv=eT.n}
  if(!s.ev&&lastEv===-1)lastEv=0;
- const h=(s.hands[myId]||[]).slice().sort((a,b)=>a%13-b%13||a-b),n=h.length,H=$("hand"),avail=H.clientWidth||340;
- const w=Math.min(118,Math.max(76,avail*.27)),step=n>1?Math.min(w*.52,(avail-w)/(n-1)):0,off=(avail-(w+step*(n-1)))/2;
+ const gh=new Set();bookQ.forEach(it=>{if(it.id===myId&&!it.s&&inGame)for(let k=0;k<4;k++)gh.add(it.r+13*k)});
+ const h=(s.hands[myId]||[]).concat([...gh]).sort((a,b)=>a%13-b%13||a-b),n=h.length,H=$("hand"),avail=H.clientWidth||340;
+ const w=OW,cw=Math.max(avail-2*(SD-12),w*1.6),step=n>1?Math.min(w*.52,(cw-w)/(n-1)):0,off=(avail-cw)/2+(cw-(w+step*(n-1)))/2;
  H.style.setProperty("--w",w+"px");
  if(sel!==null&&!h.some(c=>c%13===sel))sel=null;
  const now=Date.now(),first=seen.size===0;if(first&&h.length)SND.deal();
  h.forEach((c,i)=>{if(!seen.has(c)){seen.add(c);fresh.set(c,{t:now,d:first?i*50:(eT&&eT.t==="fish"&&eT.from===myId?1650:700)})}});
  H.innerHTML=h.map((c,i)=>{const f=fresh.get(c),on=f&&now<f.t+f.d+800;
-  return face(c,(sel===c%13?"sel ":"")+(on?"n":""),`left:${(off+i*step).toFixed(1)}px;z-index:${i+1};`+(on?`animation-delay:${f.d-(now-f.t)}ms`:""))}).join("");
+  return face(c,(gh.has(c)?"gh ":"")+(sel===c%13?"sel ":"")+(on?"n":""),`left:${(off+i*step).toFixed(1)}px;z-index:${i+1};`+(on?`animation-delay:${f.d-(now-f.t)}ms`:""))}).join("");
  $("hint").textContent=!inGame?"Oglądasz grę.":my?(sel===null?"Twój ruch – dotknij karty, o którą pytasz":"Teraz dotknij gracza, którego pytasz o "+RK[sel]):"Ruch: "+nm(s,s.turn);
  const mt=my?`<div class="tm"><i style="animation-delay:-${Math.max(0,Date.now()-tmStart)}ms"></i></div>`:"";
- $("me").innerHTML=`<div class="bkc"><b>★</b> Komplety: ${s.books[myId]?s.books[myId].length:0}</div>`+mt+`<div class="ring" style="--cl:${colOf(s,myId)}">${AV[mi%4]}</div><div class="on">${esc(nm(s,myId)||"")} (Ty)</div>`+`<div class="chips">${s.books[myId]?chips(s,myId):""}</div>`;
- $("me").className="me"+(my?" opp turn":"")}
+ $("me").innerHTML=`<div class="bkc"><b>★</b> Komplety: ${vb(s,myId).length}</div>`+mt+`<div class="ring" style="--cl:${colOf(s,myId)}">${AV[mi%4]}</div><div class="on">${esc(nm(s,myId)||"")} (Ty)</div>`+`<div class="chips">${chips(s,myId)}</div>`;
+ $("me").className="me"+(my?" opp turn":"");
+ fit()}
 
 /* ---------- statystyki ---------- */
 function finish(){
@@ -393,7 +473,7 @@ function finish(){
 function sendAsk(to){
  if(!rm||!st||st.status!=="play"||st.turn!==myId||sel===null)return;
  rm.emit("ask",{g:st.gid,to,r:sel}).catch(()=>{});sel=null;render()}
-$("hand").onclick=e=>{const c=e.target.closest(".c");if(!c||!st||st.turn!==myId)return;const r=+c.dataset.c%13;sel=sel===r?null:r;SND.pick();render()};
+$("hand").onclick=e=>{const c=e.target.closest(".c");if(!c||c.classList.contains("gh")||!st||st.turn!==myId)return;const r=+c.dataset.c%13;sel=sel===r?null:r;SND.pick();render()};
 document.addEventListener("click",e=>{const o=e.target.closest("#v-game .opp[data-id]");if(o)sendAsk(o.dataset.id)});
 addEventListener("resize",()=>render());
 $("create").onclick=()=>connect(true);
