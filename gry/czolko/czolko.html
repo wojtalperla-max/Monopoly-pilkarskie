@@ -112,7 +112,7 @@ function lgDot(c){return '<i class="lgd" style="background:'+(/^#[0-9a-f]{6}$/i.
 </script>
 <script>
 /* ===== CZÓŁKO (online, pokoje) ===== */
-let CZ={screen:'start',ref:null,listener:null,code:'',host:null,players:[],words:{},game:null,status:null,msg:'',draft:'',nick:'',col:'#2a9df4',joinCode:'',promoting:false,show:false,historyPlayer:'all',cmode:'all',category:'',catDraft:''};
+let CZ={screen:'start',ref:null,listener:null,code:'',host:null,players:[],words:{},game:null,status:null,msg:'',draft:'',nick:'',col:'#2a9df4',joinCode:'',pane:'',promoting:false,show:false,historyPlayer:'all',cmode:'all',category:'',catDraft:''};
 const czNet=()=>typeof fbDB!=='undefined'&&!!fbDB&&typeof onlineEnsureAuth==='function';
 const czWordRe=/^[\p{L}\p{N} '’.\-]{1,30}$/u;
 const czNewGame=()=>({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),turn:0,pending:null,log:[],solved:[],done:false});
@@ -154,21 +154,29 @@ function czScreen(){
   return '';
 }
 function czAccSync(){try{const a=String((typeof ACC!=='undefined'&&ACC.nick)||'').trim().slice(0,14),c=(typeof ACC!=='undefined'&&/^#[0-9a-f]{6}$/i.test(ACC.col||''))?ACC.col:'';if(a&&!CZ.nickT)CZ.nick=a;if(c&&!CZ.colT)CZ.col=c}catch(e){}}
+function czPane(p){CZ.pane=CZ.pane===p?'':p;czRefresh();if(CZ.pane==='join')setTimeout(()=>{const e=document.getElementById('czjoin');if(e)e.focus()},60)}
+/* jedyny przycisk „Menu główne” w lobby (jak w Monopoly) – klik w pasek rodzica, który jest wtedy ukryty */
+function czHub(){
+  try{const g=parent.document.querySelector('#czolko .gmenu')||parent.document.querySelector('.gmenu');if(g){g.click();return}}catch(e){}
+  try{parent.postMessage({type:'gmenu-back'},'*')}catch(e){}
+}
 function czStartHTML(m){czAccSync();
-  const net=czNet(),cat=CZ.cmode==='cat';
-  return obShell({key:'cz-start',host:'#cz',theme:'cz',words:['CZÓŁKO'],tiles:['🧠','❓','💬','🎭'],sub:'Zgadnij swoje hasło, zadając pytania.',msg:m,
-  body:`<div class="ob-pane"><label for="cznick">Twój nick</label><input id="cznick" maxlength="14" autocomplete="off" value="${lgEsc(CZ.nick||'Gracz')}" oninput="CZ.nick=this.value;CZ.nickT=1">
-    <div class="ob-opt"><span>Kolor pionka</span><input id="czcol" type="color" value="${lgEsc(CZ.col||'#2a9df4')}" oninput="CZ.col=this.value;CZ.colT=1"></div>
+  const net=czNet(),cat=CZ.cmode==='cat',pn=CZ.pane||'';
+  const nick=`<label for="cznick">Twój nick</label><input id="cznick" maxlength="14" autocomplete="off" value="${lgEsc(CZ.nick||'Gracz')}" oninput="CZ.nick=this.value;CZ.nickT=1">
+    <div class="ob-opt"><span>Kolor pionka</span><input id="czcol" type="color" value="${lgEsc(CZ.col||'#2a9df4')}" oninput="CZ.col=this.value;CZ.colT=1"></div>`;
+  const create=pn==='create'?`<div class="ob-pane">${nick}
     <div class="ob-opt"><span>Tryb gry</span><div class="ob-chips">${obChip('Wszystkie hasła',!cat,"CZ.cmode='all';czRefresh(true)")}${obChip('Wybierz kategorię',cat,"CZ.cmode='cat';czRefresh(true)")}</div></div>
     <p class="ob-note">${cat?'Na początku partii host wpisze kategorię, w której wszyscy wymyślają hasła.':'Hasła mogą być dowolne.'}</p>
-    ${obBtn('Stwórz pokój','🎲','czCreate()','gold',!net)}</div>
-  <div class="ob-or">albo</div>
-  <div class="ob-pane"><label for="czjoin">Kod pokoju</label><input id="czjoin" class="cd" maxlength="5" placeholder="KOD" autocomplete="off" value="${lgEsc(CZ.joinCode||'')}" oninput="CZ.joinCode=this.value">
-    ${obBtn('Dołącz do pokoju','🚪','czJoin()','white',!net)}</div>
+    ${obBtn('Stwórz pokój','🎲','czCreate()','gold',!net)}</div>`:'';
+  const join=pn==='join'?`<div class="ob-pane">${nick}<label for="czjoin">Kod pokoju od znajomego</label><input id="czjoin" class="cd" maxlength="5" placeholder="A8K2Q" autocomplete="off" value="${lgEsc(CZ.joinCode||'')}" oninput="CZ.joinCode=this.value" onkeydown="if(event.key==='Enter')czJoin()">
+    ${obBtn('Dołącz','🚪','czJoin()','gold',!net)}</div>`:'';
+  return obShell({key:'cz-start',host:'#cz',theme:'cz',words:['CZÓŁKO'],tiles:['🧠','❓','💬','🎭'],sub:'Zgadnij swoje hasło, zadając pytania.',msg:m,
+  back:{label:'← Menu główne',onclick:'czHub()'},
+  body:`${obBtn('Utwórz pokój','🏠',"czPane('create')",'gold')}${obBtn('Dołącz do znajomego','🚪',"czPane('join')",'white')}
+  ${create}${join}
   ${net?'':'<p class="ob-net">Czółko wymaga pokoju online, bo każdy widzi inne hasła. Działa po wgraniu gry na własny hosting z Firebase.</p>'}
   ${obRules('<p>Każdy gracz wpisuje hasło dla następnej osoby. Widzisz hasła wszystkich oprócz własnego i zadajesz pytania, na które odpowiada się tylko <b>tak</b> albo <b>nie</b>. Po każdym pytaniu — niezależnie od odpowiedzi „tak” lub „nie” — kolejka przechodzi do następnego gracza. W swojej turze możesz też zgadywać swoje hasło. Odpowiada i sprawdza zgadywanie ten, kto wpisał ci hasło. Kto zgadnie, zdobywa miejsce w rankingu.</p>')}`});
 }
-const czClean=s=>String(s||'').replace(/[<>&]/g,'').trim().slice(0,14);
 async function czCreate(){
   try{
     const uid=await onlineEnsureAuth(),code=onlineCode(),ref=fbDB.ref('czRooms/'+code);
