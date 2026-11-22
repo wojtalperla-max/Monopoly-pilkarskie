@@ -436,7 +436,7 @@ function doEnd(){const m=S.turn,p=S.pl[m];
 /* jednostki stojące razem na jednym polu zawsze mają wspólny zapas ruchu – idą razem, nie rozdzielają się */
 function mergeStack(q,r,o){const st=S.units.filter(x=>x.o==o&&x.q==q&&x.r==r&&x.k!='C');if(st.length>1){const m=Math.max(...st.map(x=>x.mp));st.forEach(x=>{x.mp=m})}}
 function tap(q,r){const mi=meIdx(),own=S.units.filter(u=>u.o==mi&&u.q==q&&u.r==r),su=sel&&sel.k=='u'?S.units.find(u=>u.id==sel.id):null;
-  if(su&&mineTurn()&&su.mp>0&&!(su.q==q&&su.r==r)&&adj(su,q,r)){let gl=grpMode?S.units.filter(x=>x.o==su.o&&x.q==su.q&&x.r==su.r&&x.mp>0):[su];if(grpMode&&grpN>0)gl=[su,...gl.filter(x=>x!==su)].slice(0,grpN);{const en=S.units.filter(x=>x.q==q&&x.r==r&&x.o!=su.o),atk=gl.filter(x=>S.units.includes(x)&&x.mp>0&&MIL(x.k));if(en.length&&tt(q,r)>=2&&atk.length&&S.pl[mi].seen[r*S.w+q]=='1'&&typeof beginBattle==='function'&&!S.bt&&!(typeof FZ!=='undefined'&&FZ)){beginBattle(atk,en,q,r);return}}_mvB=new Set(gl.map(x=>x.id));try{gl.forEach(x=>{if(S.units.includes(x)&&x.mp>0)moveU(x,q,r)})}finally{_mvB=new Set()}mergeStack(q,r,su.o);save();render();return}
+  if(su&&mineTurn()&&su.mp>0&&!(su.q==q&&su.r==r)&&adj(su,q,r)){let gl=grpMode?S.units.filter(x=>x.o==su.o&&x.q==su.q&&x.r==su.r&&x.mp>0):[su];if(grpMode&&grpN>0)gl=[su,...gl.filter(x=>x!==su)].slice(0,grpN);{const en=S.units.filter(x=>x.q==q&&x.r==r&&x.o!=su.o),atk=gl.filter(x=>S.units.includes(x)&&x.mp>0&&MIL(x.k));if(en.length&&tt(q,r)>=2&&atk.length&&S.pl[mi].seen[r*S.w+q]=='1'&&typeof beginBattle==='function'&&!S.bt&&!(typeof FZ!=='undefined'&&FZ)){beginBattle(atk,en,q,r);return}}const gids=gl.map(x=>x.id);_mvB=new Set(gids);quiet=true;try{gids.forEach(id=>{const x=S.units.find(v=>v.id==id);if(x&&x.mp>0)moveU(x,q,r)})}finally{quiet=false;_mvB=new Set()}mergeStack(q,r,su.o);save();render();return}
   const ci=S.cities.findIndex(c=>c.o==mi&&c.q==q&&c.r==r);msg='';
   if(own.length){sfx('select');{const tk=q+','+r;if(tk!==_grpTile){grpN=0;_grpTile=tk}}const i=su?own.findIndex(u=>u.id==su.id):-1;
     if(i>=0&&own.length==1&&ci>=0)sel={k:'c',i:ci};else sel={k:'u',id:own[(i+1)%own.length].id}}
@@ -725,7 +725,7 @@ function renderSpec(){
 /* ---------- okno akcji na planszy (rekrutacja, budowa, ruch grupy) + powiadomienia ---------- */
 const ACT=document.createElement('div');ACT.id='act';$('game').appendChild(ACT);
 const TOAST=document.createElement('div');TOAST.id='toast';$('game').appendChild(TOAST);
-const TB=document.createElement('div');TB.id='turnBanner';$('game').appendChild(TB);
+const TB=document.createElement('div');TB.id='turnBanner';$('game').appendChild(TB);TB.addEventListener('animationend',()=>TB.classList.remove('on'));
 /* ===== animacja monety: ile złota wydałeś / zyskałeś ===== */
 let _lastG=null,_lastGi=-1;
 function goldFx(pill,d){
@@ -792,7 +792,8 @@ function turnBannerCheck(){
   }catch(e){}
     try{window.parent.postMessage({type:'imperia:hideHeader',imperia:'hideHeader'},'*')}catch(e){}}
   function restorePortalBar(){try{const pd=window.parent.document;pd.querySelectorAll('[data-imp-hid2]').forEach(e=>{e.style.display=e.dataset.impHid2;delete e.dataset.impHid2});const fe=window.frameElement;if(fe&&fe.dataset.impH!=null){fe.style.height=fe.dataset.impH;delete fe.dataset.impH}}catch(e){}}
-  function sync(){if(leaving)return;hideParentBtn();hidePortalBar()}
+  function sync(){if(leaving)return;const g=$('game'),ing=g&&getComputedStyle(g).display!=='none';if(ing){hideParentBtn();hidePortalBar()}else restorePortalBar()}
+  window.addEventListener('pagehide',()=>{try{restorePortalBar()}catch(e){}});
   syncT=setInterval(sync,700);sync();
 })();
 let _actKey='',_lastMsg='',_toastT=0;
@@ -1343,6 +1344,7 @@ function beginBattle(atk,en,q,r){const Bt=initBattle(atk[0].o,atk,en,q,r);S.bt=B
 function startAIBattle(atk,en,q,r){S.bt=initBattle(atk[0].o,atk,en,q,r);const dp=en[0].o;
   if(hot&&!S.pl[dp].ai){lastH=dp;if(S.pl.filter(x=>!x.ai).length>1){hold=true;holdFor=dp}}}
 function openBattleView(B){
+  try{TB.classList.remove('on')}catch(e){}
   openDetail(B.q,B.r,true,true);if(!FZ)return;
   Object.assign(B,{sel:null,fl:[],ver:0,busy:false,aiRun:false});B.evn=(B.ev&&B.ev.n)||0;B.ack=B.ack||[];B.units.forEach(u=>{u.anim=null});
   FZ.cells.find(c=>c.a==0&&c.b==0).block=false;FZ.battle=B;S.bt=B;FZ.sel=null;
