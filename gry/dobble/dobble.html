@@ -34,33 +34,34 @@
     <div class="dh-logo" role="img" aria-label="Dobble" id="dhLogo"></div>
     <div class="dh-tiles" aria-hidden="true"><i>🍀</i><i>⚡</i><i>🎯</i><i>🌙</i></div>
     <p class="dh-sub">Znajdź wspólny symbol szybciej niż reszta.</p>
-    <div class="dh-pane">
-      <label for="nm">Twój nick</label>
-      <input id="nm" maxlength="14" placeholder="Wpisz nick" autocomplete="off">
-      <button class="dh-btn dh-gold" id="mk"><span class="dh-ic">🎲</span><span>Stwórz pokój</span></button>
+    <div class="dh-main">
+      <button class="dh-btn dh-gold" id="mk"><span class="dh-ic">🏠</span><span>Utwórz pokój</span></button>
+      <button class="dh-btn dh-white" id="dhJoinBtn" type="button"><span class="dh-ic">🚪</span><span>Dołącz do znajomego</span></button>
     </div>
-    <div class="dh-or">albo</div>
-    <div class="dh-pane">
-      <label for="jc">Kod pokoju</label>
-      <input id="jc" class="cd" maxlength="4" placeholder="KOD" autocomplete="off">
-      <button class="dh-btn dh-white" id="jn"><span class="dh-ic">🚪</span><span>Dołącz do pokoju</span></button>
-    </div>
-    <div class="err" id="herr"></div>
+    <div id="dhJoinPane" class="dh-joinpane"><label for="jc">Kod pokoju od znajomego</label>
+      <div class="dh-join"><input id="jc" class="cd" maxlength="4" placeholder="KOD" autocomplete="off"><button class="dh-btn dh-green" id="jn"><span>Dołącz</span></button></div></div>
+    <div class="err" id="herr" role="alert"></div>
     <p class="dh-net" id="net"></p>
   </div>
 </section>
 
 <section class="screen" id="lobby">
-  <div class="card">
-    <div class="lbl">Kod pokoju – podaj go znajomym</div>
-    <div class="code" id="lcode"></div>
-    <button class="w" id="cp" style="margin-top:8px;font-size:15px;padding:9px">Kopiuj kod</button>
+  <div class="dh-bg" aria-hidden="true" id="dhBg2"></div>
+  <div class="dh-wrap">
+    <div class="dh-tiles" aria-hidden="true"><i>🍀</i><i>⚡</i><i>🎯</i><i>🌙</i></div>
+    <div class="dh-logo" role="img" aria-label="Pokój" id="dhLogo2"></div>
+    <div class="dh-lobby">
+      <span class="dh-badge">⏳ Poczekalnia</span>
+      <div class="dh-lt">Podaj ten kod znajomym (2–5 graczy)</div>
+      <div class="code" id="lcode"></div>
+      <div class="dh-wait" id="lwait"><span id="lwtxt">Czekam na graczy</span><span class="dots"></span></div>
+      <div id="plist"></div>
+      <div class="dh-row"><button class="dh-btn dh-gold" id="cp">KOPIUJ KOD</button><button class="dh-btn dh-ghost" id="lv">ANULUJ</button></div>
+      <button class="dh-btn dh-white" id="st" style="display:none">▶ Start gry</button>
+      <p class="dh-wt" id="wt" style="display:none">Czekamy, aż gospodarz rozpocznie grę…</p>
+      <div class="err" id="lerr" role="alert"></div>
+    </div>
   </div>
-  <div class="card"><div class="lbl" style="margin-top:0">Gracze (2–5)</div><div id="plist"></div></div>
-  <button class="g" id="st" style="display:none">Start gry</button>
-  <p class="sub" id="wt" style="display:none">Czekamy, aż gospodarz rozpocznie grę…</p>
-  <div class="err" id="lerr"></div>
-  <button class="w" id="lv" style="margin-top:6px">Wyjdź z pokoju</button>
 </section>
 
 <section class="screen table" id="game">
@@ -127,8 +128,9 @@ window.__dblJoin=async function(name){
 </script>
 <script>
 const $=s=>document.querySelector(s);
-(function(){const lg=document.getElementById('dhLogo');'DOBBLE!'.split('').forEach((c,i)=>{const b=document.createElement('b');b.style.setProperty('--i',i);b.textContent=c;lg.appendChild(b)});
-const bg=document.getElementById('dhBg');['🍀','⚡','🎯','🌙','🍎','⭐','🎈','🐞','🍀','🔑','🎲','🍕'].forEach((e,i)=>{const s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})})();
+(function(){const lg2=document.getElementById('dhLogo2');'POKÓJ'.split('').forEach((c,i)=>{const b=document.createElement('b');b.style.setProperty('--i',i);b.textContent=c;lg2.appendChild(b)});
+const lg=document.getElementById('dhLogo');'DOBBLE!'.split('').forEach((c,i)=>{const b=document.createElement('b');b.style.setProperty('--i',i);b.textContent=c;lg.appendChild(b)});
+document.querySelectorAll('.dh-bg').forEach(bg=>['🍀','⚡','🎯','🌙','🍎','⭐','🎈','🐞','🍀','🔑','🎲','🍕'].forEach((e,i)=>{const s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)}))})();
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const HEX=/^#[0-9a-f]{6}$/i;
@@ -144,17 +146,14 @@ let room=null,myId=null,isHost=false,code='',st=null,sv=0,unsubs=[],lockUntil=0,
 function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id))}
 const shuffle=a=>{for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
 const cleanN=v=>String(v||'').replace(/[\u0000-\u001f\u200b-\u200f\u2028-\u202f<>&]/g,'').trim().slice(0,14);
-function myName(){return cleanN($('#nm').value)||'Gracz'}
+function myName(){return cleanN(window.__dblNick&&window.__dblNick())||'Gracz'}
 function myCol(){const c=window.__dblCol&&window.__dblCol();return HEX.test(c||'')?c:'#2a9df4'}
 
 /* ---------- nick z konta ---------- */
 (function(){
-  const n=window.__dblNick&&window.__dblNick();
-  if(n){$('#nm').value=cleanN(n);$('#nm').readOnly=true;$('#nm').title='Nick z Twojego konta'}
-  else{try{const v=localStorage.getItem('dbl_nick');if(v)$('#nm').value=cleanN(v)}catch(e){}
-    $('#nm').addEventListener('input',()=>{try{localStorage.setItem('dbl_nick',$('#nm').value)}catch(e){}})}
+  const n=cleanN(window.__dblNick&&window.__dblNick());
   if(!window.__dblNet){$('#net').textContent='Pokoje online są niedostępne (brak połączenia z Firebase).';$('#mk').disabled=true;$('#jn').disabled=true}
-  else if(n)$('#net').textContent='Grasz jako '+cleanN(n)+' – wyniki trafią do Twoich statystyk.';
+  else if(n)$('#net').textContent='Grasz jako '+n+' – wyniki trafią do Twoich statystyk.';
   else $('#net').textContent='Zaloguj się na konto, aby wyniki liczyły się do statystyk.';
 })();
 
@@ -192,7 +191,7 @@ async function connect(host){
     myId=room.uid;code=c;isHost=host;st=null;sv=0;pending=[];doneRec='';
     await room.presence({n:myName(),c:myCol(),h:host,ts:Date.now()});
     unsubs=[room.on('s',onState),room.on('claim',onClaim),room.onPeers(onPeers)];
-    $('#lcode').textContent=c;show('lobby');renderLobby();$('#lerr').textContent='';
+    setCode(c);$('#cp').textContent='KOPIUJ KOD';show('lobby');renderLobby();$('#lerr').textContent='';
     if(!host){
       await sleep(3000);
       if(!room)return;
@@ -221,13 +220,15 @@ function onPeers(ch){
   }
   if(st)render();
 }
+function setCode(c){$('#lcode').innerHTML=[...c].map(x=>`<b>${x}</b>`).join('')}
 function renderLobby(){
   if(!room||st)return;
   const L=peerList().slice(0,MAXP);
   $('#plist').innerHTML=L.map(p=>`<div class="pl ${p.isMe?'me':''}"><i style="background:${HEX.test(p.presence.c||'')?p.presence.c:'#888'}"></i><span>${esc(cleanN(p.presence.n)||'…')}${p.presence.h?' 👑':''}${p.isMe?' (Ty)':''}</span></div>`).join('');
-  $('#st').style.display=isHost?'':'none';$('#wt').style.display=isHost?'none':'';
+  $('#st').style.display=isHost?'':'none';$('#wt').style.display=(!isHost&&L.length>=2)?'':'none';
   $('#st').disabled=L.length<2;
-  $('#st').textContent=L.length<2?'Czekamy na graczy…':'Start gry ('+L.length+')';
+  $('#st').textContent='▶ Start gry ('+L.length+')';
+  $('#lwait').style.display=L.length<2?'':'none';
 }
 
 /* ---------- logika gospodarza (sędzia) ---------- */
@@ -344,7 +345,8 @@ $('#st').onclick=startGame;
 $('#again').onclick=startGame;
 $('#lv').onclick=leave;$('#ex').onclick=leave;
 $('#gq').onclick=()=>{if(confirm('Wyjść z gry? Stracisz możliwość zapisania wyniku.'))leave()};
-$('#cp').onclick=()=>{try{navigator.clipboard.writeText(code)}catch(e){}$('#cp').textContent='Skopiowano ✓'};
+$('#cp').onclick=()=>{try{navigator.clipboard.writeText(code)}catch(e){}$('#cp').textContent='SKOPIOWANO ✓';setTimeout(()=>$('#cp').textContent='KOPIUJ KOD',1800)};
+(function(){const jp=document.getElementById('dhJoinPane');document.getElementById('dhJoinBtn').onclick=function(){const on=jp.style.display!=='block';jp.style.display=on?'block':'none';if(on)setTimeout(()=>$('#jc').focus(),60)}})();
 addEventListener('resize',()=>{if(st&&st.status==='play'){$('#center').dataset.c='';$('#mine').dataset.c='';render()}});
 window.__dblLeave=function(){try{if(room)leave()}catch(e){}};
 </script>

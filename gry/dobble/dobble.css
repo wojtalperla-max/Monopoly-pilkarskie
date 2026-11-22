@@ -51,10 +51,10 @@ button.w{background:#ffffff1f;color:#fff;border:3px solid #ffffff66}
 
 
 /* ===== EKRAN STARTOWY (styl jak w pod, kolory dobble) ===== */
-#app:has(#home.on)>h1,#app:has(#home.on)>.sub{display:none}
-#home.on{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto;text-align:center;background:radial-gradient(circle at 50% 18%,#8a5bff 0,#4a1fa8 38%,#1a1033 100%);animation:none}
-#home *{box-sizing:border-box}
-#home::before{content:"";position:fixed;inset:-50%;background:conic-gradient(from 0deg,#ffffff00 0 8%,#ffffff14 10%,#ffffff00 12% 33%,#ffffff12 35%,#ffffff00 37% 58%,#ffffff14 60%,#ffffff00 62% 83%,#ffffff12 85%,#ffffff00 87%);animation:dhSpin 40s linear infinite;pointer-events:none}
+#app:has(#home.on)>h1,#app:has(#home.on)>.sub,#app:has(#lobby.on)>h1,#app:has(#lobby.on)>.sub{display:none}
+#home.on,#lobby.on{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto;text-align:center;background:radial-gradient(circle at 50% 18%,#8a5bff 0,#4a1fa8 38%,#1a1033 100%);animation:none}
+#home *,#lobby *{box-sizing:border-box}
+#home::before,#lobby::before{content:"";position:fixed;inset:-50%;background:conic-gradient(from 0deg,#ffffff00 0 8%,#ffffff14 10%,#ffffff00 12% 33%,#ffffff12 35%,#ffffff00 37% 58%,#ffffff14 60%,#ffffff00 62% 83%,#ffffff12 85%,#ffffff00 87%);animation:dhSpin 40s linear infinite;pointer-events:none}
 @keyframes dhSpin{to{transform:rotate(360deg)}}
 .dh-bg{position:fixed;inset:0;overflow:hidden;pointer-events:none}
 .dh-bg span{position:absolute;bottom:-12vh;font-size:clamp(26px,5vw,56px);opacity:.3;animation:dhFloat linear infinite;filter:drop-shadow(0 4px 6px #0006)}
@@ -91,9 +91,35 @@ button.dh-btn:not(:disabled):active{transform:translateY(2px) scale(.98)}
 .dh-gold{background:linear-gradient(180deg,#ffd84a,#f2a900);color:#3b2400;box-shadow:0 6px 0 #a26b00,0 14px 22px #0006;animation:dhPulse 2.4s 2s ease-in-out infinite}
 .dh-white{background:linear-gradient(180deg,#fff,#ececec);color:#4a1fa8;box-shadow:0 6px 0 #b9b9b9,0 14px 22px #0006}
 @keyframes dhPulse{50%{box-shadow:0 6px 0 #a26b00,0 14px 22px #0006,0 0 0 8px #ffd84a44}}
-#home .err{margin:0;animation:none}
+#home .err,#lobby .err{margin:0;animation:none;color:#fff3b0;overflow-wrap:anywhere}#home .err:empty,#lobby .err:empty{display:none}
 .dh-net{margin:0;color:#ffffffcc;font-size:15px;text-align:center}
-@media(prefers-reduced-motion:reduce){button,.screen.on{transition:none;animation:none}#home *,#home::before{animation:none!important}}
+@media(prefers-reduced-motion:reduce){button,.screen.on{transition:none;animation:none}#home *,#home::before,#lobby *,#lobby::before{animation:none!important}}
+
+/* ===== menu i poczekalnia w stylu Monopoly/Kulek ===== */
+.dh-main{width:100%;display:flex;flex-direction:column;gap:14px;animation:dhUp .7s 1.3s both}
+.dh-main .dh-btn{padding:clamp(16px,3.6vw,22px) 22px}
+.dh-joinpane{display:none;width:100%;background:#00000052;border:2px solid #ffffff3a;border-radius:18px;padding:16px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:dhPane .45s cubic-bezier(.2,1.3,.4,1) both}
+.dh-joinpane label{display:block;text-align:center;font-size:15px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#ffe9a8;margin:0 0 8px}
+@keyframes dhPane{0%{transform:translateY(-14px) scale(.94);opacity:0}100%{transform:none;opacity:1}}
+.dh-join{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
+.dh-join input.cd{width:min(100%,180px);margin:0;border:3px solid #fff;background:#1a0845;font-size:24px;letter-spacing:.3em;padding:12px 8px 12px 18px}
+.dh-join input.cd:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 4px #ffd23f44}
+.dh-green{background:linear-gradient(180deg,#3fd47c,#1c9c52);box-shadow:0 5px 0 #0f6a35,0 10px 18px #0006;width:auto;flex:0 0 auto;padding:12px 24px;font-size:20px}
+.dh-ghost{background:#00000040;border:2px solid #ffffff55;font-size:17px;box-shadow:none}
+.dh-lobby{width:100%;display:flex;flex-direction:column;gap:10px;background:#00000052;border:2px solid #ffffff3a;border-radius:20px;padding:18px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:dhPane .5s cubic-bezier(.2,1.3,.4,1) both}
+.dh-badge{align-self:center;background:#ffd84a;color:#3b2400;font-weight:700;border-radius:999px;padding:4px 16px;font-size:16px}
+.dh-lt{font-size:17px;color:#fff}
+.dh-wait,.dh-wt{opacity:.9;color:#fff;margin:0}
+#lobby .code{display:flex;gap:clamp(6px,2vw,12px);justify-content:center;margin:8px 0;padding:0;border:0;border-radius:0;background:none;letter-spacing:0;font-size:inherit}
+#lobby .code b{display:grid;place-items:center;font-family:"Bowlby One",Impact,sans-serif;font-weight:400;font-size:clamp(34px,10vw,46px);width:clamp(48px,15vw,64px);height:clamp(60px,18vw,78px);background:#1a0845;border:3px solid #fff;border-radius:12px;color:#ffd84a;text-shadow:0 3px 0 #4a1fb8;animation:dhTile .5s backwards}
+#lobby .code b:nth-child(2){animation-delay:.1s}#lobby .code b:nth-child(3){animation-delay:.2s}#lobby .code b:nth-child(4){animation-delay:.3s}
+@keyframes dhTile{from{transform:scale(0) rotate(-90deg);opacity:0}70%{transform:scale(1.25)}}
+.dots::after{content:'';animation:dhDots 1.4s infinite}
+@keyframes dhDots{33%{content:'.'}66%{content:'..'}100%{content:'...'}}
+.dh-row{display:flex;gap:10px}.dh-row>*{flex:1}
+.dh-row .dh-btn,#lobby #st{font-size:clamp(17px,3.6vw,22px);padding:14px 10px}
+.dh-row .dh-gold,#lobby #st{animation:none}
+#lobby .pl{text-align:left}
 
 /* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
 html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
