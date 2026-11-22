@@ -34,8 +34,6 @@
     </div>
     <div id="ilRoomPane" class="il-pane">
       <h3 id="ilRoomTitle">Utwórz pokój</h3>
-      <div id="nmacc" style="display:none;margin:0 0 8px;color:var(--muted)"></div>
-      <input id="nm" placeholder="Twoje imię" maxlength="16" autocomplete="off">
       <input id="kingdom" placeholder="Nazwa królestwa (np. Złota Korona)" maxlength="24" autocomplete="off">
       <input id="cd" placeholder="Kod pokoju od znajomego" maxlength="8" autocomplete="off" style="text-transform:uppercase">
       <button type="button" id="ilGo" class="il-btn il-gold il-go"><span class="il-ic">⚔️</span><span id="ilGoTxt">Utwórz pokój</span></button>
@@ -80,7 +78,7 @@
   document.getElementById('ilCreate').onclick=function(){setMode('create')};
   document.getElementById('ilJoin').onclick=function(){setMode('join')};
   go.onclick=function(){enter(mode==='create')};
-  ['cd','kingdom','nm'].forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('keydown',function(e){if(e.key==='Enter')go.click()})});
+  ['cd','kingdom'].forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('keydown',function(e){if(e.key==='Enter')go.click()})});
   document.getElementById('ilLocal').onclick=function(){mode='';show(rp,false);show(lp,lp.style.display!=='block')};
 })();
 </script>

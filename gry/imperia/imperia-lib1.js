@@ -12,7 +12,7 @@ const NB=r=>r&1?[[1,0],[-1,0],[1,-1],[0,-1],[1,1],[0,1]]:[[1,0],[-1,0],[0,-1],[-
 const cube=(q,r)=>{const x=q-(r-(r&1))/2;return[x,r,-x-r]};
 const HD=(a,b,c,d)=>{const p=cube(a,b),o=cube(c,d);return Math.max(Math.abs(p[0]-o[0]),Math.abs(p[1]-o[1]),Math.abs(p[2]-o[2]))};
 const C=(q,r)=>[W*(q+(r&1)/2)+W/2+5,R*1.5*r+R+5];
-let myId,name,code,ref,RD={},LP=[],S=null,sel=null,msg='',started=false,local=false,hold=false,lastH=0,quiet=false,aiBusy=false,grpMode=true,grpN=0,zoom=1,holdFor=null,needBR=false,spec=null;
+let hot=false,myId,name,code,ref,RD={},LP=[],S=null,sel=null,msg='',started=false,local=false,hold=false,lastH=0,quiet=false,aiBusy=false,grpMode=true,grpN=0,zoom=1,holdFor=null,needBR=false,spec=null;
 try{myId=localStorage.getItem('imp_id')}catch(e){}
 if(!myId){myId=Math.random().toString(36).slice(2,10);try{localStorage.setItem('imp_id',myId)}catch(e){}}
 
@@ -108,16 +108,12 @@ async function impDb(){
   }
   return{uid,doc:p=>new Doc(p)};
 }
-function impLobbyInfo(){
-  const a=impAcc(),el=$('nmacc'),inp=$('nm');if(!el||!inp||!a.nick)return;
-  inp.style.display='none';el.style.display='block';
-  el.innerHTML='Grasz jako <b>'+esc(a.nick)+'</b>'+(a.col?' <i style="display:inline-block;width:.9em;height:.9em;border-radius:50%;vertical-align:middle;border:2px solid #fff;background:'+a.col+'"></i> <small>(nick i kolor z konta DGW)</small>':' <small>(nick z konta DGW)</small>');
-}
+function impLobbyInfo(){}
 
 /* ---------- pokój / lobby ---------- */
 function genCode(){const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<5;i++)s+=a[Math.floor(Math.random()*a.length)];return s}
 async function enter(create){
-  const ia=impAcc();name=ia.nick||$('nm').value.trim().slice(0,16)||'Gracz';code=create?genCode():$('cd').value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8);
+  const ia=impAcc();name=(ia.nick||'Gracz').slice(0,16);code=create?genCode():$('cd').value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8);
   const er=m=>$('er').textContent=m;
   if(!create&&code.length<3)return er('Wpisz kod pokoju od znajomego (min. 3 znaki).');
   const db=await impDb();
@@ -212,12 +208,12 @@ function localCivUI(){
     return `<div class="lc"><div class="lc-h"><span>👤 Gracz ${i+1}</span><label class="lcol">Kolor <input type="color" id="local-col-${i}" value="${col}" ${user?'data-u="1"':''} oninput="this.dataset.u='1'"></label></div><input type="hidden" id="local-ni-${i}" value="${v}"><div class="civ-grid" id="lg-${i}"></div></div>`}).join('');
   localCivPaint();
 }
-function localGame(){const n=+$('ln').value,m=+$('la').value;if(n+m<2)return $('er').textContent=n==0?'Tryb obserwatora: ustaw min. 2 AI.':'Potrzeba min. 2 graczy (ludzie + AI).';if(n+m>6)return $('er').textContent='Max 6 graczy łącznie.';spec=n==0?{paused:false,speed:800,target:0,step:0}:null;local=true;ref={update:()=>Promise.resolve()};code='LOKALNIE';RD={size:$('ls').value,started:true};
+function localGame(){const n=+$('ln').value,m=+$('la').value;if(n+m<2)return $('er').textContent=n==0?'Tryb obserwatora: ustaw min. 2 AI.':'Potrzeba min. 2 graczy (ludzie + AI).';if(n+m>6)return $('er').textContent='Max 6 graczy łącznie.';spec=n==0?{paused:false,speed:800,target:0,step:0}:null;local=true;hot=(n!==1);myId=(n===1?'L0':myId);ref={update:()=>Promise.resolve()};code='LOKALNIE';RD={size:$('ls').value,started:true};
   const chosen=Array.from({length:n},(_,i)=>+$('local-ni-'+i).value),used=new Set(chosen);if(used.size<n)return $('er').textContent='Każdy gracz musi wybrać inną cywilizację.';if(new Set(chosen.map((_,i)=>$('local-col-'+i).value)).size<n)return $('er').textContent='Każdy gracz musi mieć inny kolor.';
   const aiN=N.map((_,i)=>i).filter(i=>!used.has(i));if(aiN.length<m)return $('er').textContent='Za mało różnych cywilizacji dla tylu graczy i AI.';
   LP=Array.from({length:n+m},(_,i)=>{const ni=i<n?chosen[i]:aiN[i-n];return{id:'L'+i,name:i>=n?'Władca '+(i-n+1):(i===0&&impAcc().nick?impAcc().nick:'Gracz '+(i+1)),kingdom:(i===0&&n>0)?($('kingdom').value.trim()||randomKingdom()):randomKingdom(),ni,t:i,ai:i>=n,col:i<n?$('local-col-'+i).value:undefined}});start()}
 /* ---------- logika gry ---------- */
-const meIdx=()=>{if(local&&S){if(!S.pl[S.turn].ai)lastH=S.turn;return lastH}return S.pl.findIndex(p=>p.id==myId)};
+const meIdx=()=>{if(hot&&S){if(!S.pl[S.turn].ai)lastH=S.turn;return lastH}return S.pl.findIndex(p=>p.id==myId)};
 const mineTurn=()=>S&&S.over<0&&S.turn==meIdx();
 const tt=(q,r)=>+S.t[r*S.w+q];
 const adj=(u,q,r)=>NB(u.r).some(([a,b])=>u.q+a==q&&u.r+b==r);
@@ -437,8 +433,10 @@ function doEnd(){const m=S.turn,p=S.pl[m];
     S.cities.filter(c=>c.o==m).forEach(c=>{});
   let n=m;do{n++;if(n>=S.pl.length){n=0;S.round++}}while(!S.pl[n].alive);
   S.turn=n;S.units.forEach(u=>{if(u.o==n)u.mp=mx(S,n)+(u.k=='C'?2:0)});(S.q||[]).filter(x=>x.o==n&&S.cities.some(c=>c.q==x.q&&c.r==x.r&&c.o==n)).forEach(x=>add(S,n,x.k,x.q,x.r));S.q=(S.q||[]).filter(x=>x.o!=n);sel=null;msg='';{const pn=S.pl[n],inc=income(n);let ng=(pn.g||0)+inc;if(ng<0){ng=0;const ml=S.units.filter(u=>u.o==n&&MIL(u.k));if(ml.length>1){const d=ml[ml.length-1];S.units=S.units.filter(x=>x!==d);pn.dr=S.round}}pn.g=ng;pn.e=(pn.e||0)+Math.max(0,inc);(pn.h=pn.h||[]).push([S.round,pn.g,inc,pn.e])}hold=false;holdFor=null;save();render()}
+/* jednostki stojące razem na jednym polu zawsze mają wspólny zapas ruchu – idą razem, nie rozdzielają się */
+function mergeStack(q,r,o){const st=S.units.filter(x=>x.o==o&&x.q==q&&x.r==r&&x.k!='C');if(st.length>1){const m=Math.max(...st.map(x=>x.mp));st.forEach(x=>{x.mp=m})}}
 function tap(q,r){const mi=meIdx(),own=S.units.filter(u=>u.o==mi&&u.q==q&&u.r==r),su=sel&&sel.k=='u'?S.units.find(u=>u.id==sel.id):null;
-  if(su&&mineTurn()&&su.mp>0&&!(su.q==q&&su.r==r)&&adj(su,q,r)){let gl=grpMode?S.units.filter(x=>x.o==su.o&&x.q==su.q&&x.r==su.r&&x.mp>0):[su];if(grpMode&&grpN>0)gl=[su,...gl.filter(x=>x!==su)].slice(0,grpN);{const en=S.units.filter(x=>x.q==q&&x.r==r&&x.o!=su.o),atk=gl.filter(x=>S.units.includes(x)&&x.mp>0&&MIL(x.k));if(en.length&&tt(q,r)>=2&&atk.length&&S.pl[mi].seen[r*S.w+q]=='1'&&typeof beginBattle==='function'&&!S.bt&&!(typeof FZ!=='undefined'&&FZ)){beginBattle(atk,en,q,r);return}}_mvB=new Set(gl.map(x=>x.id));try{gl.forEach(x=>{if(S.units.includes(x)&&x.mp>0)moveU(x,q,r)})}finally{_mvB=new Set()}return}
+  if(su&&mineTurn()&&su.mp>0&&!(su.q==q&&su.r==r)&&adj(su,q,r)){let gl=grpMode?S.units.filter(x=>x.o==su.o&&x.q==su.q&&x.r==su.r&&x.mp>0):[su];if(grpMode&&grpN>0)gl=[su,...gl.filter(x=>x!==su)].slice(0,grpN);{const en=S.units.filter(x=>x.q==q&&x.r==r&&x.o!=su.o),atk=gl.filter(x=>S.units.includes(x)&&x.mp>0&&MIL(x.k));if(en.length&&tt(q,r)>=2&&atk.length&&S.pl[mi].seen[r*S.w+q]=='1'&&typeof beginBattle==='function'&&!S.bt&&!(typeof FZ!=='undefined'&&FZ)){beginBattle(atk,en,q,r);return}}_mvB=new Set(gl.map(x=>x.id));try{gl.forEach(x=>{if(S.units.includes(x)&&x.mp>0)moveU(x,q,r)})}finally{_mvB=new Set()}mergeStack(q,r,su.o);save();render();return}
   const ci=S.cities.findIndex(c=>c.o==mi&&c.q==q&&c.r==r);msg='';
   if(own.length){sfx('select');{const tk=q+','+r;if(tk!==_grpTile){grpN=0;_grpTile=tk}}const i=su?own.findIndex(u=>u.id==su.id):-1;
     if(i>=0&&own.length==1&&ci>=0)sel={k:'c',i:ci};else sel={k:'u',id:own[(i+1)%own.length].id}}
@@ -728,11 +726,32 @@ function renderSpec(){
 const ACT=document.createElement('div');ACT.id='act';$('game').appendChild(ACT);
 const TOAST=document.createElement('div');TOAST.id='toast';$('game').appendChild(TOAST);
 const TB=document.createElement('div');TB.id='turnBanner';$('game').appendChild(TB);
-let _turnKey='';
+/* ===== animacja monety: ile złota wydałeś / zyskałeś ===== */
+let _lastG=null,_lastGi=-1;
+function goldFx(pill,d){
+  if(!pill||!d)return;
+  const r=pill.getBoundingClientRect(),e=document.createElement('div');
+  e.className='gold-fx '+(d<0?'neg':'pos');
+  e.innerHTML='<i class="gfx-c">🪙</i><b>'+(d<0?'−':'+')+Math.abs(d)+'</b>';
+  e.style.left=(r.left+r.width/2)+'px';e.style.top=(r.bottom-6)+'px';
+  document.body.appendChild(e);setTimeout(()=>e.remove(),1700);
+  const ic=pill.querySelector('.gold-icon');if(ic){ic.classList.remove('bump');void ic.offsetWidth;ic.classList.add('bump')}
+}
+function goldCheck(mi){
+  const g=(S.pl[mi]&&S.pl[mi].g)||0;
+  if(_lastG!==null&&_lastGi===mi&&g!==_lastG)goldFx(document.querySelector('#hd .gold-pill'),g-_lastG);
+  _lastG=g;_lastGi=mi;
+}
+let _turnKey='',_tbBlock=0;
 function turnBannerCheck(){
-  if(!S||!S.pl||S.over>=0||spec||hold||(FZ&&FZ.battle)||S.bt||!mineTurn())return;
-  const k=S.round+':'+S.turn;if(k===_turnKey)return;_turnKey=k;
-  const multi=local&&S.pl.filter(p=>!p.ai).length>1;
+  if(!S||!S.pl||S.over>=0||spec)return;
+  const k=S.round+':'+S.turn;
+  if(k===_turnKey)return;
+  /* zawsze zapamiętujemy zmianę tury – baner może się pojawić tylko w momencie przekazania tury, nigdy później (np. po bitwie) */
+  if(S.bt||(FZ&&FZ.battle)||hold)return;
+  _turnKey=k;
+  if(Date.now()<_tbBlock||!mineTurn()||S.pl[S.turn].ai||!S.pl[S.turn].alive)return;
+  const multi=hot&&S.pl.filter(p=>!p.ai).length>1;
   TB.innerHTML=multi?'TURA GRACZA<small>'+esc(S.pl[S.turn].kingdom||S.pl[S.turn].name)+'</small>':'TWOJA TURA';
   TB.classList.remove('on');void TB.offsetWidth;TB.classList.add('on');try{sfx('tap')}catch(e){}
 }
@@ -755,11 +774,12 @@ function turnBannerCheck(){
     const viaBridge=()=>{try{const B=impBridge();if(B)for(const k of ['menu','mainMenu','home','exit','back','close'])if(typeof B[k]==='function'){B[k]();return true}}catch(e){}return false};
     if(!viaParent()&&!viaBridge()){try{window.parent.postMessage({type:'imperia:menu',imperia:'menu'},'*')}catch(e){}}
     /* jeśli portal nie zareagował – wracamy na stronę główną sami */
+    setTimeout(()=>{leaving=false;clearInterval(syncT);syncT=setInterval(sync,700)},2500);
     setTimeout(()=>{
-      if(gone())return;
+      if(gone()){try{location.reload()}catch(e){}return}
       const home=w=>{const L=w.location;if(w===window)L.href='./';else L.href=L.origin+L.pathname};
       try{home(window.top)}catch(e){try{home(window.parent)}catch(e2){try{location.href='./'}catch(e3){}}}
-      setTimeout(()=>{if(!gone()){leaving=false;syncT=setInterval(sync,700)}},1500);
+      
     },600);
   }
   $('ilMenu').onclick=goMenu;
@@ -832,7 +852,7 @@ function render(){
   if(!S||meIdx()<0){$('game').style.display='none';$('room').style.display='';
     roomSet(RD.started&&!S?roomMsg('Ładowanie…'):RD.started?roomMsg('Gra już trwa bez Ciebie.'):lobbyView());return}
   $('room').style.display='none';$('game').style.display='flex';applyCols(S.pl);
-  if(local&&hold){hold=false;holdFor=null;}
+  if(hot&&hold){hold=false;holdFor=null;}
   if(spec){actHide();renderSpec();return}
   const mi=meIdx(),V=vision(mi),sn=S.pl[mi].seen.split('');V.forEach((v,i)=>{if(v)sn[i]='1'});S.pl[mi].seen=sn.join('');
   if(S.own)for(let r=0;r<S.h;r++)for(let q=0;q<S.w;q++){if(S.own[r*S.w+q]!=mi+1)continue;NB(r).forEach(([a,b])=>{const x=q+a,y=r+b;if(x<0||y<0||x>=S.w||y>=S.h)return;const o=+S.own[y*S.w+x];if(o&&o!=mi+1)noteMet(mi,o-1)})}
@@ -848,7 +868,7 @@ function render(){
   else if(sel&&sel.k=='t'){const ti=sel.r*S.w+sel.q,has=(S.hs||[]).includes(ti);h+=`Pole: ${T[tt(sel.q,sel.r)]} – Twoje ziemie<br>${has?'<b>🏠 Domek'+((S.hup||[]).includes(ti)?' · dochód +5':'')+'</b><br>':''}<small>Budowa i ulepszenia są w oknie na dole planszy.</small>`}
   else h+='<small>Kliknij swoją jednostkę, miasto lub pole w swoim królestwie (budowa domków).</small>';
   h+=`</div><div class="err">${esc(msg)}</div><hr><small>❗ <b style="color:#ff6258">Czerwony wykrzyknik „OKRĄŻENI”</b> przy oddziale = okrążony, bez drogi do własnego królestwa (−1 atak i −1 obrona).<br>⬆️ <b style="color:#ff6258">Czerwona strzałka</b> nad wojownikiem = może zaatakować sąsiedni cel. Jednostki bez strzałki nie mają teraz takiego ataku.<br>Fog of war: widzisz tylko pola w zasięgu swoich jednostek i miast. Zdobądź wszystkie wrogie miasta i jednostki, by wygrać.<br>Dwukrotne kliknięcie pola przybliża je na planszy.</small>`;
-  $('side').innerHTML=h;if(msg&&msg!==_lastMsg)showToast(msg);_lastMsg=msg;renderAct(mi);computeCuts();draw(V);applyZoom();aiCheck();if(typeof focusRefresh==='function')focusRefresh();battleHook();turnBannerCheck();
+  $('side').innerHTML=h;if(msg&&msg!==_lastMsg)showToast(msg);_lastMsg=msg;renderAct(mi);computeCuts();draw(V);applyZoom();goldCheck(mi);aiCheck();if(typeof focusRefresh==='function')focusRefresh();battleHook();turnBannerCheck();
 }
 
 
@@ -1295,10 +1315,10 @@ function getReach(Bt,u){
       const nd=d+c.sub.mv;if(nd>u.mvLeft)continue;if(nd<(dist.has(nb)?dist.get(nb):1e9)){dist.set(nb,nd);pq.push([nd,nb])}}}
   const m=new Map();dist.forEach((d,ci)=>{if(!occ.has(ci))m.set(ci,d)});
   Bt._rc={ver:Bt.ver,id:u.id,m};return m}
-const aiSide=(B,s)=>!!S.pl[s?B.defP:B.atkP].ai,sideLabel=(B,s)=>S.pl[s?B.defP:B.atkP].name,isPart=B=>local||meIdx()===B.atkP||meIdx()===B.defP;
-const viewSide=B=>local?(aiSide(B,0)?1:aiSide(B,1)?0:B.turnSide):(meIdx()===B.defP?1:0);
-const canAct=B=>!!B&&B.phase==='play'&&!aiSide(B,B.turnSide)&&(local||meIdx()===(B.turnSide?B.defP:B.atkP));
-const bothHuman=B=>local&&!aiSide(B,0)&&!aiSide(B,1),isFin=B=>local||meIdx()===(S.pl[B.atkP].ai?B.defP:B.atkP);
+const aiSide=(B,s)=>!!S.pl[s?B.defP:B.atkP].ai,sideLabel=(B,s)=>S.pl[s?B.defP:B.atkP].name,isPart=B=>hot||meIdx()===B.atkP||meIdx()===B.defP;
+const viewSide=B=>hot?(aiSide(B,0)?1:aiSide(B,1)?0:B.turnSide):(meIdx()===B.defP?1:0);
+const canAct=B=>!!B&&B.phase==='play'&&!aiSide(B,B.turnSide)&&(hot||meIdx()===(B.turnSide?B.defP:B.atkP));
+const bothHuman=B=>hot&&!aiSide(B,0)&&!aiSide(B,1),isFin=B=>hot||meIdx()===(S.pl[B.atkP].ai?B.defP:B.atkP);
 function bsave(B){B.sv=(B.sv||0)+1;S.bt=B;save()}
 function resultInfo(B){if(B.retreat)return['WYCOFANIE',true];if(bothHuman(B))return['WYGRYWA '+sideLabel(B,B.win).toUpperCase(),true];return B.win===viewSide(B)?['ZWYCIĘSTWO',true]:['PORAŻKA',false]}
 function initBattle(atkP,A0,D0,q,r){
@@ -1321,7 +1341,7 @@ function initBattle(atkP,A0,D0,q,r){
   return Bt}
 function beginBattle(atk,en,q,r){const Bt=initBattle(atk[0].o,atk,en,q,r);S.bt=Bt;save();openBattleView(Bt)}
 function startAIBattle(atk,en,q,r){S.bt=initBattle(atk[0].o,atk,en,q,r);const dp=en[0].o;
-  if(local){lastH=dp;if(S.pl.filter(x=>!x.ai).length>1){hold=true;holdFor=dp}}}
+  if(hot&&!S.pl[dp].ai){lastH=dp;if(S.pl.filter(x=>!x.ai).length>1){hold=true;holdFor=dp}}}
 function openBattleView(B){
   openDetail(B.q,B.r,true,true);if(!FZ)return;
   Object.assign(B,{sel:null,fl:[],ver:0,busy:false,aiRun:false});B.evn=(B.ev&&B.ev.n)||0;B.ack=B.ack||[];B.units.forEach(u=>{u.anim=null});
@@ -1365,7 +1385,7 @@ const UPRICE={W:15,A:20,S:15,C:8};
 function battleLosses(Bt){const alive=new Set(Bt.units.map(u=>u.gid));return[Bt.atkIds,Bt.defIds].map(ids=>{const L={W:0,A:0,S:0,C:0};ids.forEach(id=>{if(alive.has(id))return;const u=S.units.find(x=>x.id==id);if(u&&L[u.k]!=null)L[u.k]++});const gold=Object.keys(L).reduce((a,k)=>a+L[k]*UPRICE[k],0),n=Object.values(L).reduce((a,b)=>a+b,0);return{L,gold,n}})}
 function battleSummaryHtml(Bt){const NM={W:'Wojownik',A:'Łucznik',S:'Osadnik',C:'Zwiadowca'},R=battleLosses(Bt);let h='<h4>Podsumowanie strat</h4>';[0,1].forEach(s=>{const r=R[s];h+=`<div class="sd" style="border-left-color:${Bt.col[s]}"><b>${s?'🛡':'⚔'} ${esc(sideLabel(Bt,s))}</b>: `+(r.n?Object.keys(r.L).filter(k=>r.L[k]).map(k=>`${NM[k]} ×${r.L[k]}`).join(', ')+` · <b>${r.n}</b> jedn. (~${r.n*100} żołn.) · wartość <b>${r.gold} 🪙</b>`:'brak strat')+'</div>'});return h}
 function ackBattle(){const B=FZ&&FZ.battle;if(!B||B.phase!=='over')return;
-  if(local)[B.atkP,B.defP].filter(p=>!S.pl[p].ai).forEach(p=>{if(!B.ack.includes(p))B.ack.push(p)});else if(!B.ack.includes(meIdx()))B.ack.push(meIdx());
+  if(hot)[B.atkP,B.defP].filter(p=>!S.pl[p].ai).forEach(p=>{if(!B.ack.includes(p))B.ack.push(p)});else if(!B.ack.includes(meIdx()))B.ack.push(meIdx());
   bsave(B);fzHud();tryFinalize(B)}
 function tryFinalize(B){if(!B||B.phase!=='over'||B.fin||!isFin(B))return;if([B.atkP,B.defP].filter(p=>!S.pl[p].ai).every(p=>B.ack.includes(p)))finishBattle()}
 function retreatBattle(){const B=FZ&&FZ.battle;if(!B||B.busy||!canAct(B)||B.turnSide!==0)return;
@@ -1384,7 +1404,7 @@ function finishBattle(){
     if(ec){ec.o=me;claim(me,Bt.q,Bt.r,1,2);msg=att?'Bitwa wygrana – miasto zdobyte!':'Wróg zdobył miasto!'}else{claim(me,Bt.q,Bt.r,0,1);msg=att?'Bitwa wygrana! Pole zajęte.':'Wróg zajął pole.'}
     try{sfx('win')}catch(e){}
   }else msg=Bt.retreat?(att?'Wycofano się z bitwy.':'Wróg wycofał się z bitwy.'):Bt.win===vs?(att?'Bitwa wygrana, lecz na polu zostali wrogowie.':'Obroniłeś pole!'):'Bitwa przegrana.';
-  S.bt=null;sel=null;closeBattleView();chk();save();render()}
+  _tbBlock=Date.now()+2500;S.bt=null;sel=null;closeBattleView();chk();save();render()}
 async function rollDie(sides,label){
   const v=1+Math.floor(Math.random()*sides),dn=fzw.querySelector('#fzdn');fzw.querySelector('#fzdielbl').textContent=label+' · k'+sides;
   for(let t=0;t<8;t++){dn.textContent=1+Math.floor(Math.random()*sides);await sleep(55)}
@@ -1462,9 +1482,9 @@ function hudBattle(){
   else h+='<small>Kliknij swoją jednostkę. Niebieskie pola = ruch, czerwone = cele w zasięgu.</small>';
   if(Bt.phase==='over')h+=battleSummaryHtml(Bt);
   h+=`<h4>Dziennik</h4><div class="blog">`+Bt.log.slice(-9).map(l=>`<div class="${l.cls||''}">${esc(l.t)}</div>`).join('')+`</div><div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">`;
-  if(Bt.phase==='over'){const mine=local?false:Bt.ack.includes(meIdx());
+  if(Bt.phase==='over'){const mine=hot?false:Bt.ack.includes(meIdx());
     h+=mine?`<button class="p" style="flex:1" disabled>Czekanie na drugiego gracza…</button>`+(isFin(Bt)?`<button style="flex:1" onclick="finishBattle()">Zakończ bez czekania</button>`:''):`<button class="p" style="flex:1" onclick="ackBattle()">Zakończ bitwę</button>`}
-  else h+=`<button class="p" style="flex:1" ${act&&!Bt.busy?'':'disabled'} onclick="endBattleTurn()">Zakończ turę</button>`+(!aiSide(Bt,0)&&(local||vs===0)?`<button style="flex:1" ${act&&!Bt.busy&&Bt.turnSide===0?'':'disabled'} onclick="retreatBattle()">Wycofaj się</button>`:'');
+  else h+=`<button class="p" style="flex:1" ${act&&!Bt.busy?'':'disabled'} onclick="endBattleTurn()">Zakończ turę</button>`+(!aiSide(Bt,0)&&(hot||vs===0)?`<button style="flex:1" ${act&&!Bt.busy&&Bt.turnSide===0?'':'disabled'} onclick="retreatBattle()">Wycofaj się</button>`:'');
   h+=`</div><p><small>Zasady: k20 + atak ≥ 10 + obrona + osłona pola. 20 = krytyk (×2), 1 = pudło. Wysokość i okrążenie dają +1. Kontratak −2 (tylko gdy cel sięga napastnika). Łucznik strzela z odległości do 3 pól (z bliska −2). <b>Rzeki:</b> przeprawa kosztuje +2 ruchu, a atak przez rzekę daje napastnikom −1 do ataku i obrońcom +1 do obrony. <b>Formacje</b> (złote linie): Mur tarcz – wojownik z 2+ wojownikami obok +1 obrona; Wsparcie łuczników – wojownik z łucznikiem w zasięgu 2 pól +1 atak; Osłona – łucznik obok wojownika +1 obrona; Salwa – łucznicy w odległości 2 pól +1 atak. Atakujący i obrońca grają naprzemiennie; AI steruje się samo. Wynik trafia do gry: polegli znikają, zwycięzca atakujący zajmuje pole.</small></p>`;
   fzhud.innerHTML=h}
 
