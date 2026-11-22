@@ -138,3 +138,10 @@ label{font-size:13px;color:var(--mut);text-transform:uppercase;letter-spacing:.1
 /* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
 html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
 html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
+
+/* przycisk „Menu główne” i tryb bez graczy (jak w Monopoly) */
+.kl-back{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);left:12px;z-index:5;margin:0;font:inherit;font-weight:600;font-size:16px;background:#00000040;color:#fff;border:2px solid #ffffff55;border-radius:999px;padding:7px 16px;cursor:pointer;backdrop-filter:blur(6px);transition:transform .15s,background .15s}
+.kl-back:hover{background:#00000066;transform:translateX(-3px)}
+#menu .kl-wrap{padding-top:44px}
+.kl-local{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;font:inherit;font-weight:600;font-size:clamp(14px,3.2vw,17px);background:#ffffff26;color:#fff;border:1px solid #ffffff59;border-radius:14px;box-shadow:none;padding:12px 16px;margin:0;cursor:pointer;transition:background .15s,transform .15s;animation:klUp .7s 1.45s both}
+.kl-local:hover{background:#ffffff3a;transform:translateY(-2px)}

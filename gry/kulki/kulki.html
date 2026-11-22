@@ -24,21 +24,18 @@
 
 <section class="scr kl on" id="menu">
  <div class="kl-bg" aria-hidden="true"></div>
+ <button class="kl-back" id="klBack" type="button">← Menu główne</button>
  <div class="kl-wrap">
   <div class="kl-shapes" aria-hidden="true"><i class="p">○</i><i class="t">△</i><i class="w">□</i></div>
   <div class="kl-logo" role="img" aria-label="Kulki"><div class="kl-l" data-t="KULKI"></div></div>
   <p class="kl-sub">Parzysta czy nieparzysta? Zgarnij wszystkie kulki.</p>
-  <div class="kl-panel">
-   <label for="name">Twój pseudonim</label>
-   <input id="name" maxlength="16" placeholder="np. Gracz 456" value="Gracz 456" autocomplete="off">
-  </div>
   <div class="kl-main">
-   <button class="kl-btn kl-gold onl" id="bCreate" disabled><span class="kl-ic">🚪</span><span>Stwórz pokój</span></button>
-   <button class="kl-btn kl-white" id="klJoinBtn" type="button"><span class="kl-ic">🔑</span><span>Dołącz do znajomego</span></button>
+   <button class="kl-btn kl-gold onl" id="bCreate" disabled><span class="kl-ic">🏠</span><span>Utwórz pokój</span></button>
+   <button class="kl-btn kl-white" id="klJoinBtn" type="button"><span class="kl-ic">🚪</span><span>Dołącz do znajomego</span></button>
   </div>
   <div id="klJoinPane" class="kl-pane"><label for="jc" style="text-align:center">Kod pokoju od znajomego</label>
    <div class="kl-join"><input id="jc" maxlength="4" placeholder="KOD" autocomplete="off" style="text-transform:uppercase"><button class="kl-btn kl-green onl" id="bJoin" disabled>Dołącz</button></div></div>
-  <button class="kl-btn kl-ghost" id="bBot"><span class="kl-ic">🤖</span><span>Graj z botem</span></button>
+  <button class="kl-local" id="bBot" type="button">🤖 Gra z botem</button>
   <div id="net" class="kl-note">Łączenie z trybem online<span class="dots"></span></div>
   <div id="klRulesPane" class="kl-pane"><h3>Zasady</h3><p>Każdy zaczyna z 10 kulkami. W swojej turze ukrywasz w dłoni od 1 kulki w górę, a przeciwnik zgaduje, czy ich liczba jest parzysta. Trafi – zabiera Ci tyle kulek, ile miałeś w dłoni. Pudło – to Ty zabierasz tyle jemu. Potem zamiana ról. Kto straci wszystkie, odpada.</p></div>
   <button class="kl-link" id="klRulesBtn" type="button">📜 Jak grać?</button>
@@ -121,14 +118,13 @@ function fit(){cv.width=innerWidth;cv.height=innerHeight}fit();addEventListener(
 function burst(x,y,n,cols){for(let i=0;i<n;i++){const a=Math.random()*6.28,v=3+Math.random()*9;P.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v-5,r:3+Math.random()*5,c:cols[i%cols.length],l:1,s:Math.random()<.5})}if(!raf)loop()}
 function loop(){cx.clearRect(0,0,cv.width,cv.height);P=P.filter(p=>p.l>0);for(const p of P){p.x+=p.vx;p.y+=p.vy;p.vy+=.25;p.vx*=.99;p.l-=.011;cx.globalAlpha=Math.max(p.l,0);cx.fillStyle=p.c;cx.shadowColor=p.c;cx.shadowBlur=10;p.s?(cx.beginPath(),cx.arc(p.x,p.y,p.r,0,7),cx.fill()):cx.fillRect(p.x,p.y,p.r*1.6,p.r*1.6)}raf=P.length?requestAnimationFrame(loop):0;if(!raf)cx.clearRect(0,0,cv.width,cv.height)}
 const PC=['#ed1b76','#1fb5a6','#ffd166','#fff'];
-function show(id){if(typeof syncNick==='function'&&id==='menu')syncNick();document.querySelectorAll('.scr').forEach(s=>s.classList.toggle('on',s.id===id));$('#ov').classList.remove('on')}
+function show(id){document.querySelectorAll('.scr').forEach(s=>s.classList.toggle('on',s.id===id));$('#ov').classList.remove('on')}
 // online
 (async()=>{try{roomMod=window.claude&&await claude.use('room')}catch(e){}
  $('#net').textContent=roomMod?'🟢 Tryb online gotowy':'Online niedostępny w tym widoku – zagraj z botem';
  if(roomMod)document.querySelectorAll('.onl').forEach(b=>b.disabled=false)})();
 const accNick=()=>{try{return(window.__kulkiNick&&window.__kulkiNick()||'').trim()}catch(e){return''}};
-const nm=()=>(accNick()||$('#name').value.trim()||'Gracz').slice(0,16);
-function syncNick(){const n=accNick();if(n){$('#name').value=n.slice(0,16);$('#name').readOnly=true}}
+const nm=()=>(accNick()||'Gracz').slice(0,16);
 const goHub=()=>{try{window.parent.kulkiExit()}catch(e){toMenu()}};
 function leave(){clearInterval(helloT);unsubs.forEach(u=>u());unsubs=[];if(room){room.leave().catch(()=>{});room=null}G=null;guestPeer=null}
 async function enter(code,host){
@@ -145,7 +141,7 @@ $('#bJoin').onclick=async()=>{const c=$('#jc').value.trim().toUpperCase();if(c.l
  $('#codeBox').innerHTML=[...c].map(x=>`<b>${x}</b>`).join('');$('#lobTxt').textContent='Łączenie z pokojem';show('lobby');
  const hi=()=>room&&room.emit('hello',{name:myName}).catch(()=>{});hi();helloT=setInterval(hi,1500)};
 $('#bCopy').onclick=()=>{try{navigator.clipboard.writeText([...$('#codeBox').children].map(b=>b.textContent).join(''))}catch(e){}$('#bCopy').textContent='SKOPIOWANO ✓'};
-$('#bCancel').onclick=toMenu;$('#bQuit').onclick=toMenu;
+$('#klBack').onclick=goHub;$('#bCancel').onclick=toMenu;$('#bQuit').onclick=toMenu;
 function toMenu(){leave();show('menu')}
 $('#bBot').onclick=()=>{myName=nm();newGame([myName,'Bot 067'],0,Math.random()<.5?0:1,'bot')};
 function onMsg(t,d,m){
