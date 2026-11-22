@@ -31,23 +31,20 @@
 <h1>Kółko i krzyżyk</h1>
 <section id="menu" class="ms">
   <div class="ms-bg" aria-hidden="true"></div>
+  <button class="ms-back" id="msBack" type="button">← Menu główne</button>
   <div class="ms-wrap">
     <div class="ms-xo" aria-hidden="true"><i class="x">✕</i><i class="o">○</i><i class="x">✕</i></div>
     <div class="ms-logo" role="img" aria-label="Kółko i krzyżyk"><div class="ms-l1" data-t="KÓŁKO"></div><div class="ms-l2" data-t="I KRZYŻYK"></div></div>
     <p class="ms-sub">Trzy w rzędzie. Zero litości.</p>
-    <div class="ms-panel">
-      <label for="nm">Twój nick</label>
-      <input id="nm" maxlength="16" placeholder="np. Kuba" autocomplete="off">
-      <label>Plansza</label>
-      <div class="chips" id="sz"><button class="chip on" data-s="3">Normalna<small>3 × 3</small></button><button class="chip" data-s="8">Większa<small>8 × 8</small></button><button class="chip" data-s="12">Ogromna<small>12 × 12</small></button></div>
-    </div>
     <div class="ms-main">
-      <button class="ms-btn ms-gold" id="mk" disabled><span class="ms-ic">🏠</span><span>Utwórz pokój online</span></button>
+      <button class="ms-btn ms-gold" id="mk" disabled><span class="ms-ic">🏠</span><span>Utwórz pokój</span></button>
       <button class="ms-btn ms-white" id="msJoinBtn" type="button"><span class="ms-ic">🚪</span><span>Dołącz do znajomego</span></button>
     </div>
+    <div id="msCreatePane" class="ms-pane" style="text-align:center"><h3 style="margin:0 0 12px;font-size:20px">Jaką planszę tworzysz?</h3>
+      <div class="chips" id="sz"><button class="chip on" data-s="3">Normalna<small>3 × 3</small></button><button class="chip" data-s="8">Większa<small>8 × 8</small></button><button class="chip" data-s="12">Ogromna<small>12 × 12</small></button></div></div>
     <div id="msJoinPane" class="ms-pane"><label for="jc" style="text-align:center">Kod pokoju od znajomego</label>
       <div class="ms-join"><input id="jc" maxlength="5" placeholder="KOD" autocomplete="off" style="text-transform:uppercase"><button class="ms-btn ms-green" id="jn" disabled>Dołącz</button></div></div>
-    <div class="ms-two"><button class="ms-btn ms-ghost" id="bot">🤖 Z komputerem</button><button class="ms-btn ms-ghost" id="loc">👥 Lokalnie</button></div>
+    <button class="ms-local" id="loc" type="button">🎲 Gra lokalnie na jednym urządzeniu</button>
     <p class="err ms-err" id="err"></p><p class="note ms-note" id="mpn">Łączę z trybem online…</p>
   </div>
 </section>
@@ -129,7 +126,7 @@ function show(id){['menu','lobby','game'].forEach(x=>$('#'+x).classList.toggle('
 function err(t){$('#err').textContent=t||''}
 function cleanup(){unsubs.forEach(f=>{try{f()}catch(e){}});unsubs=[];clearInterval(timer);if(room){try{room.leave()}catch(e){}}room=null;S=null;isHost=false;mode='';gone=false;winKey='';$('#bd').innerHTML=''}
 function genCode(){const a='abcdefghjkmnpqrstuvwxyz23456789';let s='';for(let i=0;i<5;i++)s+=a[Math.floor(Math.random()*a.length)];return s}
-function getName(){name=clean($('#nm').value)||'Gracz'+Math.floor(Math.random()*90+10);return name}
+function getName(){let n='';try{n=clean(window.__tttNick&&window.__tttNick()||'').slice(0,16)}catch(e){}name=n||'Gracz'+Math.floor(Math.random()*90+10);return name}
 function emitState(){if(room&&isHost){if(!S.X)S.X=me();room.emit('state',S).catch(()=>{})}render()}
 /* ---------- widok ---------- */
 const MX='<svg class="m X" viewBox="0 0 100 100"><path pathLength="1" d="M24 24L76 76"/><path pathLength="1" d="M76 24L24 76"/></svg>',MO='<svg class="m O" viewBox="0 0 100 100"><circle pathLength="1" cx="50" cy="50" r="30"/></svg>';
@@ -198,8 +195,8 @@ async function join(){if(!R)return;err('');const c=($('#jc').value||'').trim().t
  const hi=()=>room&&room.emit('hello',{name}).catch(()=>{});hi();
  timer=setInterval(()=>{if(got)return;if(++tries>=5){clearInterval(timer);cleanup();err('Nie znaleziono pokoju o tym kodzie.');$('#jn').disabled=false;return}hi()},1800)}
 function leave(){cleanup();show('menu');$('#jn').disabled=!R;err('')}
-$('#sz').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;size=+b.dataset.s;[...$('#sz').children].forEach(x=>x.classList.toggle('on',x===b))};
-$('#mk').onclick=create;$('#jn').onclick=join;$('#bot').onclick=()=>startLocal('bot');$('#loc').onclick=()=>startLocal('local');$('#lv').onclick=leave;$('#gl').onclick=leave;
+$('#sz').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;size=+b.dataset.s;[...$('#sz').children].forEach(x=>x.classList.toggle('on',x===b));create()};
+$('#mk').onclick=()=>{const p=$('#msCreatePane'),on=p.style.display!=='block';$('#msJoinPane').style.display='none';p.style.display=on?'block':'none';err('')};$('#jn').onclick=join;$('#loc').onclick=()=>{size=3;startLocal('local')};$('#lv').onclick=leave;$('#gl').onclick=leave;
 $('#jc').addEventListener('keydown',e=>{if(e.key==='Enter')join()});
 $('#cb').onclick=()=>{try{navigator.clipboard.writeText(code.toUpperCase()).then(()=>{$('#cp').textContent='Skopiowano! ✓'},()=>{})}catch(e){}};
 $('#again').onclick=()=>{if(mode!=='online'||isHost){reset(S);if(mode==='online')emitState();else{render();if(mode==='bot'&&S.turn==='O')setTimeout(botMove,600)}}else room.emit('rematch',{}).catch(()=>{})};
@@ -210,7 +207,7 @@ $('#bd').addEventListener('click',e=>{const el=e.target.closest('.c');if(!el||!S
  if(isHost){if(applyMove(S,i,ms))emitState()}else room.emit('move',{i}).catch(()=>{})});
 (async()=>{try{R=window.claude&&claude.use?await claude.use('room'):null}catch(e){R=null}
  if(R){$('#mk').disabled=false;$('#jn').disabled=false;$('#mpn').textContent='Gra online: utwórz pokój i podaj kod znajomemu. Wyniki zapisują się w statystykach zalogowanego konta.'}else $('#mpn').textContent='Tryb online niedostępny (brak połączenia z Firebase). Tryby z komputerem i lokalny działają.';
- try{const n=window.__tttNick&&window.__tttNick();if(n&&!$('#nm').value){$('#nm').value=n.slice(0,16);$('#nm').dispatchEvent(new Event('input'))}}catch(e){}})();
+ })();
 window.__tttLeave=leave;
 })();
 </script>
@@ -221,8 +218,16 @@ window.__tttLeave=leave;
     el.dataset.t.split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i+(el.className==='ms-l2'?5:0));b.textContent=c==' '?'\u00a0':c;el.appendChild(b)})});
   var em=['✕','○','✕','○','🤖','👥','✕','○','🏆','✕','○','✕'];
   document.querySelectorAll('.ms-bg').forEach(function(bg){em.forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.className=e==='✕'?'x':e==='○'?'o':'';s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})});
+  /* jedyny przycisk „Menu główne” w lobby (jak w Monopoly) – klik w pasek strony głównej, w której siedzi ta ramka */
+  document.getElementById('msBack').onclick=function(){
+    try{
+      var a=window.frameElement;while(a&&!a.querySelector('.gmenu'))a=a.parentElement;
+      var g=(a&&a.querySelector('.gmenu'))||parent.document.querySelector('.gmenu');if(g){g.click();return}
+    }catch(e){}
+    try{parent.postMessage({type:'gmenu-back'},'*')}catch(e){}
+  };
   var jp=document.getElementById('msJoinPane');
-  document.getElementById('msJoinBtn').onclick=function(){var on=jp.style.display!=='block';jp.style.display=on?'block':'none';if(on)setTimeout(function(){document.getElementById('jc').focus()},60)};
+  document.getElementById('msJoinBtn').onclick=function(){var on=jp.style.display!=='block';document.getElementById('msCreatePane').style.display='none';jp.style.display=on?'block':'none';if(on)setTimeout(function(){document.getElementById('jc').focus()},60)};
   document.getElementById('jc').addEventListener('keydown',function(e){if(e.key==='Enter'){var j=document.getElementById('jn');if(!j.disabled)j.click()}});
 })();
 </script>
