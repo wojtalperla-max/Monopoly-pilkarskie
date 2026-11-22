@@ -1376,6 +1376,7 @@ async function replayAttack(B,ev,old){
     else if(ev.m){fzWindup(att,def,!!ev.k);await sleep(ev.k?120:200);if(!live())return}
     if(ev.m)await fzStrike(att,def,!!ev.h,!!ev.c,!!ev.f);else if(ev.h)fzImpact(att,def,{crit:!!ev.c,melee:false});
     if(!live())return;
+    if(!ev.h)B.fl.push({ci:def.cell,text:'pudło',col:'#cfd8e3',t0:performance.now()});
     if(ev.dead&&ghost){const g=fzGeo(att,def);fzGhost(def,B,Math.atan2(g.uy,g.ux))}
   }catch(e){}
   finally{if(ghost)B.units=B.units.filter(u=>u!==ghost);if(live()){B.ver++;fzRedraw()}}
