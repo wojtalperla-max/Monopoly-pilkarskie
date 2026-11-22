@@ -37,13 +37,15 @@
   <div class="st-tiles" aria-hidden="true"><i>💬</i><i>🌶</i><i>🔥</i><i>⚡</i></div>
   <p class="st-sub">Gra imprezowa 18+ · odwaga mile widziana</p>
 
-  <div class="st-panel">
-   <label class="st-lab" for="stInp">Kto gra?</label>
-   <div class="st-add"><input id="stInp" maxlength="16" placeholder="Imię gracza…" autocomplete="off"><button id="stAdd" type="button">Dodaj</button></div>
-   <div class="st-chips" id="stChips"></div>
+  <button class="st-go" id="stGo" type="button">🔥 Zaczynamy</button>
+  <button class="st-link" id="stRulesBtn" type="button">📜 Jak grać?</button>
+  <div class="st-rules" id="stRules">
+   <p>Wybierz Prawdę albo Wyzwanie. Karta się odwraca i masz pytanie albo zadanie do wykonania.</p>
+   <p>Dodaj graczy, a gra sama pokaże, czyja kolej. Poziom ostrości możesz zmienić w każdej chwili.</p>
+   <p>Nie chcesz odpowiadać? Pijesz łyk i losujesz inną kartę. Szanuj granice innych.</p>
   </div>
 
-  <div class="st-panel">
+  <div class="st-panel" id="stHeatPane">
    <span class="st-lab" id="stHeatLab">Jak ostro?</span>
    <div class="st-heat" id="stHeat" role="radiogroup" aria-labelledby="stHeatLab">
     <button type="button" role="radio" data-l="1"><i>🌶</i>Lekko</button>
@@ -52,13 +54,6 @@
    </div>
   </div>
 
-  <button class="st-go" id="stGo" type="button">🔥 Zaczynamy</button>
-  <div class="st-rules" id="stRules">
-   <p>Wybierz Prawdę albo Wyzwanie. Karta się odwraca i masz pytanie albo zadanie do wykonania.</p>
-   <p>Dodaj graczy, a gra sama pokaże, czyja kolej. Poziom ostrości możesz zmienić w każdej chwili.</p>
-   <p>Nie chcesz odpowiadać? Pijesz łyk i losujesz inną kartę. Szanuj granice innych.</p>
-  </div>
-  <button class="st-link" id="stRulesBtn" type="button">📜 Jak grać?</button>
   <p class="st-note">Pij odpowiedzialnie. 💜</p>
  </div>
 </section>
@@ -190,20 +185,6 @@ foot();
   const bg=document.querySelector('.st-bg'),em=['🔥','💬','⚡','🌶','💋','🎲','😈','💜','🔥','⚡','💬','🌶'];
   em.forEach((e,i)=>{const s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)});
   [['stR1','PRAWDA',0],['stR2','WYZWANIE',6]].forEach(([id,t,o])=>{const r=$(id);t.split('').forEach((c,i)=>{const e=document.createElement('b');e.style.setProperty('--i',i+o);e.textContent=c;r.appendChild(e)})});
-  const chips=$('stChips');
-  function renderChips(){
-    chips.innerHTML='';
-    if(!players.length){const h=document.createElement('span');h.className='st-hint';h.textContent='Możesz grać bez imion. Dodasz je też w trakcie gry.';chips.append(h);return}
-    players.forEach((n,i)=>{
-      const c=document.createElement('span');c.className='st-chip';c.append(n);
-      const x=document.createElement('button');x.type='button';x.textContent='✕';x.setAttribute('aria-label','Usuń gracza '+n);
-      x.onclick=()=>{players.splice(i,1);pi=0;renderChips()};
-      c.append(x);chips.append(c);
-    });
-  }
-  function addP(){const v=$('stInp').value.trim();if(!v)return;players.push(v);$('stInp').value='';renderChips();$('stInp').focus()}
-  $('stAdd').onclick=addP;
-  $('stInp').onkeydown=e=>{if(e.key==='Enter')addP()};
   function setLvl(n){
     lvl=n;
     document.querySelectorAll('#stHeat button,#lv button').forEach(b=>{
@@ -211,14 +192,17 @@ foot();
   }
   document.querySelectorAll('#stHeat button,#lv button').forEach(b=>b.onclick=()=>setLvl(+b.dataset.l));
   $('stRulesBtn').onclick=()=>$('stRules').classList.toggle('on');
-  $('stGo').onclick=()=>{
-    document.body.classList.remove('menu');
+  function startGame(){
+    document.body.classList.remove('menu');$('stHeatPane').classList.remove('on');
     $('card').classList.remove('flip');flipped=false;
     pi=players.length?players.length-1:0;
     who();window.scrollTo(0,0);
-  };
-  $('toMenu').onclick=()=>{document.body.classList.add('menu');renderChips()};
-  setLvl(lvl);renderChips();
+  }
+  $('stGo').onclick=()=>{const p=$('stHeatPane');p.classList.add('on');setTimeout(()=>p.scrollIntoView({behavior:'smooth',block:'nearest'}),60)};
+  document.querySelectorAll('#stHeat button').forEach(b=>b.onclick=()=>{setLvl(+b.dataset.l);startGame()});
+
+  $('toMenu').onclick=()=>{document.body.classList.add('menu');$('stHeatPane').classList.remove('on')};
+  setLvl(lvl);
 })();
 </script>
 </body>
