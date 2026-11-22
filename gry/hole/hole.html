@@ -22,30 +22,26 @@
 <canvas id="c"></canvas><div id="hud"></div><div id="tm"></div><div id="rb"></div><button id="mb" title="Wycisz / włącz dźwięk (M)">🔊</button>
 <div id="menu">
 <div class="hm-bg" aria-hidden="true" id="hmBg"></div>
+<button class="hm-back" id="hmBack">← Menu główne</button>
 <div class="hm-wrap">
   <div class="hm-logo" role="img" aria-label="Hole Arena">
     <div class="hm-row" id="hmR1"></div>
-    <div class="hm-row" id="hmR2"></div>
   </div>
-  <div class="hm-tiles" aria-hidden="true"><i style="--c:#ef476f"></i><i style="--c:#06d6a0"></i><i style="--c:#ffb703"></i><i style="--c:#4cc9f0"></i></div>
   <p class="hm-sub">Pochłaniaj wszystko, rośnij i zjedz rywali!</p>
-  <div class="hm-pane">
-    <label for="nick">Twój nick</label>
-    <input id="nick" placeholder="Twój nick" maxlength="14" autocomplete="off">
-    <div id="cols" aria-label="Kolor dziury"></div>
-    <div id="who"></div>
+  <div class="hm-main">
+    <button id="showHost" class="hm-btn hm-gold"><span class="hm-ic">🕳️</span><span>Utwórz pokój</span></button>
+    <button id="showJoin" class="hm-btn hm-white"><span class="hm-ic">🚪</span><span>Dołącz do znajomego</span></button>
   </div>
-  <button id="solo" class="hm-btn hm-gold"><span class="hm-ic">🤖</span><span>Graj z botami</span></button>
-  <div class="hm-or">albo graj online</div>
-  <div class="hm-pane">
+  <div id="hostArea" class="hm-pane">
     <div class="hm-bots"><label for="nb">Boty w pokoju:</label><select id="nb" class="hm-select"><option>0</option><option>1</option><option selected>2</option><option>3</option><option>4</option></select></div>
-    <button id="host" class="hm-btn hm-white"><span class="hm-ic">🕳️</span><span>Stwórz pokój</span></button>
-    <label for="code">Kod pokoju</label>
-    <input id="code" class="hm-code" placeholder="KOD" maxlength="4" autocomplete="off">
-    <button id="join" class="hm-btn hm-white"><span class="hm-ic">🚪</span><span>Dołącz</span></button>
+    <button id="host" class="hm-btn hm-gold"><span class="hm-ic">🕳️</span><span>Stwórz pokój</span></button>
   </div>
-  <div id="mm"></div>
-  <small>Pochłaniaj obiekty mniejsze od dziury. Większe dziury zjadają mniejsze! Runda trwa 3 minuty, wygrywa najwyższy wynik. Klawisz M wycisza dźwięk.</small>
+  <div id="joinArea" class="hm-pane"><label for="code">Kod pokoju od znajomego</label>
+    <div class="hm-join"><input id="code" maxlength="4" placeholder="KOD" autocomplete="off"><button id="join" class="hm-btn hm-green">Dołącz</button></div>
+  </div>
+  <div id="mm" role="alert"></div>
+  <button id="solo" class="hm-btn hm-ghost"><span class="hm-ic">🤖</span><span>Gra z botami</span></button>
+  <div id="who"></div>
 </div></div>
 <script>
 /* ===== most do index.html (Firebase: pokoje online, nick i kolor z konta, statystyki) ===== */
@@ -238,20 +234,16 @@ function draw(){
  requestAnimationFrame(draw)}
 /* ===== MENU: nick i kolor z konta, pokoje ===== */
 let accNick='',accCol='';
-function paintCols(){const b=$('cols');b.innerHTML='';
- if(accCol){const x=document.createElement('button');x.className='on lock';x.style.background=accCol;x.title='Kolor z Twojego konta';b.appendChild(x);return}
- PAL.forEach(c=>{const x=document.createElement('button');x.style.background=c;if(c===myCol)x.className='on';x.title=c;
-  x.onclick=()=>{myCol=c;try{localStorage.setItem('ho_col',c)}catch(e){}paintCols()};b.appendChild(x)})}
 function initPrefs(){
  let n='',c='';try{n=B&&B.nick&&B.nick()||'';c=B&&B.col&&B.col()||''}catch(e){}
  accNick=n;accCol=HEX.test(c)?c.toLowerCase():'';
- if(n){nick=cleanN(n)||'Gracz';$('nick').value=nick;$('nick').readOnly=true;$('nick').title='Nick z Twojego konta'}
- else{$('nick').readOnly=false;let v='';try{v=cleanN(localStorage.getItem('ho_nick'))}catch(e){}nick=v||'Gracz';$('nick').value=v}
+ if(n)nick=cleanN(n)||'Gracz';else{let v='';try{v=cleanN(localStorage.getItem('ho_nick'))}catch(e){}nick=v||'Gracz'}
  if(accCol)myCol=accCol;else{let v='';try{v=localStorage.getItem('ho_col')}catch(e){}myCol=HEX.test(v||'')?v.toLowerCase():PAL[0]}
- paintCols();
- $('who').textContent=!NET?'Pokoje online są niedostępne (brak połączenia z Firebase) – zagraj z botami.':n?'Grasz jako '+nick+' – wyniki z pokoi (min. 2 graczy) trafią do Twoich statystyk.':'Zaloguj się na konto, aby nick, kolor i statystyki były z Twojego profilu.';
- if(!NET)$('host').disabled=$('join').disabled=true}
-$('nick').addEventListener('input',e=>{if(e.target.readOnly)return;nick=cleanN(e.target.value)||'Gracz';try{localStorage.setItem('ho_nick',cleanN(e.target.value))}catch(x){}});
+  $('who').textContent=!NET?'Pokoje online są niedostępne (brak połączenia z Firebase). Możesz zagrać z botami.':n?'':'';
+ if(!NET)$('host').disabled=$('join').disabled=$('showHost').disabled=$('showJoin').disabled=true}
+const showP=(id,on)=>$(id).style.display=on?'block':'none';
+$('showHost').onclick=()=>{showP('joinArea',false);showP('hostArea',$('hostArea').style.display!=='block');$('mm').textContent=''};
+$('showJoin').onclick=()=>{showP('hostArea',false);const o=$('joinArea').style.display==='block';showP('joinArea',!o);$('mm').textContent='';if(!o)setTimeout(()=>$('code').focus(),60)};
 $('nb').onchange=()=>botsN=+$('nb').value||0;
 $('solo').onclick=()=>startHost(false);
 $('host').onclick=()=>{botsN=+$('nb').value||0;startHost(true)};
@@ -266,7 +258,13 @@ window.__holeLeave=function(){
 window.__holeRefresh=function(){if(!running)initPrefs()};
 initPrefs();
 </script><script>
-(function(){[['hmR1','HOLE',0],['hmR2','ARENA',4]].forEach(function(x){var r=document.getElementById(x[0]);x[1].split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i+x[2]);b.textContent=c;r.appendChild(b)})});
-var bg=document.getElementById('hmBg');['🕳️','🍎','🚗','🌳','🏠','⭐','🕳️','🎈','🚲','🌳','🍎','🕳️'].forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})})();
+(function(){[['hmR1','HOLE ARENA',0]].forEach(function(x){var r=document.getElementById(x[0]);x[1].split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i+x[2]);b.textContent=c===' '?'\u00a0':c;r.appendChild(b)})});
+var bg=document.getElementById('hmBg'),CL=['#ef476f','#06d6a0','#ffb703','#4cc9f0','#a77bff','#ff8a3d'];
+for(var i=0;i<14;i++){var s=document.createElement('span');s.className='hm-hole';var z=36+((i*37)%70);
+s.style.cssText='--c:'+CL[i%CL.length]+';--z:'+z+'px;left:'+((i*7.3+2)%94)+'%;animation-duration:'+(15+(i*5)%12)+'s,'+(3+(i%4))+'s;animation-delay:-'+((i*3.1)%15)+'s,-'+(i%3)+'s';bg.appendChild(s)}
+document.getElementById('hmBack').onclick=function(){var d=null;try{d=window.parent.document}catch(e){}
+ var b=d&&(d.querySelector('#hole .gmenu')||d.querySelector('[id*="hole" i] .gmenu')||d.querySelector('.gmenu'));
+ if(b)b.click();else location.reload()};
+})();
 </script>
 </body></html>
