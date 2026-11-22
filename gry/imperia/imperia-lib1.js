@@ -1362,6 +1362,8 @@ function adoptState(ns){const B=FZ&&FZ.battle;
 function syncBattleFrom(B,R){if(B.busy||B.aiRun)return;const now=performance.now(),old=new Map(B.units.map(u=>[u.id,u]));
   R.units.forEach(n=>{const o=old.get(n.id);if(!o)return;if(o.cell!==n.cell)n.anim={from:o.cell,t0:now,dur:240};if(n.hp<o.hp)B.fl.push({ci:n.cell,text:'−'+(o.hp-n.hp),col:'#ff6b5e',t0:now})});
   old.forEach((o,id)=>{if(!R.units.some(n=>n.id===id))B.fl.push({ci:o.cell,text:'✖',col:'#ffd34d',t0:now})});
+  /* pudło: nie zmienia HP, więc napis dodajemy z samego zdarzenia ataku – tak jak widzi go atakujący */
+  if(R.ev&&R.ev.n>(B.evn||0)&&!R.ev.h){const dn_=R.units.find(u=>u.id===R.ev.d)||old.get(R.ev.d);if(dn_)B.fl.push({ci:dn_.cell,text:'pudło',col:'#cfd8e3',t0:now})}
   ['units','round','turnSide','phase','win','retreat','log','ack','nid','sv','ev'].forEach(k=>B[k]=R[k]);B.sel=null;B.ver++;needBR=true;
   if(R.ev&&R.ev.n>(B.evn||0)){B.evn=R.ev.n;replayAttack(B,R.ev,old)}}
 /* animacja ataku przeciwnika widziana u drugiego gracza online */
@@ -1376,7 +1378,6 @@ async function replayAttack(B,ev,old){
     else if(ev.m){fzWindup(att,def,!!ev.k);await sleep(ev.k?120:200);if(!live())return}
     if(ev.m)await fzStrike(att,def,!!ev.h,!!ev.c,!!ev.f);else if(ev.h)fzImpact(att,def,{crit:!!ev.c,melee:false});
     if(!live())return;
-    if(!ev.h)B.fl.push({ci:def.cell,text:'pudło',col:'#cfd8e3',t0:performance.now()});
     if(ev.dead&&ghost){const g=fzGeo(att,def);fzGhost(def,B,Math.atan2(g.uy,g.ux))}
   }catch(e){}
   finally{if(ghost)B.units=B.units.filter(u=>u!==ghost);if(live()){B.ver++;fzRedraw()}}
