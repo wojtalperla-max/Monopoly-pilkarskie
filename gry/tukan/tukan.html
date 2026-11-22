@@ -21,14 +21,18 @@
 </head><body>
 <div id="tkStart" role="dialog" aria-label="Tukan – ekran startowy">
   <div class="tk-bg" aria-hidden="true" id="tkBg"></div>
+  <button class="tk-back" id="tkBack">← Menu główne</button>
   <div class="tk-wrap">
     <div class="tk-logo" role="img" aria-label="Tukan" id="tkLogo"></div>
     <div class="tk-bird" aria-hidden="true">🦜</div>
     <p class="tk-sub">Odkryj wyspę. Zbierz symbole. Wyprzedź znajomych.</p>
     <div class="tk-main">
-      <button id="tkSolo" class="tk-btn tk-gold"><span class="tk-ic">🌴</span><span>Graj solo</span></button>
-      <button id="tkOnline" class="tk-btn tk-white"><span class="tk-ic">🚪</span><span>Pokój online</span></button>
+      <button id="tkCreate" class="tk-btn tk-gold"><span class="tk-ic">🏠</span><span>Utwórz pokój</span></button>
+      <button id="tkJoinBtn" class="tk-btn tk-white"><span class="tk-ic">🚪</span><span>Dołącz do znajomego</span></button>
     </div>
+    <div id="tkJoinArea" class="tk-pane"><label for="tkCode"><b>Kod pokoju od znajomego</b></label>
+      <div class="tk-join"><input id="tkCode" maxlength="5" placeholder="A8K2Q" autocomplete="off"><button id="tkJoin" class="tk-btn tk-green">Dołącz</button></div></div>
+    <button id="tkLocal" class="tk-local">🎲 Gra lokalnie na jednym urządzeniu</button>
     <div class="tk-note" id="tkNote"></div>
   </div>
 </div>
@@ -282,11 +286,21 @@ startGame(randCode());
   em.forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)});
   function hide(){if(st.classList.contains('out'))return;st.classList.add('out');setTimeout(function(){st.style.display='none'},500)}
   window.tukanStartHide=hide;
-  document.getElementById('tkSolo').onclick=hide;
+  document.getElementById('tkLocal').onclick=hide;
+  /* jedyny przycisk „Menu główne” w lobby (jak w Monopoly) – klik w pasek rodzica, który jest wtedy ukryty */
+  document.getElementById('tkBack').onclick=function(){
+    try{var g=parent.document.querySelector('#tukan .gmenu')||parent.document.querySelector('.gmenu');if(g){g.click();return}}catch(e){}
+    try{parent.postMessage({type:'gmenu-back'},'*')}catch(e){}
+  };
   var inFrame=false;try{inFrame=parent!==window}catch(e){inFrame=true}
-  var ob=document.getElementById('tkOnline');
-  if(!inFrame){ob.disabled=true;document.getElementById('tkNote').textContent='Pokoje online działają po wgraniu gry na hosting z Firebase.'}
-  ob.onclick=function(){try{parent.postMessage({isla:1,type:'lobby'},'*')}catch(e){}hide()};
+  var $=function(i){return document.getElementById(i)},ja=$('tkJoinArea');
+  function post(o){try{parent.postMessage(Object.assign({isla:1,type:'lobby'},o),'*')}catch(e){}}
+  if(!inFrame){['tkCreate','tkJoinBtn','tkJoin'].forEach(function(i){$(i).disabled=true});$('tkNote').textContent='Pokoje online działają po wgraniu gry na hosting z Firebase.'}
+  $('tkCreate').onclick=function(){ja.style.display='none';post({action:'create'});hide()};
+  $('tkJoinBtn').onclick=function(){var o=ja.style.display==='block';ja.style.display=o?'none':'block';if(!o)setTimeout(function(){$('tkCode').focus()},60)};
+  function join(){var c=$('tkCode').value.trim().toUpperCase();if(!c){$('tkNote').textContent='Wpisz kod pokoju.';return}post({action:'join',code:c});hide()}
+  $('tkJoin').onclick=join;
+  $('tkCode').addEventListener('keydown',function(e){if(e.key==='Enter')join()});
   /* gdy rodzic włączy tryb pokoju / wystartuje partię – schowaj ekran startowy */
   addEventListener('message',function(e){if(e.source!==parent)return;var d=e.data;if(d&&d.islaCmd&&(d.cmd==='lock'||d.cmd==='start'))hide()});
 })();
