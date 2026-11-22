@@ -114,7 +114,7 @@ const KJ_N=24;
 const kjEmpty=()=>Array.from({length:KJ_N},()=>({n:'',i:''}));
 const kjImgOk=s=>typeof s==='string'&&s.length<60000&&/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(s);
 function kjFixIcons(a){const r=kjEmpty();if(Array.isArray(a))for(let k=0;k<KJ_N;k++){const x=a[k]||{};r[k]={n:String(x.n||'').replace(/[<>&]/g,'').slice(0,24),i:kjImgOk(x.i)?x.i:''}}return r}
-let KJ={screen:'start',ref:null,listener:null,code:'',host:null,players:[],status:null,lastStatus:null,msg:'',ok:'',nick:'',col:'',anim:{},joinCode:'',themeId:'default',roomTheme:'default',themes:{},tRef:null,tListener:null,board:null,picks:{},cover:{},game:null,selPick:null,guessing:false,guessSel:null,draft:'',promoting:false,edit:null,busy:false,seenId:null};
+let KJ={screen:'start',ref:null,listener:null,code:'',host:null,players:[],status:null,lastStatus:null,msg:'',ok:'',nick:'',col:'',anim:{},joinCode:'',pane:'',themeId:'default',roomTheme:'default',themes:{},tRef:null,tListener:null,board:null,picks:{},cover:{},game:null,selPick:null,guessing:false,guessSel:null,draft:'',promoting:false,edit:null,busy:false,seenId:null};
 const kjNet=()=>typeof fbDB!=='undefined'&&!!fbDB&&typeof onlineEnsureAuth==='function';
 const kjMe=()=>KJ.players.findIndex(p=>p.id===(typeof onlinePlayerId!=='undefined'?onlinePlayerId:null));
 const kjHex=c=>/^#[0-9a-f]{6}$/i.test(c||'')?c:'';
@@ -240,17 +240,21 @@ function kjClickDo(i){
   }
 }
 /* ---------- start / lobby ---------- */
+function kjPane(){KJ.pane=KJ.pane==='join'?'':'join';kjRefresh();if(KJ.pane==='join')setTimeout(()=>{const e=document.getElementById('kjjoin');if(e)e.focus()},60)}
+/* jedyny przycisk „Menu główne” w lobby (jak w Monopoly) – klik w pasek rodzica, który jest wtedy ukryty */
+function kjHub(){
+  try{const g=parent.document.querySelector('#kim .gmenu')||parent.document.querySelector('.gmenu');if(g){g.click();return}}catch(e){}
+  try{parent.postMessage({type:'gmenu-back'},'*')}catch(e){}
+}
 function kjStartHTML(m){
-  const net=kjNet(),T=kjThemeList(),ids=kjThemeIds(),last=kjLastGet();
+  const net=kjNet(),last=kjLastGet(),pn=KJ.pane||'';
+  const join=pn==='join'?`<div class="ob-pane ob-center"><label for="kjjoin">Kod pokoju od znajomego</label><input id="kjjoin" class="cd" maxlength="5" placeholder="A8K2Q" autocomplete="off" value="${lgEsc(KJ.joinCode||'')}" oninput="KJ.joinCode=this.value" onkeydown="if(event.key==='Enter')kjJoin()">
+    ${obBtn('Dołącz','🚪','kjJoin()','gold',!net)}</div>`:'';
   return obShell({key:'kj-start',host:'#kj',theme:'kj',words:['KIM','JESTEM?'],tiles:['🕵️','👤','❓','🔍'],sub:'Zgadnij, kim jest postać przeciwnika.',msg:m,
-  body:`<div class="ob-pane"><label for="kjnick">Twój nick</label><input id="kjnick" maxlength="14" autocomplete="off" value="${lgEsc(KJ.nick||kjNickVal())}" oninput="KJ.nick=this.value">
-    <div class="ob-opt"><span>Kolor pionka</span><input id="kjcol" type="color" value="${lgEsc(kjColor())}" oninput="KJ.col=this.value"></div>
-    <label for="kjtheme">Motyw</label><select id="kjtheme" onchange="KJ.themeId=this.value">${ids.map(id=>`<option value="${lgEsc(id)}" ${id===KJ.themeId?'selected':''}>${lgEsc(T[id].name)}</option>`).join('')}</select>
-    ${net&&last&&!KJ.ref?obBtn('Wróć do ostatniej gry ('+lgEsc(last)+')','↩',"kjResume('"+lgEsc(last)+"')",'white','','ob-sm')+'<div style="height:12px"></div>':''}
-    ${obBtn('Stwórz pokój','🎲','kjCreate()','gold',!net)}</div>
-  <div class="ob-or">albo</div>
-  <div class="ob-pane"><label for="kjjoin">Kod pokoju</label><input id="kjjoin" class="cd" maxlength="5" placeholder="KOD" autocomplete="off" value="${lgEsc(KJ.joinCode||'')}" oninput="KJ.joinCode=this.value">
-    ${obBtn('Dołącz do pokoju','🚪','kjJoin()','white',!net)}</div>
+  back:{label:'← Menu główne',onclick:'kjHub()'},
+  body:`${obBtn('Utwórz pokój','🏠','kjCreate()','gold',!net)}${obBtn('Dołącz do znajomego','🚪','kjPane()','white',!net)}
+  ${join}
+  ${net&&last&&!KJ.ref?obBtn('Wróć do ostatniej gry ('+lgEsc(last)+')','↩',"kjResume('"+lgEsc(last)+"')",'white','','ob-sm'):''}
   ${kjIsAdmin()?obBtn('Motywy (admin)','🎨','kjThemesOpen()','ghost',false,'ob-sm'):''}
   ${net?'':'<p class="ob-net">Kim jestem? wymaga pokoju online. Działa po wgraniu gry na własny hosting z Firebase.</p>'}
   ${obRules('<p>Gra dla dwóch osób. Każdy w tajemnicy wybiera jedną postać z planszy 6×4. W swojej turze zadajesz przeciwnikowi pytanie, na które odpowie <b>tak</b> albo <b>nie</b> (np. „Czy jestem mężczyzną?”), a potem zakrywasz ikony, które nie pasują. Gdy wiesz, kim jest przeciwnik, kliknij „Zgaduję!” i wskaż postać. Trafisz — wygrywasz. Pomylisz się — ikona zostaje zakryta, a kolej przechodzi na przeciwnika. Cały czas widzisz obie plansze: swoją i przeciwnika.</p>')}`});
