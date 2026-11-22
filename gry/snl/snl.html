@@ -33,20 +33,14 @@
     <div class="sn-deco" aria-hidden="true"><i>🐍</i><i>🎲</i><i><img src="1fa9c.png" width=60 height=60></i></div>
     <div class="sn-logo" role="img" aria-label="Węże i Drabiny"><div class="sn-l1" data-t="WĘŻE"></div><div class="sn-l2" data-t="I DRABINY"></div></div>
     <p class="sn-sub">Zagraj ze znajomymi online – stwórz pokój i wyślij im kod!</p>
-    <div class="sn-panel">
-      <label for="nm">Twoje imię</label>
-      <input id="nm" maxlength="14" placeholder="np. Kasia" autocomplete="off">
-      <label for="pc">Twój kolor pionka</label>
-      <input id="pc" type="color" value="#2a9df4">
-    </div>
     <div class="sn-main">
-      <button class="sn-btn sn-gold" id="mk"><span class="sn-ic">✨</span><span>Utwórz pokój</span></button>
+      <button class="sn-btn sn-gold" id="mk"><span class="sn-ic">🏠</span><span>Utwórz pokój</span></button>
       <button class="sn-btn sn-white" id="snJoinBtn" type="button"><span class="sn-ic">🚪</span><span>Dołącz do znajomego</span></button>
     </div>
     <div id="snJoinPane" class="sn-pane"><label for="cd" style="text-align:center">Kod pokoju od znajomego</label>
       <div class="sn-join"><input id="cd" maxlength="5" placeholder="ABCDE" autocomplete="off" style="text-transform:uppercase"><button class="sn-btn sn-green" id="jn">Dołącz</button></div></div>
+    <button class="sn-local" id="lc" type="button">🎲 Gra lokalnie na jednym urządzeniu</button>
     <div class="err sn-err" id="herr" role="alert"></div>
-    <button class="sn-link" id="lc">👥 Gra lokalna (jedno urządzenie)</button>
   </div>
 </section>
 
@@ -54,17 +48,16 @@
   <div class="sn-bg" aria-hidden="true"></div>
   <div class="sn-wrap">
     <div class="sn-deco" aria-hidden="true"><i>🐍</i><i>🎲</i><i>🪜</i></div>
-    <div class="sn-logo" role="img" aria-label="Poczekalnia"><div class="sn-l1" data-t="POKÓJ"></div></div>
-    <p class="sn-sub">Przekaż znajomym kod. Mogą grać do 4 osób.</p>
+    <div class="sn-logo" role="img" aria-label="Pokój"><div class="sn-l1" data-t="POKÓJ"></div></div>
     <div class="sn-lobby">
-      <span class="sn-badge">🎲 Poczekalnia</span>
-      <label style="display:block;margin-top:12px;text-align:center">Kod pokoju</label>
-      <div class="code" id="lcode">-----</div>
-      <button class="sn-btn sn-ghost" id="cp">📋 Kopiuj kod</button>
-      <div id="plist" style="margin:14px 0"></div>
-      <button class="sn-btn sn-gold" id="st">▶ Start gry</button>
+      <span class="sn-badge">⏳ Poczekalnia</span>
+      <div id="lobTxt" class="sn-lt">Podaj ten kod znajomym (do 4 osób)</div>
+      <div class="code" id="lcode"></div>
+      <div class="sn-wait" id="lwait"><span id="lwtxt">Czekam na graczy</span><span class="dots"></span></div>
+      <div id="plist"></div>
+      <div class="row"><button class="sn-btn sn-gold" id="cp">KOPIUJ KOD</button><button class="sn-btn sn-ghost" id="lv">ANULUJ</button></div>
+      <button class="sn-btn sn-white" id="st">▶ Start gry</button>
       <div class="err sn-err" id="lerr" role="alert"></div>
-      <button class="sn-link" id="lv">← Wyjdź</button>
     </div>
   </div>
 </section>
@@ -217,7 +210,9 @@ function onMsg(m){const d=m.data;if(!d)return;
   else if(d.t==='s'&&d.s)apply(d.s,!!d.sync)}
 function plist(){return room.peers().filter(p=>p.presence&&p.presence.n).sort((a,b)=>(b.presence.h?1:0)-(a.presence.h?1:0)||(a.presence.ts-b.presence.ts)||(a.peer<b.peer?-1:1))}
 function renderLobby(){const L=plist();$('#plist').innerHTML=L.map((p,i)=>`<div class="pl" style="border-left:8px solid ${HEX.test(p.presence.c||'')?p.presence.c:COL[i%4]}"><i>${EMO[i]||'🙂'}</i>${esc(p.presence.n)}${p.isMe?' (Ty)':''}<small>${p.presence.h?'👑 gospodarz':'gotowy'}</small></div>`).join('')||'<div class="pl">Łączenie…</div>';
-  $('#st').style.display=isHost?'':'none';$('#st').disabled=L.length<2;$('#st').textContent=L.length<2?'Czekam na graczy…':'▶ Start gry ('+Math.min(L.length,4)+')'}
+  $('#st').style.display=isHost?'':'none';$('#st').disabled=L.length<2;$('#st').textContent='▶ Start gry ('+Math.min(L.length,4)+')';
+  const w=L.length<2?'Czekam na graczy':(isHost?'':'Czekam na start od gospodarza');$('#lwtxt').textContent=w;$('#lwait').style.display=w?'':'none'}
+function setCode(c){$('#lcode').innerHTML=[...c].map(x=>`<b>${x}</b>`).join('')}
 function startGame(){const L=plist().slice(0,4);const m=genMap();send('start',{lad:m.lad,snk:m.snk,gid:Date.now().toString(36)+Math.random().toString(36).slice(2,6),ord:L.map((p,i)=>({id:p.peer,n:p.presence.n,c:HEX.test(p.presence.c||'')?p.presence.c:COL[i]}))})}
 async function connect(host){
   const name=myName();$('#herr').textContent='';
@@ -231,7 +226,7 @@ async function connect(host){
     unsubs=[room.on('g',onMsg),room.onPeers(ch=>{whoAmI();
       if(isHost&&st&&ch.joined.some(p=>!p.isMe))room.emit('g',{t:'s',s:st,sync:true}).catch(()=>{});
       if(!st)renderLobby()})];
-    $('#lcode').textContent=c;show('lobby');renderLobby();$('#lerr').textContent='';
+    setCode(c);$('#lobTxt').textContent=host?'Podaj ten kod znajomym (do 4 osób)':'Dołączyłeś do pokoju';$('#cp').textContent='KOPIUJ KOD';show('lobby');renderLobby();$('#lerr').textContent='';
     if(!host){await sleep(3200);const L=plist();
       if(!L.some(p=>p.presence.h)){$('#lerr').textContent='';leave();$('#herr').textContent='Nie znaleziono pokoju o kodzie '+c+'.';return}
       if(L.length>4&&!L.slice(0,4).some(p=>p.isMe)){leave();$('#herr').textContent='Pokój jest pełny (max 4 graczy).'}}
@@ -241,26 +236,20 @@ function leave(){unsubs.forEach(u=>u());unsubs=[];if(room)room.leave().catch(()=
 
 /* ---------- nick, kolor, statystyki (host: index.html) ---------- */
 const cleanN=v=>String(v||'').replace(/[\u0000-\u001f\u200b-\u200f\u2028-\u202f<>&]/g,'').trim().slice(0,14);
-function myName(){const v=cleanN($('#nm').value);return v||'Gracz'}
-function myCol(){const v=$('#pc').value;return HEX.test(v)?v:'#2a9df4'}
+function myName(){const v=cleanN(window.__snlNick&&window.__snlNick());return v||'Gracz'}
+function myCol(){const v=window.__snlCol&&window.__snlCol();return HEX.test(v||'')?v:'#2a9df4'}
 function recStats(s){
   if(local||!s||!s.win||!s.gid||!whoAmI())return;
   const pl=s.ord.map(p=>({uid:p.id,name:p.n}));
   window.__snlStats&&window.__snlStats(code,s.gid,pl,s.win===myId?'w':'l');
 }
-(function(){const n=window.__snlNick&&window.__snlNick(),c=window.__snlCol&&window.__snlCol();
-  if(n)$('#nm').value=cleanN(n);
-  if(c&&HEX.test(c))$('#pc').value=c;
-  try{const sv=JSON.parse(localStorage.getItem('snl_pref')||'null');if(sv){if(!n&&sv.n)$('#nm').value=cleanN(sv.n);if(!c&&HEX.test(sv.c||''))$('#pc').value=sv.c}}catch(e){}
-  const save=()=>{try{localStorage.setItem('snl_pref',JSON.stringify({n:$('#nm').value,c:$('#pc').value}))}catch(e){}};
-  $('#nm').addEventListener('input',save);$('#pc').addEventListener('input',save);
-})();
+
 window.__snlLeave=function(){try{if(room)leave()}catch(e){}};
 
 /* ---------- wiring ---------- */
 $('#mk').onclick=()=>connect(true);$('#jn').onclick=()=>connect(false);
 $('#lc').onclick=()=>{local=true;isHost=true;st=null;q=Promise.resolve();enter(localState())};
-$('#cp').onclick=async()=>{try{await navigator.clipboard.writeText(code);$('#cp').textContent='✅ Skopiowano!'}catch(e){$('#cp').textContent='Zaznacz kod i skopiuj ręcznie'}setTimeout(()=>$('#cp').textContent='📋 Kopiuj kod',1800)};
+$('#cp').onclick=async()=>{try{await navigator.clipboard.writeText(code);$('#cp').textContent='SKOPIOWANO ✓'}catch(e){$('#cp').textContent='SKOPIUJ RĘCZNIE'}setTimeout(()=>$('#cp').textContent='KOPIUJ KOD',1800)};
 $('#st').onclick=startGame;$('#lv').onclick=leave;$('#rl').onclick=roll;$('#ex').onclick=leave;
 $('#ag').onclick=()=>{$('#win').classList.remove('on');if(local){st=null;enter(localState())}else{q=q.then(()=>{st=null});startGame()}};
 /* powrót do menu głównego (index.html) */
