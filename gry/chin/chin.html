@@ -28,23 +28,21 @@
 
 <section id="home" class="card center">
 <div class="ch-bg" aria-hidden="true" id="chBg"></div>
+<button class="ch-back" id="chBack">← Menu główne</button>
 <div class="ch-wrap">
   <div class="ch-logo" role="img" aria-label="Chińczyk" id="chLogo"></div>
-  <div class="ch-tiles" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
   <p class="ch-sub">Chińczyk dla 2–4 osób. Załóż pokój albo zagraj z botami.</p>
-  <div class="ch-pane">
-    <div class="me"><span class="av" id="mav"></span><input id="nick" maxlength="14" placeholder="Twój nick" autocomplete="off" aria-label="Twój nick"></div>
+  <div class="ch-main">
     <button class="ch-btn ch-gold" id="bC"><span class="ch-ic">🎲</span><span>Utwórz pokój</span></button>
+    <button class="ch-btn ch-white" id="bSJ"><span class="ch-ic">🚪</span><span>Dołącz do znajomego</span></button>
   </div>
-  <div class="ch-or">albo dołącz kodem</div>
-  <div class="ch-pane">
-    <label for="ci">Kod pokoju</label>
-    <input id="ci" class="ch-code" maxlength="4" placeholder="KOD" autocomplete="off">
-    <button class="ch-btn ch-white" id="bJ"><span class="ch-ic">🚪</span><span>Dołącz</span></button>
+  <div id="joinArea" class="ch-pane"><label for="ci">Kod pokoju od znajomego</label>
+    <div class="ch-join"><input id="ci" class="ch-code" maxlength="4" placeholder="KOD" autocomplete="off"><button class="ch-btn ch-green" id="bJ">Dołącz</button></div>
   </div>
   <button class="ch-btn ch-ghost" id="bL"><span class="ch-ic">🤖</span><span>Graj z botami</span></button>
   <p class="ch-hint" id="nt2"></p>
 </div>
+<div class="me" hidden><span class="av" id="mav"></span><input id="nick" readonly tabindex="-1" aria-hidden="true"></div>
 </section>
 
 <section id="lobby" class="card center" hidden></section>
@@ -365,6 +363,7 @@ const au=()=>{if(!AC)try{AC=new(window.AudioContext||window.webkitAudioContext)(
 const mkCode=()=>{const a='ABCDEFGHJKMNPQRSTUVWXYZ';let s='';for(let i=0;i<4;i++)s+=a[Math.floor(Math.random()*a.length)];return s};
 $('#bC').onclick=()=>{au();sfx.ui();joinNet(mkCode(),true)};
 $('#bJ').onclick=()=>{au();sfx.ui();const c=$('#ci').value.trim().toUpperCase();if(!/^[A-Z0-9]{4}$/.test(c)){toast('Kod ma 4 znaki');return}joinNet(c,false)};
+$('#bSJ').onclick=()=>{au();sfx.ui();const p=$('#joinArea'),o=p.style.display==='block';p.style.display=o?'none':'block';if(!o)setTimeout(()=>$('#ci').focus(),60)};
 $('#ci').onkeydown=e=>{if(e.key==='Enter')$('#bJ').click()};
 $('#bL').onclick=()=>{au();sfx.ui();GEN++;ctx={mode:'local'};isHost=true;V={};lastRoll=-1;shw.length=0;boardKey='';S={ph:'lobby',mode:'classic',nb:3,pl:[null,null,null,null],sid:0};rebuildLocal();render()};
 $('#bk').onclick=()=>{sfx.ui();const b=$('#bk');if(b.dataset.ask){clearTimeout(b.t);b.dataset.ask='';b.textContent='←';leave();return}b.dataset.ask='1';b.textContent='Wyjść?';b.t=setTimeout(()=>{b.dataset.ask='';b.textContent='←'},3000)};
@@ -381,16 +380,21 @@ function initPrefs(){
   if(n){me.name=cleanN(n)||'Gracz';$('#nick').readOnly=true;$('#nick').title='Nick z Twojego konta'}
   else{$('#nick').readOnly=false;try{const v=cleanN(localStorage.getItem('ch_nick'));if(v)me.name=v}catch(e){}}
   paintMe();
-  if(!window.__chNet){$('#bC').disabled=$('#bJ').disabled=true;$('#nt2').textContent='Pokoje online są niedostępne (brak połączenia z Firebase) – zagraj z botami.'}
-  else if(n)$('#nt2').textContent='Grasz jako '+me.name+' – wyniki trafią do Twoich statystyk.';
-  else $('#nt2').textContent='Zaloguj się na konto, aby wyniki liczyły się do statystyk.'}
+  if(!window.__chNet){$('#bC').disabled=$('#bJ').disabled=$('#bSJ').disabled=true;$('#nt2').textContent='Pokoje online są niedostępne (brak połączenia z Firebase). Możesz zagrać z botami.'}
+  else $('#nt2').textContent=''}
 $('#nick').addEventListener('input',e=>{if(e.target.readOnly)return;me.name=cleanN(e.target.value)||'Gracz';try{localStorage.setItem('ch_nick',me.name)}catch(x){}paintMe()});
 window.__chLeave=function(){try{if(R||S)leave()}catch(e){}};
 window.__chRefresh=function(){if(!R&&!S)initPrefs()};
 initPrefs();render();
 </script><script>
-(function(){var cols=['#ff6b78','#6fb2ff','#5ee08a','#ffd84a'];
-var lg=document.getElementById('chLogo');'CHIŃCZYK'.split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i);b.style.color=cols[i%4];b.textContent=c;lg.appendChild(b)});
-var bg=document.getElementById('chBg');['🎲','🔴','🔵','🟢','🟡','🎲','🔴','🔵','🟢','🟡','🎲','⭐'].forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})})();
+(function(){
+var lg=document.getElementById('chLogo');'CHIŃCZYK'.split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i);b.textContent=c;lg.appendChild(b)});
+var bg=document.getElementById('chBg'),CL=['#e63946','#2a7de1','#2a9d4f','#f0a202'];
+for(var i=0;i<14;i++){var s=document.createElement('span');s.className='ch-peg';
+ s.style.cssText='--c:'+CL[i%4]+';--z:'+(34+(i*29)%44)+'px;left:'+((i*7.3+2)%94)+'%;animation-duration:'+(15+(i*5)%12)+'s,'+(3+(i%4))+'s;animation-delay:-'+((i*3.1)%15)+'s,-'+(i%3)+'s';bg.appendChild(s)}
+document.getElementById('chBack').onclick=function(){var d=null;try{d=window.parent.document}catch(e){}
+ var q=d&&(d.querySelector('[id*="chin" i] .gmenu')||d.querySelector('.gmenu'));
+ if(q)q.click();else location.reload()};
+})();
 </script>
 </body></html>
