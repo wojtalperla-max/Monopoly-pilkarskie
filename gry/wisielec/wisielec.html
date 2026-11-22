@@ -32,18 +32,13 @@
     <div class="wh-logo" role="img" aria-label="Wisielec" id="whLogo"></div>
     <div class="wh-tiles" aria-hidden="true"><i>H</i><i>A</i><i>S</i><i>Ł</i><i>O</i></div>
     <p class="wh-sub">Zgadujcie hasło razem, przez kod pokoju.</p>
-    <div class="wh-pane">
-      <label for="nick">Twój pseudonim</label>
-      <input id="nick" maxlength="14" placeholder="np. Kuba" autocomplete="off">
-      <button class="wh-btn wh-gold" id="bCreate"><span class="wh-ic">🎲</span><span>Utwórz pokój</span></button>
+    <div class="wh-main">
+      <button class="wh-btn wh-gold" id="bCreate"><span class="wh-ic">🏠</span><span>Utwórz pokój</span></button>
+      <button class="wh-btn wh-white" id="bJoinBtn" type="button"><span class="wh-ic">🚪</span><span>Dołącz do znajomego</span></button>
     </div>
-    <div class="wh-or">albo dołącz do znajomych</div>
-    <div class="wh-pane">
-      <label for="code">Kod pokoju</label>
-      <input id="code" maxlength="5" placeholder="KOD" autocomplete="off">
-      <button class="wh-btn wh-white" id="bJoin"><span class="wh-ic">🚪</span><span>Dołącz</span></button>
-    </div>
-    <button class="wh-btn wh-ghost" id="bSolo"><span class="wh-ic">🧩</span><span>Zagraj solo</span></button>
+    <div id="whJoinPane" class="wh-joinpane"><label for="code">Kod pokoju od znajomego</label>
+      <div class="wh-join"><input id="code" maxlength="5" placeholder="KOD" autocomplete="off"><button class="wh-btn wh-green" id="bJoin"><span>Dołącz</span></button></div></div>
+    <button class="wh-local" id="bSolo" type="button"><span aria-hidden="true">🧩</span> Zagraj solo</button>
     <p class="wh-net" id="net"></p>
   </div>
 </section>
@@ -152,14 +147,11 @@ const cleanN=v=>String(v||'').replace(/[\u0000-\u001f\u200b-\u200f\u2028-\u202f<
 function toast(t){const e=$('#toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),2800)}
 function nick(){
   const an=window.__wisNick&&window.__wisNick(),ac=window.__wisCol&&window.__wisCol();
-  me.name=cleanN(an||$('#nick').value)||'Gracz'+Math.floor(Math.random()*90+10);
+  me.name=cleanN(an)||'Gracz'+Math.floor(Math.random()*90+10);
   me.color=HEX.test(ac||'')?ac.toLowerCase():rndCol;
-  if(!an){try{localStorage.setItem('wis-nick',me.name)}catch(e){}}
 }
 function initPrefs(){
-  const an=window.__wisNick&&window.__wisNick(),el=$('#nick');
-  if(an){el.value=cleanN(an);el.readOnly=true;el.title='Nick z Twojego konta'}
-  else{el.readOnly=false;el.title='';if(!el.value){try{const n=localStorage.getItem('wis-nick');if(n)el.value=cleanN(n)}catch(e){}}}
+  const an=window.__wisNick&&window.__wisNick();
   $('#net').textContent=!netOk()?'Pokoje online są niedostępne (brak połączenia z Firebase). Możesz zagrać solo.':an?'Grasz jako '+cleanN(an)+' – wyniki trafią do Twoich statystyk.':'Zaloguj się na konto, aby nick i kolor pochodziły z konta, a wyniki liczyły się do statystyk.';
 }
 // klawiatura
@@ -252,6 +244,7 @@ async function online(r,c){
 }
 $('#bCreate').onclick=async()=>{const c=newCode();if(await online('host',c)){S={cat:'',tried:[],wrong:0,status:'setup',word:null,round:0,m:[]};publish()}};
 $('#bJoin').onclick=()=>{const c=$('#code').value.trim().toUpperCase();if(c.length<3){toast('Wpisz kod pokoju');return}online('guest',c)};
+$('#bJoinBtn').onclick=()=>{const p=$('#whJoinPane');const on=p.style.display!=='block';p.style.display=on?'block':'none';if(on)setTimeout(()=>$('#code').focus(),60)};
 $('#bSolo').onclick=()=>{nick();role='solo';code='';show(true);randomRound()};
 $('#bLeave').onclick=reset;
 $('#bCopy').onclick=()=>{try{navigator.clipboard.writeText(code).then(()=>toast('Skopiowano kod '+code))}catch(e){toast('Kod: '+code)}};
