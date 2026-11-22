@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@500;600;700&display=swap"><link rel="stylesheet" href="postaw-na-milion.css">
 <script>/* lobby → strona główna (chowanie przycisku „Menu główne” poza lobby) */
 (function(){
-  var sel='.ph-pane';
+  var sel='.ph-screen';
   if(window.parent===window)return;
   function shown(e){
     if(!e)return false;
@@ -540,24 +540,35 @@ function home(){
  const an=accNick(),ac=HEX.test(accCol())?accCol():"";
  const nick=an||S.nm||"";
  const L=(t,o)=>t.split("").map((c,i)=>`<b style="--i:${i+o}">${c}</b>`).join(""),BG=["💰","🎤","⭐","💎","🏆","❓","🪙","💰","⭐","💎","🎤","❓"].map((e,i)=>`<span style="left:${(i*8.7+3)%96}%;animation-duration:${14+(i*5)%11}s;animation-delay:-${(i*3.3)%14}s">${e}</span>`).join("");
- app.innerHTML=`<div class="ph-screen"><div class="ph-bg" aria-hidden="true">${BG}</div><div class="ph-wrap">
+ app.innerHTML=`<div class="ph-screen"><div class="ph-bg" aria-hidden="true">${BG}</div>
+ <button class="ph-back" id="phBack" type="button">← Menu główne</button>
+ <div hidden><input id="nm" value="${esc(nick)}" ${an?"readonly":""}></div>
+ <div class="ph-wrap">
  <div class="ph-logo" role="img" aria-label="Postaw na milion"><div class="ph-row">${L("POSTAW",0)}</div><div class="ph-na">na</div><div class="ph-row">${L("MILION",6)}</div></div>
- <div class="ph-tiles" aria-hidden="true"><i>A</i><i>B</i><i>C</i><i>D</i></div>
  <p class="ph-sub">Teleturniej na żywo · 2–3 graczy</p>
- <div class="ph-pane"><label for="nm">Twój nick</label><div class="ph-me"><div class="av" style="background:${ac||PAL[0]};color:${ink(ac||PAL[0])}">${esc((nick||"?")[0].toUpperCase())}</div><input id="nm" maxlength="14" placeholder="np. Kasia" value="${esc(nick)}" ${an?"readonly":""}></div>
- <p class="ph-note">${an?"Grasz jako <b>"+esc(an)+"</b> – kolor i nick z Twojego konta, wyniki gier online trafią do statystyk.":NET?"Zaloguj się na konto, aby wyniki liczyły się do statystyk.":"Online niedostępne – zagraj offline."}</p>
- <button class="ph-btn ph-gold" id="mk" ${NET?"":"disabled"}><span class="ph-ic">🎲</span><span>Utwórz pokój</span></button></div>
- <div class="ph-or">albo dołącz kodem</div>
- <div class="ph-pane"><label for="cd">Kod pokoju</label><input id="cd" class="ph-code" maxlength="4" placeholder="KOD" ${NET?"":"disabled"}><button id="jn" class="ph-btn ph-white" ${NET?"":"disabled"}><span class="ph-ic">🚪</span><span>Dołącz</span></button><div class="err" id="er">${esc(S.err)}</div></div>
- <button class="ph-btn ph-ghost" id="lc"><span class="ph-ic">📴</span><span>Gra offline · jedno urządzenie</span></button>
- <p class="ph-note">Bez kodu i internetu – podajecie sobie telefon.<br>Baza pytań: ${QUESTION_COUNT} w ${CATEGORIES.length} kategoriach.</p>
+ <div class="ph-main">
+  <button class="ph-btn ph-gold" id="mkT" type="button" ${NET?"":"disabled"}><span class="ph-ic">🏠</span><span>Utwórz pokój</span></button>
+  <button class="ph-btn ph-white" id="jnT" type="button" ${NET?"":"disabled"}><span class="ph-ic">🚪</span><span>Dołącz do znajomego</span></button>
+  <button class="ph-btn ph-ghost" id="lc" type="button"><span class="ph-ic">🎲</span><span>Gra lokalnie na jednym urządzeniu</span></button>
+ </div>
+ <div class="ph-pane ph-sw" id="modePane"><h3>Jaką grę tworzysz?</h3><div class="ph-modes">
+  <button class="ph-mode" data-t="45000" type="button"><span>⏱</span><b>Klasyczny</b><small>45 sekund na pytanie</small></button>
+  <button class="ph-mode" data-t="20000" type="button"><span>⚡</span><b>Szybki</b><small>20 sekund na pytanie</small></button></div></div>
+ <div class="ph-pane ph-sw" id="joinPane"><label for="cd">Kod pokoju od znajomego</label><div class="ph-joinrow"><input id="cd" class="ph-code" maxlength="4" placeholder="KOD" autocomplete="off" ${NET?"":"disabled"}><button id="jn" class="ph-btn ph-green" type="button" ${NET?"":"disabled"}><span>Dołącz</span></button></div></div>
+ <div class="err ph-err" id="er">${esc(S.err)}</div>
+ <p class="ph-note">Baza pytań: ${QUESTION_COUNT} w ${CATEGORIES.length} kategoriach.</p>
  </div></div>`;
- $("#lc").onclick=()=>{S.view="local";render()};$("#mk").onclick=()=>enter(true);$("#jn").onclick=()=>enter(false);
- $("#nm").oninput=e=>{S.nm=e.target.value;if(!an){try{localStorage.setItem("pnm_nick",cleanN(S.nm))}catch(x){}}};
+ const tg=(a,b)=>{$(b).classList.remove("open");$(a).classList.toggle("open");$("#er").textContent=""};
+ $("#phBack").onclick=()=>{try{window.frameElement.parentElement.querySelector(".gmenu").click()}catch(x){try{window.parent.document.querySelector(".gmenu").click()}catch(y){location.reload()}}};
+ $("#mkT").onclick=()=>tg("#modePane","#joinPane");
+ $("#jnT").onclick=()=>{tg("#joinPane","#modePane");if($("#joinPane").classList.contains("open"))setTimeout(()=>$("#cd").focus(),60)};
+ document.querySelectorAll(".ph-mode").forEach(b=>b.onclick=()=>{TIME=+b.dataset.t||45000;enter(true)});
+ $("#lc").onclick=()=>{S.view="local";render()};$("#jn").onclick=()=>enter(false);
+ $("#cd").onkeydown=e=>{if(e.key==="Enter")enter(false)};
 }
 async function enter(create){
  if(S.busy)return;
- const name=cleanN(accNick()||$("#nm").value);S.nm=name;
+ const name=cleanN(accNick()||$("#nm").value)||"Gracz"+(Math.random()*90+10|0);S.nm=name;
  const er=m=>{S.busy=false;const e=$("#er");if(e)e.textContent=m;else S.err=m};
  if(!name)return er("Wpisz imię!");
  if(!NET)return er("Pokoje online są niedostępne (brak połączenia z Firebase) – zagraj offline.");
@@ -573,7 +584,7 @@ async function enter(create){
    }
    if(!net)return er("Nie udało się utworzyć pokoju – spróbuj ponownie.");
    net.becomeHost();
-   await net.db.doc("rooms/"+code).set({phase:"lobby",host:ME,created:Date.now(),q:0,used:[],order:[],deadline:0});
+   await net.db.doc("rooms/"+code).set({phase:"lobby",host:ME,created:Date.now(),q:0,used:[],order:[],deadline:0,time:TIME});
   }else{
    code=($("#cd").value||"").trim().toUpperCase();
    if(!/^[A-Z]{4}$/.test(code))return er("Nie ma takiego pokoju.");
@@ -773,7 +784,7 @@ function end(){
 }
 setInterval(()=>{
  const g=S.game;if(!g||g.phase!=="question")return;
- const tb=$("#tb");if(tb)tb.style.width=Math.max(0,Math.min(100,(g.deadline-Date.now())/TIME*100))+"%";
+ const tb=$("#tb");if(tb)tb.style.width=Math.max(0,Math.min(100,(g.deadline-Date.now())/(g.time||TIME)*100))+"%";
  tick();
 },400);
 window.__pnmLeave=()=>{try{if(S.view!=="home"||NETC)toHome()}catch(e){}};
