@@ -221,7 +221,7 @@ function vision(pi){const V=new Uint8Array(S.w*S.h),ni=S.pl[pi].ni,rad=2+(ni==0?
   if(spec&&!quiet)return V.fill(1);
   const mark=(q0,r0,rr=rad)=>{for(let r=Math.max(0,r0-rr);r<=Math.min(S.h-1,r0+rr);r++)for(let q=Math.max(0,q0-rr-1);q<=Math.min(S.w-1,q0+rr+1);q++)if(HD(q0,r0,q,r)<=rr)V[r*S.w+q]=1};
   S.units.forEach(u=>u.o==pi&&mark(u.q,u.r,u.k=='C'?rad+1:rad));(S.tw||[]).forEach(k=>S.own[k]==pi+1&&mark(k%S.w,Math.floor(k/S.w),3));S.cities.forEach(c=>c.o==pi&&mark(c.q,c.r));return V}
-const BTX=new Set(['fl','busy','_rc','anim','aiRun','sel','ver','fin','pr','evn']);
+const BTX=new Set(['am','fl','busy','_rc','anim','aiRun','sel','ver','fin','pr','evn']);
 function save(){if(local||quiet)return;ref.update({game:JSON.stringify(S,(k,v)=>BTX.has(k)?undefined:v)}).catch(()=>{msg='Błąd zapisu';render()})}
 function chk(){S.pl.forEach((p,i)=>{if(p.alive&&!S.cities.some(c=>c.o==i)&&!S.units.some(u=>u.o==i))p.alive=false});
   const al=S.pl.map((p,i)=>p.alive?i:-1).filter(i=>i>=0);if(al.length==1)S.over=al[0]}
@@ -1139,7 +1139,7 @@ function fzFull(){
 }
 function fzRedraw(){
   if(!FZ)return;fzDraw();
-  const act=()=>{const B=FZ&&FZ.battle,n=performance.now();return B&&(B.fl.length||(B.pr&&B.pr.length)||B.units.some(u=>u.anim&&n-u.anim.t0<u.anim.dur)||fzFxActive(n))};
+  const act=()=>{const B=FZ&&FZ.battle,n=performance.now();return B&&(B.fl.length||(B.pr&&B.pr.length)||(B.am&&B.am.length)||B.units.some(u=>u.anim&&n-u.anim.t0<u.anim.dur)||fzFxActive(n))};
   if(act()&&!fzAnim){fzAnim=true;const loop=()=>{if(!FZ){fzAnim=false;return}fzDraw();if(act())requestAnimationFrame(loop);else{fzAnim=false;fzDraw()}};requestAnimationFrame(loop)}
 }
 function upos(u,now){const{ccx,ccy,s,cells}=FZ,c=cells[u.cell];let x=ccx+c.ux*s,y=ccy+c.uy*s;
@@ -1229,6 +1229,13 @@ function fzDraw(){
         tp.forEach((f,i)=>{const ix=x+(i-(tp.length-1)/2)*s*.75,iy=y-s*1.55;g.fillStyle=FC[f.k][0];g.beginPath();g.arc(ix,iy,s*.34,0,7);g.fill();g.strokeStyle='rgba(0,0,0,.7)';g.lineWidth=1.5;g.stroke();g.fillStyle='#fff';g.fillText(FC[f.k][1],ix,iy+1)});g.restore()});
       Bt.pr=(Bt.pr||[]).filter(pj=>now-pj.t0<650);
       Bt.pr.forEach(pj=>{const a=P(cells[pj.a]),b=P(cells[pj.b]);g.strokeStyle='#f2e3b3';g.lineWidth=Math.max(1.2,s*.07);for(let j=0;j<9;j++){const t=(now-pj.t0)/650*1.3-j*.045;if(t<=0||t>=1)continue;const at=u=>[a[0]+(b[0]-a[0])*u+Math.sin(j*2.1)*s*.35*Math.sin(u*Math.PI),a[1]+(b[1]-a[1])*u-Math.sin(u*Math.PI)*s*2.2],p1=at(t),p0=at(Math.max(0,t-.04));g.beginPath();g.moveTo(p0[0],p0[1]);g.lineTo(p1[0],p1[1]);g.stroke()}});
+      Bt.am=(Bt.am||[]).filter(m=>now-m.t0<1200);
+      Bt.am.forEach(m=>{const a=P(cells[m.a]),b=P(cells[m.b]);if(!a||!b)return;const t=(now-m.t0)/1200,pul=1+.1*Math.sin(t*22),ang=Math.atan2(b[1]-a[1],b[0]-a[0]),col=m.k?'#ffb454':'#ff5a4a';
+        g.save();g.globalAlpha=Math.min(1,(1-t)*1.8);g.strokeStyle=col;g.fillStyle=col;
+        hexPath(g,a[0],a[1],(s-2)*pul);g.lineWidth=Math.max(3,s*.2);g.stroke();
+        g.setLineDash([s*.5,s*.3]);g.lineDashOffset=-now/35;g.lineWidth=Math.max(2,s*.14);g.beginPath();g.moveTo(a[0],a[1]);g.lineTo(b[0]-Math.cos(ang)*s*.6,b[1]-Math.sin(ang)*s*.6);g.stroke();g.setLineDash([]);
+        {const hx=b[0]-Math.cos(ang)*s*.5,hy=b[1]-Math.sin(ang)*s*.5,L=s*.55;g.beginPath();g.moveTo(hx+Math.cos(ang)*L*.6,hy+Math.sin(ang)*L*.6);g.lineTo(hx+Math.cos(ang+2.5)*L,hy+Math.sin(ang+2.5)*L);g.lineTo(hx+Math.cos(ang-2.5)*L,hy+Math.sin(ang-2.5)*L);g.closePath();g.fill()}
+        g.font='bold '+Math.round(s*.6)+'px system-ui';g.textAlign='center';g.lineWidth=4;g.strokeStyle='rgba(0,0,0,.85)';const tx=m.k?'↩ KONTRATAK':'⚔ ATAK';g.strokeText(tx,a[0],a[1]-s*1.9);g.fillStyle='#fff';g.fillText(tx,a[0],a[1]-s*1.9);g.restore()});
       fzFxDraw(g,now,s);
       Bt.fl=Bt.fl.filter(f=>now-f.t0<1100);
       Bt.fl.forEach(f=>{const t=(now-f.t0)/1100,[x,y]=P(cells[f.ci]);g.save();g.globalAlpha=1-t*t;g.font='bold '+Math.round(s*1.05)+'px system-ui';g.lineWidth=4;g.strokeStyle='rgba(0,0,0,.8)';g.fillStyle=f.col;g.strokeText(f.text,x,y-s*1.2-t*s*1.6);g.fillText(f.text,x,y-s*1.2-t*s*1.6);g.restore()});
@@ -1358,7 +1365,9 @@ function openBattleView(B){
 function closeBattleView(){if(!FZ)return;FZ.battle=null;fzw.querySelector('#fzdie').style.display='none';fzw.querySelector('#fzback').style.display='';fzhint.style.display='none';document.body.classList.remove('inbattle');closeDetail()}
 function adoptState(ns){const B=FZ&&FZ.battle;
   if(B&&ns){if(ns.bt&&ns.bt.id===B.id){if((ns.bt.sv||0)>(B.sv||0))syncBattleFrom(B,ns.bt);ns.bt=B}else if(!ns.bt&&B.phase!=='over'&&!B.fin)ns.bt=B}
-  S=ns}
+  const prev=S;S=ns;
+  try{if(prev&&ns&&prev.units&&ns.units&&ns.pl&&!quiet){const mi=meIdx(),om=new Map(prev.units.map(u=>[u.id,u]));
+    ns.units.forEach(u=>{const o=om.get(u.id);if(o&&u.o!==mi&&(o.q!==u.q||o.r!==u.r))animateMove(u,{q:o.q,r:o.r},{q:u.q,r:u.r})})}}catch(e){}}
 function syncBattleFrom(B,R){if(B.busy||B.aiRun)return;const now=performance.now(),old=new Map(B.units.map(u=>[u.id,u]));
   R.units.forEach(n=>{const o=old.get(n.id);if(!o)return;if(o.cell!==n.cell)n.anim={from:o.cell,t0:now,dur:240};if(n.hp<o.hp)B.fl.push({ci:n.cell,text:'−'+(o.hp-n.hp),col:'#ff6b5e',t0:now})});
   old.forEach((o,id)=>{if(!R.units.some(n=>n.id===id))B.fl.push({ci:o.cell,text:'✖',col:'#ffd34d',t0:now})});
@@ -1373,6 +1382,7 @@ async function replayAttack(B,ev,old){
   if(!def){def=old.get(ev.d);if(def){ghost=def;B.units.push(def)}}
   try{
     if(!att||!def||!FZ.cells[att.cell]||!FZ.cells[def.cell])return;
+    (B.am=B.am||[]).push({a:att.cell,b:def.cell,t0:performance.now(),k:ev.k?1:0});fzRedraw();
     const dn=fzw.querySelector('#fzdn'),dl=fzw.querySelector('#fzdielbl');if(dn&&ev.nat){dn.textContent=ev.nat;if(dl)dl.textContent=(ev.k?'Kontratak':'Trafienie')+' · k20'}
     if(ev.r){(B.pr=B.pr||[]).push({a:att.cell,b:def.cell,t0:performance.now()});fzRedraw();await sleep(520);if(!live())return}
     else if(ev.m){fzWindup(att,def,!!ev.k);await sleep(ev.k?120:200);if(!live())return}
@@ -1420,6 +1430,7 @@ function checkEnd(Bt){const a=Bt.units.some(u=>!u.side),b=Bt.units.some(u=>u.sid
   Bt.phase='over';Bt.win=a?0:1;Bt.sel=null;Bt.busy=false;Bt.ack=[];blog(Bt,`Koniec bitwy – wygrywa ${sideLabel(Bt,Bt.win)}!`,'win');return true}
 async function doAttack(Bt,att,def,isCounter){
   const h=calcHit(Bt,att,def,att.cell,isCounter?-2:0),A=ustat(Bt,att),melee=att.k!=='A'&&A.rng<=1,live=()=>FZ&&FZ.battle===Bt;
+  (Bt.am=Bt.am||[]).push({a:att.cell,b:def.cell,t0:performance.now(),k:isCounter?1:0});fzRedraw();
   if(att.k==='A'){(Bt.pr=Bt.pr||[]).push({a:att.cell,b:def.cell,t0:performance.now()});fzRedraw();await sleep(520);if(!live())return}
   else if(melee)fzWindup(att,def,isCounter);
   const nat=await rollDie(20,isCounter?'Kontratak':'Trafienie');if(!live())return;
