@@ -1,5 +1,5 @@
 <!doctype html><html lang="pl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Tabu HARD</title>
-<link rel="stylesheet" href="tabu.css"><script>/* lobby → strona główna (chowanie przycisku „Menu główne” poza lobby) */
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=Fredoka:wght@400;600;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="tabu.css"><script>/* lobby → strona główna (chowanie przycisku „Menu główne” poza lobby) */
 (function(){
   var sel='.tb-home';
   if(window.parent===window)return;
@@ -159,18 +159,34 @@ const pname=p=>`${dot(p.presence.col)}<span style="color:${esc(colOf(p.presence.
 function tick2(){const e=document.getElementById("tm");if(e&&S&&S.ph==="turn")e.textContent=Math.max(0,Math.ceil(S.left-(Date.now()-rcv)/1000))}
 function join(){
  const an=accNick(),ac=accCol();
- const nv=an||PREF.nick,cv=ac||PREF.col;
- const info=!netOk()?"Pokoje online są niedostępne (brak połączenia z Firebase). Możesz zagrać w trybie lokalnym.":an?`Grasz jako ${esc(an)} – wyniki z pokoi (min. 2 graczy w zespołach) trafią do Twoich statystyk.`:"Zaloguj się na konto, aby nick i kolor pochodziły z konta, a wyniki z pokoi liczyły się do statystyk.";
- $.innerHTML=`<div class="tb-home${err?' again':''}"><div class="tb-bg" aria-hidden="true"><span style="left:5%;animation-duration:14s;animation-delay:-0s">🚫</span><span style="left:17%;animation-duration:19s;animation-delay:-4s">🗣</span><span style="left:29%;animation-duration:24s;animation-delay:-8s">⏱</span><span style="left:41%;animation-duration:18s;animation-delay:-12s">❓</span><span style="left:53%;animation-duration:23s;animation-delay:-3s">💬</span><span style="left:65%;animation-duration:17s;animation-delay:-7s">🙊</span><span style="left:77%;animation-duration:22s;animation-delay:-11s">🎤</span><span style="left:89%;animation-duration:16s;animation-delay:-2s">🔥</span></div><div class="tb-wrap"><h1 class="tb-logo" aria-label="Tabu Hard"><b class="" style="--i:0">T</b><b class="" style="--i:1">A</b><b class="" style="--i:2">B</b><b class="" style="--i:3">U</b><b class="h" style="--i:4">H</b><b class="h" style="--i:5">A</b><b class="h" style="--i:6">R</b><b class="h" style="--i:7">D</b></h1><div class="tb-tiles" aria-hidden="true"><i></i><i></i><i></i><i></i></div><p class="tb-sub">Trudne hasła, 6 słów zakazanych, szybkie tury.</p><div class="tb-card"><label class="mu">Twój nick i kolor</label><div class="pick"><input id="nm" maxlength="14" placeholder="Twój nick" value="${esc(nv)}" ${an?'readonly title="Nick z Twojego konta"':''}><input type="color" id="cl" value="${esc(cv)}" ${ac?'disabled title="Kolor z Twojego konta"':''}></div></div><div class="tb-main"><button class="tb-btn tb-gold" id="mk"><span class="tb-ic">＋</span>UTWÓRZ POKÓJ</button><button class="tb-btn tb-white" id="lc"><span class="tb-ic">📱</span>TRYB LOKALNY (1 TELEFON)</button></div><div class="tb-pane"><h3>Dołącz do pokoju</h3><div class="tb-row"><input id="cd" maxlength="4" placeholder="KOD" style="text-transform:uppercase"><button class="tb-btn tb-gold tb-small" id="jn">Dołącz</button></div></div><p class="msg tb-err">${esc(err)}</p><p class="tb-info">${info}</p><p class="tb-sub2">Każdy gra na swoim telefonie, odgadujecie na głos w jednym pokoju.</p></div></div>`;
- const prefs=()=>{const an=accNick(),ac=accCol(),typed=cleanN(nm.value);PREF.nick=an||typed;PREF.col=ac||(HEX.test(cl.value)?cl.value.toLowerCase():rndCol);
-  if(!an){try{if(typed)localStorage.setItem("tabu_nick",typed);if(!ac)localStorage.setItem("tabu_col",PREF.col)}catch(e){}}
-  return an||typed};
- jn.onclick=()=>{const n=prefs(),c=cd.value.trim().toUpperCase().replace(/[^A-Z0-9]/g,"");if(!n||c.length<3){err="Wpisz nick i kod pokoju.";return join()}enter(n,c,false)};
- mk.onclick=async()=>{const n=prefs();if(!n){err="Wpisz nick.";return join()}
+ const logo="TABUHARD".split("").map((c,i)=>`<b class="${i>3?'h':''}" style="--i:${i}">${c}</b>`).join("");
+ const fl=["🚫","🗣","⏱","❓","💬","🙊","🎤","🔥","🚫","💬","⏱","🎤"].map((x,i)=>`<span style="left:${(i*8.7+3)%96}%;animation-duration:${14+(i*5)%11}s;animation-delay:-${(i*3.3)%14}s">${x}</span>`).join("");
+ const info=!netOk()?"Pokoje online są niedostępne (brak połączenia z Firebase). Możesz zagrać lokalnie.":an?`Grasz jako ${esc(an)} – wyniki z pokoi trafią do Twoich statystyk.`:"";
+ $.innerHTML=`<div class="tb-home${err?' again':''}"><div class="tb-bg" aria-hidden="true">${fl}</div>
+ <button class="tb-back" id="tbBack">← Menu główne</button>
+ <div class="tb-wrap"><h1 class="tb-logo" aria-label="Tabu Hard">${logo}</h1>
+ <p class="tb-sub">Opisuj. Zgaduj. Nie wymawiaj zakazanych słów.</p>
+ <div class="tb-main"><button class="tb-btn tb-gold" id="mk"><span class="tb-ic">🏠</span><span>Utwórz pokój</span></button><button class="tb-btn tb-white" id="showJoin"><span class="tb-ic">🚪</span><span>Dołącz do znajomego</span></button><button class="tb-btn tb-ghost" id="lc" type="button"><span class="tb-ic">🎲</span><span>Gra lokalnie na jednym urządzeniu</span></button></div>
+ <div id="tbMode" class="tb-pane tb-sw"><h3>Jaką grę tworzysz?</h3><div class="tb-modes">
+  <button class="tb-mode" data-a="0"><span>🎭</span><b>Zwykłe Tabu</b><small>Hasła bez kart 18+</small></button>
+  <button class="tb-mode" data-a="1"><span>🔥</span><b>Tabu 18+</b><small>Pełna talia, także dla dorosłych</small></button></div></div>
+ <div id="tbJoin" class="tb-pane tb-sw"><label for="cd"><b>Kod pokoju od znajomego</b></label><div class="tb-row" style="margin-top:8px"><input id="cd" maxlength="4" placeholder="A8KQ" autocomplete="off" style="text-transform:uppercase"><button class="tb-btn tb-green tb-small" id="jn">Dołącz</button></div></div>
+ <p class="msg tb-err">${esc(err)}</p>${info?`<p class="tb-info">${info}</p>`:""}
+ </div></div>`;
+ const g=id=>document.getElementById(id);
+ const prefs=()=>{const an=accNick(),ac=accCol();PREF.nick=an||PREF.nick||"Gracz";PREF.col=ac||PREF.col||rndCol;return PREF.nick};
+ const show=(id,on)=>g(id).style.display=on?"block":"none";
+ g("tbBack").onclick=()=>{try{window.frameElement.parentElement.querySelector(".gmenu").click()}catch(e){try{window.parent.document.querySelector(".gmenu").click()}catch(x){location.reload()}}};
+ g("mk").onclick=()=>{show("tbJoin",false);show("tbMode",g("tbMode").style.display!=="block");err="";document.querySelector(".tb-err").textContent=""};
+ g("showJoin").onclick=()=>{show("tbMode",false);const o=g("tbJoin").style.display==="block";show("tbJoin",!o);document.querySelector(".tb-err").textContent="";if(!o)setTimeout(()=>g("cd").focus(),60)};
+ document.querySelectorAll(".tb-mode").forEach(b=>b.onclick=async()=>{const n=prefs();
+  opt.adult=b.dataset.a==="1";
   const A="ABCDEFGHJKLMNPRSTUWZ";
   for(let t=0;t<6;t++){let c="";for(let i=0;i<4;i++)c+=A[Math.random()*A.length|0];const r=await enter(n,c,true);if(r!=="busy")return}
-  err="Nie udało się utworzyć pokoju – spróbuj ponownie.";join()};
- lc.onclick=()=>{prefs();local()}}
+  err="Nie udało się utworzyć pokoju – spróbuj ponownie.";join()});
+ g("jn").onclick=()=>{const n=prefs(),c=g("cd").value.trim().toUpperCase().replace(/[^A-Z0-9]/g,"");if(c.length<3){err="Wpisz kod pokoju.";return join()}enter(n,c,false)};
+ g("cd").addEventListener("keydown",e=>{if(e.key==="Enter")g("jn").click()});
+ g("lc").onclick=()=>{prefs();local()}}
 async function enter(n,c,host){
  if(!netOk()){err="Pokoje online są niedostępne (brak połączenia z Firebase).";join();return"err"}
  let r;try{r=await window.__tbJoin("tabu-"+c.toLowerCase())}catch(e){err="Nie udało się połączyć.";join();return"err"}
