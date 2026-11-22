@@ -430,3 +430,11 @@ html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:non
 #lobby .il-local-link{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;margin:2px 0 0;padding:15px 18px;font-size:clamp(16px,3.6vw,19px);font-weight:700;color:#fff;background:#ffffff1f;border:2px solid #ffffff55;border-radius:16px;box-shadow:none;text-shadow:0 1px 3px #0008;transition:transform .18s cubic-bezier(.2,1.5,.4,1),background .18s,border-color .18s}
 #lobby .il-local-link:hover:not(:disabled){background:#ffffff33;border-color:#ffffffaa;transform:translateY(-3px)}
 #lobby .il-local-link:active:not(:disabled){transform:translateY(1px) scale(.98)}
+
+/* wielki napis na środku: TWOJA TURA */
+#turnBanner{position:fixed;left:calc((100vw - 300px)/2);top:42%;z-index:26;pointer-events:none;opacity:0;white-space:nowrap;text-align:center;font:700 clamp(40px,10vw,112px)/1 "Fredoka","Trebuchet MS",system-ui,sans-serif;letter-spacing:.05em;color:#ffdc7a;text-shadow:0 5px 0 #8f6513,0 12px 30px #000d;transform:translate(-50%,-50%)}
+#turnBanner small{display:block;margin-top:10px;font-size:.28em;letter-spacing:.14em;color:#f5e7cb;text-shadow:0 2px 6px #000a}
+#turnBanner.on{animation:tbIn 1.9s cubic-bezier(.2,1.2,.3,1) both}
+@keyframes tbIn{0%{opacity:0;transform:translate(-50%,-50%) scale(.45)}14%{opacity:1;transform:translate(-50%,-50%) scale(1.07)}22%{transform:translate(-50%,-50%) scale(1)}78%{opacity:1;transform:translate(-50%,-50%) scale(1)}100%{opacity:0;transform:translate(-50%,-50%) scale(1.14)}}
+body.inbattle #turnBanner{display:none!important}
+@media(max-width:760px){#turnBanner{left:50%}}
