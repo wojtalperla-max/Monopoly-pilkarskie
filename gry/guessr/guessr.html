@@ -27,18 +27,19 @@
 <div class="row" id="tabs"></div>
 
 <div id="lobby" class="gz">
-<div class="gz-bg" aria-hidden="true"><span style="left:5%;animation-duration:14s;animation-delay:-0s">❓</span><span style="left:17%;animation-duration:19s;animation-delay:-4s">🎯</span><span style="left:29%;animation-duration:24s;animation-delay:-8s">🔍</span><span style="left:41%;animation-duration:18s;animation-delay:-12s">🧩</span><span style="left:53%;animation-duration:23s;animation-delay:-3s">💡</span><span style="left:65%;animation-duration:17s;animation-delay:-7s">❔</span><span style="left:77%;animation-duration:22s;animation-delay:-11s">🏆</span><span style="left:89%;animation-duration:16s;animation-delay:-2s">🎲</span></div>
+<div class="gz-bg" aria-hidden="true"><span style="left:3%;animation-duration:14s;animation-delay:-0.0s">❓</span><span style="left:11.7%;animation-duration:19s;animation-delay:-3.3s">🎯</span><span style="left:20.4%;animation-duration:24s;animation-delay:-6.6s">🔍</span><span style="left:29.1%;animation-duration:18s;animation-delay:-9.9s">🧩</span><span style="left:37.8%;animation-duration:23s;animation-delay:-13.2s">💡</span><span style="left:46.5%;animation-duration:17s;animation-delay:-2.5s">❔</span><span style="left:55.2%;animation-duration:22s;animation-delay:-5.8s">🏆</span><span style="left:63.9%;animation-duration:16s;animation-delay:-9.1s">🎲</span><span style="left:72.6%;animation-duration:21s;animation-delay:-12.4s">🔍</span><span style="left:81.3%;animation-duration:15s;animation-delay:-1.7s">💡</span><span style="left:90%;animation-duration:20s;animation-delay:-5.0s">🎯</span><span style="left:2.7%;animation-duration:14s;animation-delay:-8.3s">❓</span></div>
+
 <div class="gz-wrap">
+<button class="gz-back" id="gzBack" type="button">← Menu główne</button>
+<div hidden><input id="nick"><input type="color" id="col"><button id="bCreate" type="button"></button></div>
 <h1 class="gz-logo" aria-label="GuessR"><b style="--i:0">G</b><b style="--i:1">U</b><b style="--i:2">E</b><b style="--i:3">S</b><b style="--i:4">S</b><b style="--i:5">R</b></h1>
-<div class="gz-tiles" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
 <p class="gz-sub">Zgadnij, co to jest – sam albo ze znajomymi!</p>
-<div class="gz-card"><div class="pick"><input id="nick" placeholder="Twój nick…" maxlength="14" autocomplete="off"><input type="color" id="col" aria-label="Twój kolor"></div></div>
 <div class="gz-main">
-<button class="gz-btn gz-gold" id="bSolo"><span class="gz-ic">▶</span>GRA SOLO</button>
-<button class="gz-btn gz-white" id="bCreate"><span class="gz-ic">＋</span>UTWÓRZ POKÓJ</button>
-<button class="gz-btn gz-ghost" id="bJoinToggle" type="button"><span class="gz-ic">🔑</span>DOŁĄCZ DO POKOJU</button>
+<button class="gz-btn gz-gold" id="bMkToggle" type="button"><span class="gz-ic">🏠</span><span>Utwórz pokój</span></button>
+<button class="gz-btn gz-white" id="bJoinToggle" type="button"><span class="gz-ic">🚪</span><span>Dołącz do znajomego</span></button><button class="gz-btn gz-ghost" id="bSolo" type="button"><span class="gz-ic">🎲</span><span>Gra lokalnie na jednym urządzeniu</span></button>
 </div>
-<div class="gz-pane" id="joinPane"><h3>Kod pokoju</h3><div class="in"><input id="jc" placeholder="Kod pokoju" maxlength="4" autocomplete="off" style="text-transform:uppercase"><button id="bJoin" class="gz-btn gz-gold gz-small">Dołącz</button></div></div>
+<div class="gz-pane" id="modePane"><h3>Jaką grę tworzysz?</h3><div class="gz-modes" id="modes"></div></div>
+<div class="gz-pane" id="joinPane"><label for="jc"><b>Kod pokoju od znajomego</b></label><div class="in" style="justify-content:center;align-items:center;margin-top:8px"><input id="jc" placeholder="A8K2" maxlength="4" autocomplete="off" style="text-transform:uppercase;max-width:190px;font-size:22px"><button id="bJoin" class="gz-btn gz-green gz-small" type="button">Dołącz</button></div></div>
 <small id="lobinfo"></small>
 </div>
 </div>
@@ -58,7 +59,11 @@
 
 <div id="ed"><div class="card" id="edc"></div></div>
 
-<script>document.getElementById("bJoinToggle").onclick=function(){var p=document.getElementById("joinPane");p.classList.toggle("open");if(p.classList.contains("open"))document.getElementById("jc").focus()};</script>
+<script>(function(){var g=function(i){return document.getElementById(i)};
+g("gzBack").onclick=function(){try{parent.document.querySelector("#guessr .gmenu").click()}catch(e){try{window.frameElement.parentElement.querySelector(".gmenu").click()}catch(x){location.reload()}}};
+g("bMkToggle").onclick=function(){g("joinPane").classList.remove("open");g("modePane").classList.toggle("open")};
+g("bJoinToggle").onclick=function(){g("modePane").classList.remove("open");var p=g("joinPane");p.classList.toggle("open");if(p.classList.contains("open"))setTimeout(function(){g("jc").focus()},60)};
+})();</script>
 <script>
 /* most do hosta (index.html): pokoje online przez Firebase + nick + kolor + statystyki */
 (function(){
@@ -258,7 +263,8 @@ $('#q').onkeydown=e=>{const c=[...$('#dd').children];if(e.key==='ArrowDown'||e.k
 $('#q').onblur=()=>setTimeout(()=>dd(),120);
 
 /* ---------- nick i kolor (z konta albo wpisane / wybrane) ---------- */
-function initPrefs(){
+function buildModes(){const m=$('#modes');if(!m)return;m.replaceChildren();Object.values(S.themes).filter(t=>t.items.length>=2).forEach(t=>{const b=E('button','gz-mode');b.type='button';b.append(E('span',0,t.emoji),E('b',0,t.name));b.onclick=()=>{S.cur=t.id;$('#bCreate').click()};m.append(b)})}
+function initPrefs(){buildModes();
  const an=accNick(),ac=accCol(),n=$('#nick'),c=$('#col');
  if(an){n.value=an;n.readOnly=true;n.title='Nick z Twojego konta'}
  else{n.readOnly=false;n.title='';if(!n.value){try{const v=cleanN(localStorage.getItem('guessr_nick'));if(v)n.value=v}catch(e){}}}
