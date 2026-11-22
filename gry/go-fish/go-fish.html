@@ -33,30 +33,26 @@
 
 <section id="v-home" class="hid">
  <div class="fh-bg" aria-hidden="true" id="fhBg"></div>
+ <button class="fh-back" id="fhBack">← Menu główne</button>
  <div class="fh-wrap">
   <div class="fh-logo" role="img" aria-label="Go Fish" id="fhLogo"></div>
-  <div class="fh-tiles" aria-hidden="true"><i>🐠</i><i>🐟</i><i>🐡</i><i>🦈</i></div>
   <p class="fh-sub">Podwodne łowienie kart – gra dla 2–4 osób online.</p>
-  <div class="fh-pane">
-   <label for="name">Twój nick</label>
-   <input id="name" placeholder="Twój nick" maxlength="14" autocomplete="off">
+  <div class="fh-main">
    <button id="create" class="fh-btn fh-gold"><span class="fh-ic">🎣</span><span>Stwórz stół</span></button>
-   <div id="net" class="fh-net"></div>
+   <button id="showJoin" class="fh-btn fh-white"><span class="fh-ic">🚪</span><span>Dołącz do znajomego</span></button>
   </div>
-  <div class="fh-or">albo dołącz do znajomych</div>
-  <div class="fh-pane">
-   <label for="joincode">Kod stołu</label>
-   <input id="joincode" class="code" placeholder="KOD" maxlength="4" autocomplete="off">
-   <button id="join" class="fh-btn fh-white"><span class="fh-ic">🚪</span><span>Dosiądź się</span></button>
+  <div id="joinArea" class="fh-pane"><label for="joincode">Kod stołu od znajomego</label>
+   <div class="fh-join"><input id="joincode" class="code" placeholder="KOD" maxlength="4" autocomplete="off"><button id="join" class="fh-btn fh-green">Dosiądź się</button></div>
   </div>
-  <div class="fh-pane">
-   <label for="botn">Gra offline</label>
+  <button id="showBots" class="fh-btn fh-ghost"><span class="fh-ic">🤖</span><span>Graj z botami</span></button>
+  <div id="botsArea" class="fh-pane"><label for="botn">Gra offline</label>
    <select id="botn" class="fh-select"><option value="1">1 bot (we dwoje)</option><option value="2" selected>2 boty (we troje)</option><option value="3">3 boty (we czworo)</option></select>
-   <button id="bots" class="fh-btn fh-white"><span class="fh-ic">🤖</span><span>Graj z botami</span></button>
+   <button id="bots" class="fh-btn fh-gold" style="margin-top:12px"><span class="fh-ic">🤖</span><span>Start</span></button>
+   <p class="fh-rules"><b>Zasady:</b> w swojej turze dotknij karty (pytasz o jej figurę), potem gracza, od którego chcesz wszystkie takie karty. Jak ma – dostajesz je i pytasz dalej. Jak nie – „Go Fish!” i dobierasz z talii. Cztery karty tej samej figury to komplet. Wygrywa ten z największą liczbą kompletów.</p>
   </div>
-  <button type="button" id="fhRulesBtn" class="fh-btn fh-ghost"><span class="fh-ic">📜</span><span>Zasady</span></button>
-  <div id="fhRules" class="fh-pane fh-rules"><b style="color:var(--fg)">Zasady:</b> w swojej turze dotknij karty (pytasz o jej figurę), potem gracza, od którego chcesz wszystkie takie karty. Jak ma – dostajesz je i pytasz dalej. Jak nie – „Go Fish!” i dobierasz z talii. Cztery karty tej samej figury to komplet. Wygrywa ten z największą liczbą kompletów.</div>
+  <div id="net" class="fh-net"></div>
  </div>
+ <input id="name" readonly hidden tabindex="-1" aria-hidden="true">
 </section>
 
 <section id="v-lobby" class="hid">
@@ -478,6 +474,8 @@ document.addEventListener("click",e=>{const o=e.target.closest("#v-game .opp[dat
 addEventListener("resize",()=>render());
 $("create").onclick=()=>connect(true);
 $("join").onclick=()=>connect(false);
+function fhTog(w){const o=window.__fhP===w?"":w;window.__fhP=o;["join","bots"].forEach(k=>{$(k+"Area").style.display=o===k?"block":"none"});if(o==="join")setTimeout(()=>$("joincode").focus(),60)}
+$("showJoin").onclick=()=>fhTog("join");$("showBots").onclick=()=>fhTog("bots");
 $("bots").onclick=startBots;
 $("joincode").addEventListener("keydown",e=>{if(e.key==="Enter")connect(false)});
 $("start").onclick=$("again").onclick=startGame;
@@ -489,17 +487,24 @@ function initPrefs(){
  const n=window.__gofNick&&window.__gofNick();
  if(n){$("name").value=cleanN(n);$("name").readOnly=true;$("name").title="Nick z Twojego konta"}
  else{$("name").readOnly=false;if(!$("name").value){try{const v=localStorage.getItem("gfn");if(v)$("name").value=cleanN(v)}catch(e){}}}
- if(!window.__gofNet){$("net").textContent="Pokoje online są niedostępne (brak połączenia z Firebase).";$("create").disabled=true;$("join").disabled=true}
- else if(n)$("net").textContent="Grasz jako "+cleanN(n)+" – wyniki trafią do Twoich statystyk.";
- else $("net").textContent="Zaloguj się na konto, aby wyniki liczyły się do statystyk."}
+ if(!window.__gofNet){$("net").textContent="Pokoje online są niedostępne (brak połączenia z Firebase). Możesz zagrać z botami.";$("create").disabled=true;$("join").disabled=true;$("showJoin").disabled=true}
+ else $("net").textContent=""}
 $("name").addEventListener("input",()=>{if(!$("name").readOnly){try{localStorage.setItem("gfn",$("name").value)}catch(e){}}});
 window.__gofLeave=function(){try{if(rm)leave()}catch(e){}};
 window.__gofRefresh=function(){if(!rm)initPrefs()};
 initPrefs();show("home");view="home";
 </script>
 <script>
-(function(){var lg=document.getElementById('fhLogo');'GO FISH!'.split('').forEach(function(c,i){var b=document.createElement('b');if(c===' '){b.className='sp';b.innerHTML='&nbsp;'}else{b.style.setProperty('--i',i);b.textContent=c}lg.appendChild(b)});
-var bg=document.getElementById('fhBg');['🐠','🐟','🫧','🐡','🦈','🫧','🐙','🦀','🐚','🐠','🫧','🐟'].forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)});
-document.getElementById('fhRulesBtn').onclick=function(){var r=document.getElementById('fhRules');r.style.display=r.style.display==='block'?'none':'block'}})();
+(function(){
+var lg=document.getElementById('fhLogo');'GO FISH!'.split('').forEach(function(c,i){var b=document.createElement('b');if(c===' '){b.className='sp';b.innerHTML='&nbsp;'}else{b.style.setProperty('--i',i);b.textContent=c}lg.appendChild(b)});
+var bg=document.getElementById('fhBg'),CL=['#ff8a3d','#ffd84a','#ff5d8f','#7be0ff','#a77bff'];
+for(var i=0;i<10;i++){var s=document.createElement('span');s.className='fh-bub';
+ s.style.cssText='--z:'+(18+(i*17)%44)+'px;left:'+((i*9.7+3)%94)+'%;animation-duration:'+(11+(i*5)%10)+'s;animation-delay:-'+((i*2.9)%12)+'s';bg.appendChild(s)}
+for(var k=0;k<5;k++){var f=document.createElement('span');f.className='fh-fish';
+ f.style.cssText='--c:'+CL[k%5]+';--z:'+(40+(k*19)%34)+'px;top:'+(14+k*17)+'%;animation-duration:'+(22+(k*7)%14)+'s;animation-delay:-'+((k*6.3)%20)+'s';if(k%2)f.className+=' rev';bg.appendChild(f)}
+document.getElementById('fhBack').onclick=function(){var d=null;try{d=window.parent.document}catch(e){}
+ var q=d&&(d.querySelector('[id*="fish" i] .gmenu')||d.querySelector('.gmenu'));
+ if(q)q.click();else location.reload()};
+})();
 </script>
 </body></html>
