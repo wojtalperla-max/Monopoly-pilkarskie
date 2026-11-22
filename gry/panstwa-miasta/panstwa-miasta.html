@@ -117,7 +117,7 @@ const PM_CATS=[['panstwa','Państwa'],['miasta','Miasta'],['imie_m','Imię męsk
 const PM_NAME=Object.fromEntries(PM_CATS);
 const PM_LETTERS='ABCDEFGHIJKLMNOPRSTUWZ'.split('');
 const PM_SEC=30,PM_COUNT=4000,PM_GRACE=6000,PM_MAXP=8;
-let PM={screen:'start',ref:null,listener:null,code:'',host:null,players:[],status:null,cats:[],rounds:3,cur:0,rd:{},gid:'',msg:'',nick:'',col:'#2a9df4',joinCode:'',off:0,offRef:null,offL:null,my:[],phase:'',tick:null,saveT:null,sel:['panstwa','miasta','imie_m','imie_z','zwierze','rzecz'],selRounds:3,key:'',finR:-1,advancing:false};
+let PM={screen:'start',ref:null,listener:null,code:'',host:null,players:[],status:null,cats:[],rounds:3,cur:0,rd:{},gid:'',msg:'',nick:'',col:'#2a9df4',joinCode:'',pane:'',off:0,offRef:null,offL:null,my:[],phase:'',tick:null,saveT:null,sel:['panstwa','miasta','imie_m','imie_z','zwierze','rzecz'],selRounds:3,key:'',finR:-1,advancing:false};
 const pmNet=()=>typeof fbDB!=='undefined'&&!!fbDB&&typeof onlineEnsureAuth==='function';
 const pmNow=()=>Date.now()+PM.off;
 const pmClean=s=>String(s||'').replace(/[<>&]/g,'').trim().slice(0,14);
@@ -205,18 +205,26 @@ function pmScreen(){
 function pmChips(sel,editable,fn){
   return `<div class="ob-chips">${PM_CATS.map(c=>obChip(c[1],sel.includes(c[0]),fn+"('"+c[0]+"')",!editable)).join('')}</div>`;
 }
+function pmPane(p){PM.pane=PM.pane===p?'':p;pmRender();if(PM.pane==='join')setTimeout(()=>{const e=document.getElementById('pmjoin');if(e)e.focus()},60)}
+/* jedyny przycisk „Menu główne” w lobby (jak w Monopoly) – klik w pasek rodzica, który jest wtedy ukryty */
+function pmHub(){
+  try{const g=parent.document.querySelector('#panstwa .gmenu')||parent.document.querySelector('.gmenu');if(g){g.click();return}}catch(e){}
+  try{parent.postMessage({type:'gmenu-back'},'*')}catch(e){}
+}
 function pmStartHTML(m){
-  const net=pmNet(),n=PM.sel.length;
-  return obShell({key:'pm-start',host:'#pm',theme:'pm',words:['PAŃSTWA','MIASTA'],tiles:['🌍','🏙️','🐘','🍎'],sub:'Wpisz słowa na wylosowaną literę szybciej niż reszta.',msg:m,
-  body:`<div class="ob-pane"><label>Kategorie w rozgrywce</label>${pmChips(PM.sel,true,'pmToggleSel')}
+  const net=pmNet(),n=PM.sel.length,pn=PM.pane||'';
+  const create=pn==='create'?`<div class="ob-pane"><label>Kategorie w rozgrywce</label>${pmChips(PM.sel,true,'pmToggleSel')}
     <div class="ob-chips" style="margin-top:4px">${obChip('Wszystkie',false,"PM.sel=PM_CATS.map(c=>c[0]);pmRender()")}${obChip('Wyczyść',false,"PM.sel=[];pmRender()")}</div>
     <p class="ob-note">Wybrano: ${n} · czas rundy: ${n?pmTimeTxt(n):'—'}</p>
     <label>Liczba rund</label><div class="ob-chips">${[1,2,3,4,5].map(k=>obChip(k,k===PM.selRounds,'PM.selRounds='+k+';pmRender()')).join('')}</div>
     <p class="ob-note" style="margin-bottom:14px">Grasz jako <b>${lgEsc(PM.nick||'Gracz')}</b> — nick i kolor z Twojego konta.</p>
-    ${obBtn('Stwórz pokój','🎲','pmCreate()','gold',!(net&&n))}</div>
-  <div class="ob-or">albo</div>
-  <div class="ob-pane"><label for="pmjoin">Kod pokoju</label><input id="pmjoin" class="cd" maxlength="5" placeholder="KOD" autocomplete="off" value="${lgEsc(PM.joinCode||'')}" oninput="PM.joinCode=this.value">
-    ${obBtn('Dołącz do pokoju','🚪','pmJoin()','white',!net)}</div>
+    ${obBtn('Stwórz pokój','🎲','pmCreate()','gold',!(net&&n))}</div>`:'';
+  const join=pn==='join'?`<div class="ob-pane"><label for="pmjoin">Kod pokoju od znajomego</label><input id="pmjoin" class="cd" maxlength="5" placeholder="A8K2Q" autocomplete="off" value="${lgEsc(PM.joinCode||'')}" oninput="PM.joinCode=this.value" onkeydown="if(event.key==='Enter')pmJoin()">
+    ${obBtn('Dołącz','🚪','pmJoin()','gold',!net)}</div>`:'';
+  return obShell({key:'pm-start',host:'#pm',theme:'pm',words:['PAŃSTWA','MIASTA'],tiles:['🌍','🏙️','🐘','🍎'],sub:'Wpisz słowa na wylosowaną literę szybciej niż reszta.',msg:m,
+  back:{label:'← Menu główne',onclick:'pmHub()'},
+  body:`${obBtn('Utwórz pokój','🏠',"pmPane('create')",'gold')}${obBtn('Dołącz do znajomego','🚪',"pmPane('join')",'white')}
+  ${create}${join}
   ${net?'':'<p class="ob-net">Państwa Miasta wymagają pokoju online, bo każdy wpisuje słowa na swoim urządzeniu. Działa po wgraniu gry na własny hosting z Firebase.</p>'}
   ${obRules('<p>Przed każdą rundą losujemy literę. Masz wpisać słowo na tę literę w każdej wybranej kategorii. Na każdą kategorię przypada <b>30 sekund</b> do wspólnego czasu rundy. Po czasie porównujemy odpowiedzi: słowo, którego nikt inny nie ma, daje <b>10 punktów</b>, a słowo powtórzone u kogoś innego daje <b>po 5 punktów</b> każdemu. Wygrywa gracz z największą sumą po wszystkich rundach.</p>')}`});
 }
