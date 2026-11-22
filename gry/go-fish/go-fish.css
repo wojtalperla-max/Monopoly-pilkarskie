@@ -183,3 +183,7 @@ body:has(#v-game:not(.hid)) #msg:empty{display:none}
  .tm{height:7px;margin:1px auto}
  .on{font-size:13px}.bkc{font-size:13px}
 }
+
+/* ===== cały stół wyśrodkowany w pionie (w 2 osoby też) ===== */
+#v-game:not(.hid){display:flex;flex-direction:column;flex:1;justify-content:center}
+#v-game .midrow{flex:0 0 auto}
