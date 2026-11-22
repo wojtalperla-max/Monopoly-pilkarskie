@@ -38,6 +38,7 @@
     {id:'inv',     g:'Akcje',    n:'Ekwipunek',                       def:'KeyI'},
     {id:'map',     g:'Akcje',    n:'Mapa',                            def:'KeyM'},
     {id:'phone',   g:'Akcje',    n:'Telefon',                         def:'KeyP'},
+    {id:'chat',    g:'Akcje',    n:'Czat (dymek nad głową)',          def:'KeyT'},
     {id:'sigL',    g:'Samochód', n:'Kierunkowskaz lewy',              def:'KeyZ'},
     {id:'sigR',    g:'Samochód', n:'Kierunkowskaz prawy',             def:'KeyC'},
     {id:'hazard',  g:'Samochód', n:'Światła awaryjne',                def:'KeyX'},
@@ -521,6 +522,24 @@
       plate.position.set(CW_X + 3.2, 2.75, z); plate.rotation.y = side > 0 ? 0 : Math.PI; street.add(plate);
       const tri = new THREE.Mesh(new THREE.BoxGeometry(0.36,0.36,0.02), whiteMat);
       tri.position.set(CW_X + 3.2, 2.75, z + (side > 0 ? -0.04 : 0.04)); tri.rotation.y = plate.rotation.y; street.add(tri);
+    });
+  })();
+  // Przejście dla pieszych na Krótkiej, przed drzwiami Domu A (dom x=14, drzwi na zachód w z=10) – przez jezdnię do domu
+  (function buildCrosswalkHomeA(){
+    const CW_Z = 10, stripeMat = new THREE.MeshLambertMaterial({color:0xf4f4f4});
+    for(let i=-4;i<=4;i++){   // pasy równoległe do jezdni (wzdłuż Z), rozmieszczone w poprzek (po X)
+      const st = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.012, 4.0), stripeMat);
+      st.position.set(SIDE_ROAD_X + i*1.0, 0.032, CW_Z); st.receiveShadow = true; street.add(st);
+    }
+    const poleMat = new THREE.MeshLambertMaterial({color:0x55585c}), signMat = new THREE.MeshLambertMaterial({color:0x1e66c8}), whiteMat = new THREE.MeshLambertMaterial({color:0xffffff});
+    [[-1, CW_Z - 3.2, Math.PI], [1, CW_Z + 3.2, 0]].forEach(([side, z, rot]) => {   // znak przed przejściem dla kierowców z każdej strony
+      const x = SIDE_ROAD_X + side*(ROAD_W/2 + 0.15 + 2.6);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.05,2.6,8), poleMat);
+      pole.position.set(x, 1.4, z); pole.castShadow = true; street.add(pole); solidPole(x, z);
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(0.7,0.7,0.06), signMat);
+      plate.position.set(x, 2.75, z); plate.rotation.y = rot; street.add(plate);
+      const tri = new THREE.Mesh(new THREE.BoxGeometry(0.36,0.36,0.02), whiteMat);
+      tri.position.set(x, 2.75, z + (rot === 0 ? 0.04 : -0.04)); tri.rotation.y = rot; street.add(tri);
     });
   })();
   scene.add(street);
@@ -1287,7 +1306,13 @@
                blue:new THREE.MeshBasicMaterial({color:0x4fc3f7}), graphite:lamb(0x3a4249)};
 
     // parking i chodnik przed sklepem (przedłużenie parkingu Pandy)
-    const apron = new THREE.Mesh(new THREE.PlaneGeometry(32, 20), lamb(0x3d3d42));                 // plac 20 m (z od -64 do -44), jak przy Pandzie
+    const apronTex = (() => {                                                                       // ten sam asfalt (kolor i ziarno), co plac przed Pandą i ulice
+      const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+      const g2 = cv.getContext('2d'); g2.fillStyle = '#3b3b40'; g2.fillRect(0,0,256,256);
+      for(let i=0;i<2500;i++){ const v = 40 + Math.random()*35; g2.fillStyle = `rgb(${v},${v},${v+4})`; g2.fillRect(Math.random()*256, Math.random()*256, 2, 2); }
+      const t = new THREE.CanvasTexture(cv); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(32/TILE, 20/TILE); t.anisotropy = 8; return t;
+    })();
+    const apron = new THREE.Mesh(new THREE.PlaneGeometry(32, 20), new THREE.MeshLambertMaterial({map:apronTex}));   // plac 20 m (z od -64 do -44), jak przy Pandzie
     apron.rotation.x = -Math.PI/2; apron.position.set(SX + 2, 0.03, -54); apron.receiveShadow = true; street.add(apron);
     const lineMat = new THREE.MeshBasicMaterial({color:0xe8e8e8});
     for(let i=0;i<=6;i++){ const ln = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 5), lineMat); ln.position.set(SX - 12 + i*4, 0.05, -59); street.add(ln); }
@@ -1434,7 +1459,7 @@
   }
 
   // Sklep z wnętrzem (front od strony ulicy, grupa obrócona o 180°)
-  const shopWallMat = new THREE.MeshLambertMaterial({color:0xe8d9b5});
+  const shopWallMat = new THREE.MeshLambertMaterial({color:0x9ccf9c});
   const shopExterior = [];
   let shopInside = false, shopNpc = null;
   const shopNpcDist = () => shopNpc ? Math.hypot(player.position.x - shopNpc.position.x, player.position.z - shopNpc.position.z) : 99;
@@ -1457,7 +1482,7 @@
     box(gap, h-2.7, t, shopWallMat, 0, 2.7+(h-2.7)/2, d/2-t/2, false);
 
     // dach, sufit, podłoga
-    shopExterior.push(box(w+0.6, 0.4, d+0.6, lamb(0xa0452b), 0, h+0.2, 0, false));
+    shopExterior.push(box(w+0.6, 0.4, d+0.6, lamb(0x2e6b3a), 0, h+0.2, 0, false));
     const ceil = new THREE.Mesh(new THREE.PlaneGeometry(w-2*t, d-2*t), lamb(0xf5f5f0));
     ceil.rotation.x = Math.PI/2; ceil.position.set(0, h, 0); grp.add(ceil);
     const fc = document.createElement('canvas'); fc.width = fc.height = 128;
@@ -1468,17 +1493,17 @@
     ft.repeat.set((w-2*t)/2, (d-2*t)/2);
     const floor = new THREE.Mesh(new THREE.PlaneGeometry(w-2*t, d-2*t), new THREE.MeshLambertMaterial({map:ft}));
     floor.rotation.x = -Math.PI/2; floor.position.set(0, 0.04, 0); floor.receiveShadow = true; grp.add(floor);
-    box(2, 0.03, 0.9, lamb(0x2d6cdf), 0, 0.06, d/2-0.8, false);       // wycieraczka
+    box(2, 0.03, 0.9, lamb(0x1f5a2d), 0, 0.06, d/2-0.8, false);       // wycieraczka
 
     // elewacja: okna, daszek, szyld
     const glass = new THREE.MeshLambertMaterial({color:0x9fd3f0, transparent:true, opacity:0.55});
     [-1,1].forEach(sd => box(2.2, 1.3, 0.06, glass, sd*3.2, 1.7, d/2+0.03, false));
-    shopExterior.push(box(4.6, 0.1, 1.3, lamb(0xb23a3a), 0, 2.7, d/2+0.65, false));
+    shopExterior.push(box(4.6, 0.1, 1.3, lamb(0x2e7d32), 0, 2.7, d/2+0.65, false));
     const sc = document.createElement('canvas'); sc.width = 256; sc.height = 64;
     const sg = sc.getContext('2d');
-    sg.fillStyle = '#1b3a5c'; sg.fillRect(0,0,256,64);
+    sg.fillStyle = '#1e6b34'; sg.fillRect(0,0,256,64);
     sg.fillStyle = '#fff'; sg.font = 'bold 42px sans-serif'; sg.textAlign = 'center'; sg.textBaseline = 'middle';
-    sg.fillText('SKLEP', 128, 34);
+    sg.fillText('ZAPKA', 128, 34);
     const sign = new THREE.Mesh(new THREE.PlaneGeometry(4, 0.8), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sc)}));
     sign.position.set(0, 3.15, d/2+0.04); grp.add(sign); shopExterior.push(sign);
 
@@ -1522,7 +1547,7 @@
       const m = new THREE.Mesh(new THREE.PlaneGeometry(pw, ph2), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c)}));
       m.position.set(px, py, -d/2 + t + 0.02); grp.add(m);
     };
-    poster(512, 128, 3, 0.75, (g,cw,ch) => { g.fillStyle = '#1b3a5c'; g.fillRect(0,0,cw,ch); g.fillStyle = '#fff'; g.font = 'bold 60px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('Real Shop', cw/2, ch/2+4); }, 0, 2.95);
+    poster(512, 128, 3, 0.75, (g,cw,ch) => { g.fillStyle = '#1e6b34'; g.fillRect(0,0,cw,ch); g.fillStyle = '#fff'; g.font = 'bold 60px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('Zapka', cw/2, ch/2+4); }, 0, 2.95);
     poster(256, 160, 1.3, 0.81, (g,cw,ch) => { g.fillStyle = '#f2c230'; g.fillRect(0,0,cw,ch); g.fillStyle = '#222'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = 'bold 40px sans-serif'; g.fillText('TELEFON', cw/2, 50); g.font = 'bold 46px sans-serif'; g.fillText('5 monet', cw/2, 110); }, -3.2, 2.2);
     poster(256, 160, 1.3, 0.81, (g,cw,ch) => { g.fillStyle = '#c62828'; g.fillRect(0,0,cw,ch); g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = 'bold 44px sans-serif'; g.fillText('NOWOŚĆ!', cw/2, ch/2); }, 3.2, 2.2);
 
@@ -1560,11 +1585,20 @@
     shopWallMat.transparent = false; shopWallMat.opacity = 1;
     shopWallMat.depthWrite = true;
   }
-  function openShopTalk(){
-    say('Witaj w Real Shop! Mam dziś w ofercie telefon za 5 monet 🪙. Interesuje cię?', [
-      {label:'Zobacz ofertę', fn:() => { closeDialog(); openShop(); }},
-      {label:'Tylko się rozglądam', fn:closeDialog}
-    ], '🧑‍💼 Ola, sprzedawczyni');
+  function openShopTalk(msg){
+    say(msg || 'Witaj w Zapce! Kliknij kwadrat z towarem, żeby go kupić. Telefon kosztuje 5 monet 🪙, a rower czeka potem przed sklepem.',
+      [{label:'Wyjdź', fn:closeDialog}], '🧑‍💼 Ola, sprzedawczyni', 'shop');
+    const grid = document.createElement('div');                       // kwadraty z ikonkami – jak w Mebelku
+    grid.id = 'dlgGrid';
+    SHOP_GOODS.forEach(g => {
+      const el = document.createElement('div');
+      el.className = 'slot';
+      el.title = `${g.n} – ${g.p} monet`;
+      el.innerHTML = `<span class="nm">${g.n}</span>${g.i}<span class="n">${coinHTML(g.p + ' 🪙')}</span>`;
+      el.onclick = g.buy;
+      grid.appendChild(el);
+    });
+    $('dlgText').insertAdjacentElement('afterend', grid);
   }
 
 
@@ -2102,12 +2136,13 @@
   // ===== Sklep z ubraniami przy ulicy Społecznej (wschodnia strona, drzwi na zachód – w stronę jezdni) =====
   const CLOTH = {x:144, z:56, w:10, d:7, h:3.6};                 // w – wzdłuż osi Z świata, d – wzdłuż osi X świata
   BUILDINGS.push({x:CLOTH.x, z:CLOTH.z, w:CLOTH.d, d:CLOTH.w, open:true});
-  const HAT_PRICE = 10, CAP_PRICE = 8, SHIRT_PRICE = 6, SHOES_PRICE = 12, PANTS_PRICE = 10, PANTS_DEF = 0x333333;
+  const HAT_PRICE = 10, CAP_PRICE = 8, SHIRT_PRICE = 6, SHOES_PRICE = 12, PANTS_PRICE = 10, PANTS_DEF = 0x333333, DRESS_PRICE = 20, DRESS_DEF = 0xc2185b, SKIN_COL = 0xf1c27d, GLASSES_PRICE = 14, GLASSES_DEF = 0x111111;
+  const PANTS_STRIPE = 0x1000000, STRIPE_PANTS_PRICE = 15;                   // spodnie z 3 paskami: flaga w bicie 24 liczby koloru
   // Buty mają dwa kolory (cholewka + podeszwa) zapisane w jednej liczbie: cholewka + podeszwa * 0x1000000
   const SH_DEF_UP = 0x1d1d1f, SH_DEF_SOLE = 0xe8e8e8;
   const shoeEnc = (u, so) => (u & 0xffffff) + (so & 0xffffff) * 0x1000000;
   const shoeUp = v => v % 0x1000000, shoeSole = v => Math.floor(v / 0x1000000);
-  const NOSTACK = id => id === 'shirt' || id === 'shoes' || id === 'pants';        // każda sztuka w osobnym slocie
+  const NOSTACK = id => id === 'shirt' || id === 'shoes' || id === 'pants' || id === 'dress' || id === 'glasses';        // każda sztuka w osobnym slocie
   function buildCapGroup(color){                         // czapka z daszkiem: kopuła + półokrągły daszek + guzik, jeden materiał (jeden kolor)
     const g = new THREE.Group(), m = new THREE.MeshLambertMaterial({color});
     const crown = new THREE.Mesh(new THREE.SphereGeometry(0.3, 18, 10, 0, Math.PI*2, 0, Math.PI/2), m); crown.scale.y = 0.8;
@@ -2230,6 +2265,36 @@
     const pprice = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.4), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(ppc)}));
     pprice.position.set(2.4, 0.7, 1.86); grp.add(pprice);
 
+    // stojak z sukienką i ceną
+    box(0.5, 0.9, 0.5, dark, 1.2, 0.45, 1.6, true);
+    const ddisp = new THREE.Group(), dmat = lamb(DRESS_DEF);
+    const dTorso = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.3,0.2), dmat); dTorso.position.y = 0.45;
+    const dSkirt = new THREE.Mesh(new THREE.BoxGeometry(0.56,0.32,0.34), dmat); dSkirt.position.y = 0.2;
+    const dBelt = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.05,0.22), lamb(0xffd6e8)); dBelt.position.y = 0.32;
+    ddisp.add(dTorso, dSkirt, dBelt); ddisp.position.set(1.2, 0.95, 1.6); ddisp.rotation.y = 0.15;
+    ddisp.children.forEach(m => m.castShadow = true); grp.add(ddisp);
+    const dpc = document.createElement('canvas'); dpc.width = 256; dpc.height = 128;
+    const dpg = dpc.getContext('2d'); dpg.fillStyle = '#fff6d6'; dpg.fillRect(0,0,256,128); dpg.strokeStyle = '#d1477a'; dpg.lineWidth = 8; dpg.strokeRect(4,4,248,120);
+    dpg.fillStyle = '#222'; dpg.textAlign = 'center'; dpg.textBaseline = 'middle'; dpg.font = 'bold 40px sans-serif'; dpg.fillText('SUKIENKA', 128, 40);
+    dpg.font = 'bold 44px sans-serif'; dpg.fillStyle = '#c0392b'; dpg.fillText(DRESS_PRICE + ' monet', 128, 92);
+    const dprice = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.4), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(dpc)}));
+    dprice.position.set(1.2, 0.7, 1.86); grp.add(dprice);
+
+    // stojak z okularami i ceną (wyspa na środku sklepu)
+    box(0.5, 0.9, 0.5, dark, -1.8, 0.45, -0.4, true);
+    const gdisp = new THREE.Group(), gfm = lamb(GLASSES_DEF), glm = new THREE.MeshLambertMaterial({color:0x1b2430, transparent:true, opacity:0.7});
+    [-0.12, 0.12].forEach(ox => { const l = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.12,0.03), glm); l.position.set(ox, 0.1, 0); gdisp.add(l); });
+    const gbr = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.03,0.03), gfm); gbr.position.set(0, 0.15, 0); gdisp.add(gbr);
+    [-0.2, 0.2].forEach(ox => { const t = new THREE.Mesh(new THREE.BoxGeometry(0.025,0.025,0.25), gfm); t.position.set(ox, 0.15, -0.13); gdisp.add(t); });
+    gdisp.position.set(-1.8, 0.95, -0.4); gdisp.rotation.y = 0.3;
+    gdisp.children.forEach(m => m.castShadow = true); grp.add(gdisp);
+    const gpc = document.createElement('canvas'); gpc.width = 256; gpc.height = 128;
+    const gpg = gpc.getContext('2d'); gpg.fillStyle = '#fff6d6'; gpg.fillRect(0,0,256,128); gpg.strokeStyle = '#d1477a'; gpg.lineWidth = 8; gpg.strokeRect(4,4,248,120);
+    gpg.fillStyle = '#222'; gpg.textAlign = 'center'; gpg.textBaseline = 'middle'; gpg.font = 'bold 40px sans-serif'; gpg.fillText('OKULARY', 128, 40);
+    gpg.font = 'bold 44px sans-serif'; gpg.fillStyle = '#c0392b'; gpg.fillText(GLASSES_PRICE + ' monet', 128, 92);
+    const gprice = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.4), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(gpc)}));
+    gprice.position.set(-1.8, 0.7, -0.14); grp.add(gprice);
+
     // lada sprzedawcy
     box(3.7, 1.1, 0.8, dark, 2.45, 0.55, -1.2, true);
     box(3.9, 0.08, 1.0, lamb(0xd7b98a), 2.45, 1.14, -1.2, false);
@@ -2271,20 +2336,22 @@
     cap:{price:CAP_PRICE, name:'Czapka z daszkiem', acc:'czapkę z daszkiem', gen:'czapki z daszkiem', emoji:'🧢', def:0xc62828},
     shirt:{price:SHIRT_PRICE, name:'Koszulka', acc:'koszulkę', gen:'koszulki', emoji:'👕', get def(){ return accShirtCol; }},   // domyślnie w kolorze konta
     shoes:{price:SHOES_PRICE, name:'Buty', acc:'buty', gen:'butów', emoji:'👟', def:SH_DEF_UP},
-    pants:{price:PANTS_PRICE, name:'Spodnie', acc:'spodnie', gen:'spodni', emoji:'👖', def:PANTS_DEF}
+    pants:{price:PANTS_PRICE, name:'Spodnie', acc:'spodnie', gen:'spodni', emoji:'👖', def:PANTS_DEF},
+    dress:{price:DRESS_PRICE, name:'Sukienka', acc:'sukienkę', gen:'sukienki', emoji:'👗', def:DRESS_DEF},
+    glasses:{price:GLASSES_PRICE, name:'Okulary', acc:'okulary', gen:'okularów', emoji:'🕶️', def:GLASSES_DEF}
   };
   const canAddItem = (id, color) => (!NOSTACK(id) && inv.some(x => x && x.id === id && x.color === color)) || inv.indexOf(null) >= 0;   // koszulki się nie stackują
   function buyHeadwear(kind, color){
-    const D = HEAD_DEF[kind];
-    if(coins() < D.price){ toast(`${D.name} kosztuje ${D.price} monet 🪙 (masz ${coins()})`); return false; }
+    const D = HEAD_DEF[kind], price = kind === 'pants' && (color & PANTS_STRIPE) ? STRIPE_PANTS_PRICE : D.price;
+    if(coins() < price){ toast(`${kind === 'pants' && price !== D.price ? 'Spodnie z 3 paskami' : D.name} kosztują ${price} monet 🪙 (masz ${coins()})`); return false; }
     if(!canAddItem(kind, color)){ toast(`Ekwipunek pełny – zrób miejsce na ${D.acc}`); return false; }
-    for(let i=0;i<D.price;i++) removeOne(inv.findIndex(x => x && x.id === 'coin'));
+    for(let i=0;i<price;i++) removeOne(inv.findIndex(x => x && x.id === 'coin'));
     addItem(kind, color);
     renderInv(); renderShop();
     return true;
   }
   // okno wyboru koloru RGB kapelusza / czapki (podgląd na żywo na postaci)
-  let headUiKind = null, headPrevWorn = null, headColor = 0, headColor2 = 0, headPart = 0;   // headColor2/headPart: buty mają 2 kolory (0 = cholewka, 1 = podeszwa)
+  let headStripes = false, headUiKind = null, headPrevWorn = null, headColor = 0, headColor2 = 0, headPart = 0;   // headColor2/headPart: buty mają 2 kolory (0 = cholewka, 1 = podeszwa)
   const headUI = document.createElement('div'); headUI.id = 'headUI';
   headUI.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(330px,calc(100vw - 28px));background:rgba(20,24,30,.97);color:#fff;border-radius:14px;padding:16px;display:none;z-index:40;box-sizing:border-box;font-size:14px';
   const hRow = (id, name, col) => `<div style="display:flex;align-items:center;gap:8px;margin:8px 0"><b style="width:16px;color:${col}">${name}</b><input id="${id}" type="range" min="0" max="255" value="0" style="flex:1"><input id="${id}n" type="number" min="0" max="255" value="0" style="width:58px;padding:3px;border-radius:6px;border:0;background:#2b3340;color:#fff"></div>`;
@@ -2314,7 +2381,7 @@
     const c24 = (r << 16) | (g << 8) | b;
     if(headPart === 1) headColor2 = c24; else headColor = c24;
     if(headUiKind === 'shoes'){ hEl('headTab0c').style.background = '#' + hex6(headColor); hEl('headTab1c').style.background = '#' + hex6(headColor2); }
-    if(headUiKind) setWorn({id:headUiKind, color: headUiKind === 'shoes' ? shoeEnc(headColor, headColor2) : headColor});   // podgląd na postaci
+    if(headUiKind) setWorn({id:headUiKind, color: headUiKind === 'shoes' ? shoeEnc(headColor, headColor2) : headColor | (headUiKind === 'pants' && headStripes ? PANTS_STRIPE : 0)});   // podgląd na postaci
   }
   ['R','G','B'].forEach(k => ['','n'].forEach(sfx => { hEl('head'+k+sfx).oninput = e => {
     const v = {R:hEl('headR').value, G:hEl('headG').value, B:hEl('headB').value}; v[k] = e.target.value; headSet(v.R, v.G, v.B);
@@ -2328,17 +2395,17 @@
   hEl('headTab0').onclick = () => headTab(0); hEl('headTab1').onclick = () => headTab(1);
   function closeHeadUI(cancel, reopenTalk){
     if(!headUiKind) return;
-    if(headUiKind === 'shirt') setShirt(headPrevWorn); else if(headUiKind === 'shoes') setShoes(headPrevWorn); else if(headUiKind === 'pants') setPants(headPrevWorn); else setWorn(headPrevWorn);   // wracamy do tego, co gracz miał na sobie
+    if(headUiKind === 'shirt') setShirt(headPrevWorn); else if(headUiKind === 'shoes') setShoes(headPrevWorn); else if(headUiKind === 'pants') setPants(headPrevWorn); else if(headUiKind === 'dress') setDress(headPrevWorn); else if(headUiKind === 'glasses') setGlasses(headPrevWorn); else setWorn(headPrevWorn);   // wracamy do tego, co gracz miał na sobie
     headUiKind = null; headUI.style.display = 'none';
     if(reopenTalk) openClothTalk();
   }
-  function openHeadPicker(kind){
-    closeDialog();
-    const pw = kind === 'shirt' ? wornShirt : kind === 'shoes' ? wornShoes : kind === 'pants' ? wornPants : worn;
+  function openHeadPicker(kind, stripes){
+    closeDialog(); headStripes = kind === 'pants' && !!stripes;
+    const pw = kind === 'shirt' ? wornShirt : kind === 'shoes' ? wornShoes : kind === 'pants' ? wornPants : kind === 'dress' ? wornDress : kind === 'glasses' ? wornGlasses : worn;
     headPrevWorn = pw ? {id:pw.id, color:pw.color} : null; headUiKind = kind;
     const D = HEAD_DEF[kind];
-    hEl('headTitle').textContent = `${D.emoji} ${D.name} – wybierz kolor`;
-    hEl('headOk').innerHTML = coinHTML(`Kup (${D.price} 🪙)`);
+    hEl('headTitle').textContent = `${D.emoji} ${headStripes ? 'Spodnie z 3 paskami' : D.name} – wybierz kolor`;
+    hEl('headOk').innerHTML = coinHTML(`Kup (${headStripes ? STRIPE_PANTS_PRICE : D.price} 🪙)`);
     headUI.style.display = 'block';
     hEl('headTabs').style.display = kind === 'shoes' ? 'flex' : 'none'; headPart = 0;
     if(kind === 'shoes'){ headColor = SH_DEF_UP; headColor2 = SH_DEF_SOLE; headTab(0); }
@@ -2347,19 +2414,40 @@
     hEl('headOk').focus();
   }
   hEl('headOk').onclick = () => {
-    const kind = headUiKind, color = kind === 'shoes' ? shoeEnc(headColor, headColor2) : headColor; if(!kind) return;
+    const kind = headUiKind, color = kind === 'shoes' ? shoeEnc(headColor, headColor2) : headColor | (kind === 'pants' && headStripes ? PANTS_STRIPE : 0); if(!kind) return;
     const D = HEAD_DEF[kind];
     if(!buyHeadwear(kind, color)) return;
     closeHeadUI(false);
     openClothTalk(`Dziękuję za zakup ${D.gen}! Czy mogę jeszcze w czymś pomóc?`);
-    toast(`Kupiono ${D.acc} ${D.emoji} – załóż w ekwipunku (I)`);
+    toast(`Kupiono ${D.acc} ${D.emoji} – ubierzesz to w szafie 🚪 w swoim domu`);
   };
   hEl('headNo').onclick = () => closeHeadUI(true, true);
   headUI.addEventListener('keydown', e => { e.stopPropagation(); if(e.code === 'Escape') closeHeadUI(true, true); });
   headUI.addEventListener('keyup', e => e.stopPropagation());
+  const CLOTH_GOODS = [
+    {k:'hat',   n:'Kapelusz', i:'🎩', p:HAT_PRICE,   t:'Kapelusz'},
+    {k:'cap',   n:'Czapka',   i:'🧢', p:CAP_PRICE,   t:'Czapka z daszkiem'},
+    {k:'shirt', n:'Koszulka', i:'👕', p:SHIRT_PRICE, t:'Koszulka'},
+    {k:'shoes', n:'Buty',     i:'👟', p:SHOES_PRICE, t:'Buty'},
+    {k:'pants', n:'Spodnie',  i:'👖', p:PANTS_PRICE, t:'Spodnie'},
+    {k:'pants', n:'3 paski',  i:'👖', p:STRIPE_PANTS_PRICE, t:'Spodnie z 3 paskami', stripes:true},
+    {k:'dress', n:'Sukienka', i:'👗', p:DRESS_PRICE, t:'Sukienka'},
+    {k:'glasses', n:'Okulary', i:'🕶️', p:GLASSES_PRICE, t:'Okulary'}
+  ];
   function openClothTalk(msg){
-    say(msg || `Witaj w ZARA'Z! Mam elegancki kapelusz za ${HAT_PRICE} monet 🪙, czapkę z daszkiem za ${CAP_PRICE} monet 🪙 koszulkę za ${SHIRT_PRICE} monet 🪙, buty za ${SHOES_PRICE} monet 🪙 i spodnie za ${PANTS_PRICE} monet 🪙. Kolory wybierzesz sam z palety RGB. Założysz je w ekwipunku (I).`,
-      [{label:`Kup kapelusz (${HAT_PRICE} 🪙)`, fn:() => openHeadPicker('hat')}, {label:`Kup czapkę z daszkiem (${CAP_PRICE} 🪙)`, fn:() => openHeadPicker('cap')}, {label:`Kup koszulkę (${SHIRT_PRICE} 🪙)`, fn:() => openHeadPicker('shirt')}, {label:`Kup buty (${SHOES_PRICE} 🪙)`, fn:() => openHeadPicker('shoes')}, {label:`Kup spodnie (${PANTS_PRICE} 🪙)`, fn:() => openHeadPicker('pants')}, {label:'Wyjdź', fn:closeDialog}], '👗 Ola, sprzedawczyni', 'cloth');
+    say(msg || "Witaj w ZARA'Z! Kliknij kwadrat z towarem, żeby go kupić. Kolor wybierzesz sam z palety RGB. Ubrania zakładasz w szafie w swoim domu.",
+      [{label:'Wyjdź', fn:closeDialog}], '👗 Ola, sprzedawczyni', 'cloth');
+    const grid = document.createElement('div');                       // kwadraty z ikonkami – jak w Mebelku i Dom i AGD
+    grid.id = 'dlgGrid';
+    CLOTH_GOODS.forEach(g => {
+      const el = document.createElement('div');
+      el.className = 'slot';
+      el.title = `${g.t} – ${g.p} monet`;
+      el.innerHTML = `<span class=\"nm\">${g.n}</span>${g.i}<span class=\"n\">${coinHTML(g.p + ' 🪙')}</span>`;
+      el.onclick = () => openHeadPicker(g.k, g.stripes);
+      grid.appendChild(el);
+    });
+    $('dlgText').insertAdjacentElement('afterend', grid);
   }
 
   // ===== Salon samochodowy przy ulicy Poprzecznej (wschodnia strona, drzwi na zachód) =====
@@ -3023,7 +3111,7 @@
     say(`Fajne auto! Mogę poprawić jego skręt, żeby wchodziło w zakręty dużo lepiej. Teraz masz poziom ${steerLvl}/${MECH_PRICES.length}. Następny: ${MECH_TITLES[steerLvl]} – ${price} 🪙. Płacisz monetami przy sobie, a brakującą część pobiorę z konta bankowego.`,
       [{label:`Ulepsz skręt (${price} 🪙)`, fn:buySteer}, {label:'Wyjdź', fn:closeDialog}], W, 'mech');
   }
-  const dlgDist = () => dlgWho === 'miner' ? minerDist() : dlgWho === 'nbr' ? nbrDist() : dlgWho === 'fuel' ? pumpDist() : dlgWho === 'agd' ? agdNpcDist() : dlgWho === 'mech' ? mechNpcDist() : dlgWho === 'paint' ? paintNpcDist() : dlgWho === 'car' ? carNpcDist() : dlgWho === 'cloth' ? clothNpcDist() : dlgWho === 'shop' ? shopNpcDist() : dlgWho === 'bank' ? bankNpcDist() : dlgWho === 'furn' ? furnNpcDist() : dlgWho === 'home' ? (dlgHome ? Math.hypot(player.position.x-homeDoorPos(dlgHome).x, player.position.z-homeDoorPos(dlgHome).z) : 0) : npcDist();
+  const dlgDist = () => dlgWho === 'miner' ? minerDist() : dlgWho === 'nbr' ? nbrDist() : dlgWho === 'fuel' ? pumpDist() : dlgWho === 'agd' ? agdNpcDist() : dlgWho === 'mech' ? mechNpcDist() : dlgWho === 'paint' ? paintNpcDist() : dlgWho === 'car' ? carNpcDist() : dlgWho === 'cloth' ? clothNpcDist() : dlgWho === 'barber' ? barberNpcDist() : dlgWho === 'shop' ? shopNpcDist() : dlgWho === 'bank' ? bankNpcDist() : dlgWho === 'furn' ? furnNpcDist() : dlgWho === 'home' ? (dlgHome ? Math.hypot(player.position.x-homeDoorPos(dlgHome).x, player.position.z-homeDoorPos(dlgHome).z) : 0) : npcDist();
 
   // ===== Ustawianie biurka w domu =====
   const placedDesks = [];
@@ -3825,14 +3913,14 @@
     const th = pd.mesh.rotation.y + (pd.kind === 'bathtub' ? Math.PI/2 : 0);      // w wannie postać siedzi wzdłuż jej długiej osi, plecami do baterii
     player.position.set(pd.wall.x, 0, pd.wall.z); vy = 0;
     facing = th; player.rotation.y = th;
-    toast(pd.kind === 'bathtub' ? 'Kąpiesz się 🛁 Higiena rośnie • F lub Shift – wyjdź' : pd.kind === 'bench' ? 'Siedzisz na ławce 🪑 F lub Shift – wstań' : 'Siedzisz 🪑 F lub Shift – wstań');
+    toast(pd.kind === 'bathtub' ? 'Kąpiesz się 🛁 Higiena rośnie • F lub Shift – wyjdź' : pd.kind === 'bench' ? 'Siedzisz na ławce 🪑 Shift – wstań' : 'Siedzisz 🪑 F lub Shift – wstań');
   }
   // Bezpieczne miejsce po zsiadnięciu / wyjściu (rower, wanna, krzesło, ławka, auto): od (ox,oz) próbuje kierunku (bx,bz), a potem innych stron i krótszych odległości.
   // Odrzuca punkty w ścianie/meblu/budynku oraz takie, do których odcinek od miejsca startu przecinałby ścianę (inaczej lądowałeś po drugiej stronie ściany).
   function safeExitSpot(ox, oz, bx, bz, ignoreWall, minDist){
     const rects = [];
     for(const w of WALLS){
-      if(w === ignoreWall || w.enter !== undefined) continue;
+      if(w === ignoreWall || (ignoreWall && ignoreWall.ring && w.ring === ignoreWall.ring) || w.enter !== undefined) continue;
       if(Math.abs(w.x - ox) > w.w/2 + 7 || Math.abs(w.z - oz) > w.d/2 + 7) continue;
       rects.push([w.x - w.w/2, w.x + w.w/2, w.z - w.d/2, w.z + w.d/2]);
     }
@@ -3966,6 +4054,236 @@
   addEventListener('keydown', e => { if(e.code === 'Escape' && ovenOpen()) closeOven(); });
   setInterval(() => { if(!ovenOpen()) return; if(!homeInside || !ovenCur || !placedDesks.includes(ovenCur) || nearDesk('oven') !== ovenCur){ closeOven(); return; } refreshOvenUI(); }, 120);
 
+  // ===== Portal drogowy jak na autostradzie nad Długą przed rondem: zielona tablica „Nowe fryzury w CUT'S” + strzałka w prawo (zwrócona na zachód, do jadących na rondo) =====
+  (function buildBarberGantry(){
+    const GX = 104, EDGE = ROAD_W/2 + SIDEWALK_GAP + SIDEWALK_W + 0.6;               // słupy tuż za chodnikami po obu stronach jezdni
+    const ZN = ROAD_Z - EDGE, ZS = ROAD_Z + EDGE, TOP = 7.9;
+    const grp = new THREE.Group(); grp.position.set(GX, 0, 0); scene.add(grp);
+    const steel = new THREE.MeshLambertMaterial({color:0x9aa1a8});
+    const put = (m, px, py, pz) => { m.position.set(px,py,pz); m.castShadow = m.receiveShadow = true; grp.add(m); return m; };
+    [ZN, ZS].forEach(z => {
+      put(new THREE.Mesh(new THREE.BoxGeometry(0.45, TOP, 0.45), steel), 0, TOP/2, z);         // słup
+      put(new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.3, 1.1), steel), 0, 0.15, z);            // cokół
+      WALLS.push({x:GX, z, w:0.7, d:0.7});
+    });
+    put(new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.5, ZS - ZN + 0.45), steel), 0, TOP - 0.25, (ZN + ZS)/2);   // belka poprzeczna
+
+    const PW = 6.4, PH = 2.3, PY = 6.2, PZ = ROAD_Z;                                 // tablica nad jezdnią (dolna krawędź 5,05 m – przejadą nawet autobusy)
+    const cw = 1024, ch = 368, c = document.createElement('canvas'); c.width = cw; c.height = ch;
+    const g = c.getContext('2d');
+    g.fillStyle = '#0a6b3d'; g.fillRect(0, 0, cw, ch);                               // zielone tło jak na autostradzie
+    g.strokeStyle = '#fff'; g.lineWidth = 12; g.strokeRect(14, 14, cw - 28, ch - 28);
+    g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = 'bold 92px sans-serif'; g.fillText('Nowe fryzury', 360, 125);
+    g.fillText("w CUT'S", 360, 255);
+    g.beginPath(); g.moveTo(720, 150); g.lineTo(850, 150); g.lineTo(850, 95); g.lineTo(975, 184);   // strzałka w prawo
+    g.lineTo(850, 273); g.lineTo(850, 218); g.lineTo(720, 218); g.closePath(); g.fill();
+    put(new THREE.Mesh(new THREE.BoxGeometry(0.16, PH + 0.2, PW + 0.2), new THREE.MeshLambertMaterial({color:0xdadada})), 0.02, PY, PZ);   // rama i tył tablicy
+    const face = new THREE.Mesh(new THREE.PlaneGeometry(PW, PH), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c)}));
+    face.rotation.y = -Math.PI/2; face.position.set(-0.09, PY, PZ); grp.add(face);   // przód na zachód; prawa strona napisu = +z (prawa strona kierowcy)
+    [-1.9, 1.9].forEach(dz => put(new THREE.Mesh(new THREE.BoxGeometry(0.12, PY ? TOP - PY - PH/2 + 0.1 : 0.4, 0.12), steel), 0, (PY + PH/2 + TOP - 0.5)/2, PZ + dz));   // wieszaki tablicy
+  })();
+
+  // ===== Fryzjer „CUT'S” obok Domu E (Społeczna, zachodnia strona, drzwi na wschód – w stronę jezdni). Na razie bez fryzur =====
+  const BARBER = {x:116, z:64, w:8, d:7, h:3.6};                  // w – wzdłuż osi Z świata, d – wzdłuż osi X świata (front na x = 119,5; chodnik od x = 121,85)
+  BUILDINGS.push({x:BARBER.x, z:BARBER.z, w:BARBER.d, d:BARBER.w, open:true});
+  const barberWallMat = new THREE.MeshLambertMaterial({color:0xe9e4da});
+  const barberExterior = [];
+  let barberInside = false, barberNpc = null, barberPoleTex = null;
+  const barberNpcDist = () => barberNpc ? Math.hypot(player.position.x - barberNpc.position.x, player.position.z - barberNpc.position.z) : 99;
+  const barberLight = new THREE.PointLight(0xfff2e0, 0, 12);
+  (function buildBarberShop(){
+    const CX = BARBER.x, CZ = BARBER.z, w = BARBER.w, d = BARBER.d, h = BARBER.h, t = 0.3, gap = 2.4;
+    const grp = new THREE.Group(); grp.position.set(CX, 0, CZ); grp.rotation.y = Math.PI/2; scene.add(grp);   // front (lokalne +z) → +x
+    const lamb = c => new THREE.MeshLambertMaterial({color:c});
+    const put = (m, px, py, pz) => { m.position.set(px,py,pz); m.castShadow = m.receiveShadow = true; grp.add(m); return m; };
+    const col = (px, pz, bw, bd) => WALLS.push({x:CX + pz, z:CZ - px, w:bd, d:bw});                         // lokalne → świat (obrót +90°)
+    const box = (bw,bh,bd,mat,px,py,pz,collide) => { if(collide) col(px,pz,bw,bd); return put(new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), mat), px, py, pz); };
+    const cyl = (rt,rb,ch,mat,px,py,pz,seg) => put(new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,ch,seg||14), mat), px, py, pz);
+    const dark = lamb(0x1f1f24), red = lamb(0xb71c1c), chrome = lamb(0xc9ced3), wood = lamb(0x6d4c2f), black = lamb(0x111111);
+
+    // ściany: tył, boki, front z wejściem
+    box(w, h, t, barberWallMat, 0, h/2, -d/2+t/2, true);
+    box(t, h, d, barberWallMat, -w/2+t/2, h/2, 0, true);
+    box(t, h, d, barberWallMat,  w/2-t/2, h/2, 0, true);
+    const seg = (w-gap)/2;
+    box(seg, h, t, barberWallMat, -(gap/2+seg/2), h/2, d/2-t/2, true);
+    box(seg, h, t, barberWallMat,  (gap/2+seg/2), h/2, d/2-t/2, true);
+    box(gap, h-2.7, t, barberWallMat, 0, 2.7+(h-2.7)/2, d/2-t/2, false);
+
+    barberExterior.push(box(w+0.6, 0.4, d+0.6, lamb(0x222a35), 0, h+0.2, 0, false));      // dach (w środku chowany)
+    const ceil = new THREE.Mesh(new THREE.PlaneGeometry(w-2*t, d-2*t), lamb(0xf6f3ee));
+    ceil.rotation.x = Math.PI/2; ceil.position.set(0, h, 0); grp.add(ceil);
+
+    // podłoga w czarno-białą szachownicę
+    const fc = document.createElement('canvas'); fc.width = fc.height = 256;
+    const fg = fc.getContext('2d'); for(let i=0;i<8;i++) for(let j=0;j<8;j++){ fg.fillStyle = (i+j)%2 ? '#1c1c20' : '#f1f1ee'; fg.fillRect(i*32, j*32, 32, 32); }
+    const ftex = new THREE.CanvasTexture(fc); ftex.wrapS = ftex.wrapT = THREE.RepeatWrapping; ftex.repeat.set((w-2*t)/1.4, (d-2*t)/1.4);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(w-2*t, d-2*t), new THREE.MeshLambertMaterial({map:ftex}));
+    floor.rotation.x = -Math.PI/2; floor.position.set(0, 0.04, 0); floor.receiveShadow = true; grp.add(floor);
+
+    // witryna, daszek i szyld
+    const glass = new THREE.MeshLambertMaterial({color:0x9fd3f0, transparent:true, opacity:0.5});
+    [-1,1].forEach(sd => box(2.2, 1.6, 0.06, glass, sd*3.0, 1.7, d/2+0.03, false));
+    barberExterior.push(box(4.2, 0.1, 1.2, red, 0, 2.7, d/2+0.6, false));
+    const sc = document.createElement('canvas'); sc.width = 512; sc.height = 128;
+    const sg = sc.getContext('2d'); sg.fillStyle = '#16161a'; sg.fillRect(0,0,512,128);
+    sg.strokeStyle = '#e53935'; sg.lineWidth = 6; sg.strokeRect(4,4,504,120);
+    sg.fillStyle = '#fff'; sg.textAlign = 'center'; sg.textBaseline = 'middle'; sg.font = 'bold 78px sans-serif'; sg.fillText("✂ CUT'S", 256, 68);
+    const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 1.1), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sc)}));
+    sign.position.set(0, 3.15, d/2+0.04); grp.add(sign); barberExterior.push(sign);
+
+    // słupek fryzjerski przy drzwiach (pasy się obracają)
+    const pc = document.createElement('canvas'); pc.width = 64; pc.height = 128;
+    const pg = pc.getContext('2d'); pg.fillStyle = '#fff'; pg.fillRect(0,0,64,128);
+    pg.fillStyle = '#d32f2f'; for(let i=-1;i<5;i++){ pg.beginPath(); pg.moveTo(0,i*32); pg.lineTo(64,i*32-32); pg.lineTo(64,i*32-8); pg.lineTo(0,i*32+24); pg.fill(); }
+    pg.fillStyle = '#1e88e5'; for(let i=-1;i<5;i++){ pg.beginPath(); pg.moveTo(0,i*32+24); pg.lineTo(64,i*32-8); pg.lineTo(64,i*32+8); pg.lineTo(0,i*32+40); pg.fill(); }
+    barberPoleTex = new THREE.CanvasTexture(pc); barberPoleTex.wrapS = barberPoleTex.wrapT = THREE.RepeatWrapping; barberPoleTex.repeat.set(1, 1.2);
+    const pole = cyl(0.14, 0.14, 1.3, new THREE.MeshLambertMaterial({map:barberPoleTex}), 2.0, 1.6, d/2+0.22, 16);
+    barberExterior.push(pole, cyl(0.17, 0.17, 0.08, chrome, 2.0, 0.95, d/2+0.22, 16), cyl(0.17, 0.17, 0.08, chrome, 2.0, 2.27, d/2+0.22, 16));
+
+    // lustra na tylnej ścianie + półka z kosmetykami
+    const mirM = new THREE.MeshLambertMaterial({color:0xcfe8f5, emissive:0x223344});
+    [-2.4, 0, 2.4].forEach(x => { box(1.9, 1.5, 0.05, black, x, 1.95, -d/2+t+0.02, false); box(1.7, 1.3, 0.03, mirM, x, 1.95, -d/2+t+0.05, false); });
+    box(7.4, 0.06, 0.3, wood, 0, 1.0, -d/2+t+0.16, false);
+    [-3.2,-2.4,-1.6,-0.8,0,0.8,1.6,2.4,3.2].forEach((x,i) => cyl(0.07, 0.07, 0.2+0.06*(i%3), lamb([0x1e88e5,0xe53935,0xfdd835,0x43a047][i%4]), x, 1.13+0.03*(i%3), -d/2+t+0.16, 10));
+
+    // fotele fryzjerskie (dwa, przed lustrami)
+    [-2.4, 0].forEach(x => {
+      const z = -d/2 + 1.5;
+      cyl(0.4, 0.45, 0.08, chrome, x, 0.1, z, 18); cyl(0.09, 0.09, 0.45, chrome, x, 0.32, z, 10);
+      box(0.8, 0.18, 0.8, red, x, 0.62, z, false);
+      box(0.8, 1.0, 0.16, red, x, 1.12, z-0.38, false);
+      box(0.08, 0.08, 0.7, chrome, x-0.46, 0.85, z, false); box(0.08, 0.08, 0.7, chrome, x+0.46, 0.85, z, false);
+      box(0.6, 0.06, 0.3, chrome, x, 0.22, z+0.55, false);
+      col(x, z, 0.9, 0.9);
+    });
+    // lada przy prawej ścianie, ławka dla czekających przy lewej
+    box(0.9, 1.1, 2.4, dark, 3.2, 0.55, 0.4, true);
+    box(1.0, 0.07, 2.5, lamb(0xd7c9aa), 3.2, 1.14, 0.4, false);
+    box(0.4, 0.3, 0.3, lamb(0x333333), 3.2, 1.34, 0.9, false);
+    box(0.7, 0.45, 2.0, lamb(0x37474f), -3.3, 0.22, 0.9, true);
+    box(0.12, 0.5, 2.0, lamb(0x37474f), -3.62, 0.65, 0.9, false);
+
+    // tablica „FRYZURY – WKRÓTCE” na lewej ścianie
+    const bc = document.createElement('canvas'); bc.width = 512; bc.height = 192;
+    const bg = bc.getContext('2d'); bg.fillStyle = '#1b2a2f'; bg.fillRect(0,0,512,192); bg.strokeStyle = '#d7c9aa'; bg.lineWidth = 8; bg.strokeRect(4,4,504,184);
+    bg.fillStyle = '#fff'; bg.textAlign = 'center'; bg.textBaseline = 'middle'; bg.font = 'bold 56px sans-serif'; bg.fillText('FRYZURY', 256, 70);
+    bg.fillStyle = '#ffd54a'; bg.font = 'bold 44px sans-serif'; bg.fillText('wkrótce…', 256, 134);
+    const board = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 0.82), new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(bc)}));
+    board.position.set(-w/2+t+0.02, 2.2, -0.3); board.rotation.y = Math.PI/2; grp.add(board);
+
+    const lampM = new THREE.MeshBasicMaterial({color:0xfff4cc});
+    [[-2.4,-0.4],[0,-0.4],[2.4,-0.4],[-1.2,1.6],[1.2,1.6]].forEach(q => put(new THREE.Mesh(new THREE.BoxGeometry(1.2,0.06,0.5), lampM), q[0], h-0.04, q[1]));
+
+    // fryzjer (stoi przy ladzie)
+    const npc = new THREE.Group();
+    const nb = (bw,bh,bd,c,x,y,z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(bw,bh,bd), lamb(c)); m.position.set(x,y,z); m.castShadow = true; npc.add(m); };
+    nb(0.7,0.9,0.4,0x1f1f24,0,1.25,0); nb(0.3,0.7,0.02,0xffffff,0,1.3,0.21);              // czarna kamizelka, biała koszula
+    nb(0.5,0.5,0.5,0xe0ac69,0,1.95,0); nb(0.54,0.16,0.54,0x2b1b10,0,2.25,-0.02);            // głowa, włosy
+    nb(0.08,0.08,0.02,0x000000,-0.12,2.0,0.26); nb(0.08,0.08,0.02,0x000000,0.12,2.0,0.26);
+    nb(0.22,0.05,0.02,0x2b1b10,0,1.88,0.26);                                                 // wąsik
+    nb(0.25,0.8,0.25,0xffffff,-0.48,1.25,0); nb(0.25,0.8,0.25,0xffffff,0.48,1.25,0);
+    nb(0.25,0.8,0.25,0x263238,-0.18,0.4,0); nb(0.25,0.8,0.25,0x263238,0.18,0.4,0);
+    npc.position.set(CX + 0.4, 0, CZ - 2.2); npc.rotation.y = Math.PI/2;                    // lokalnie (2.2, 0.4)
+    scene.add(npc); barberNpc = npc;
+    const tc = document.createElement('canvas'); tc.width = 256; tc.height = 64; const tg = tc.getContext('2d');
+    tg.fillStyle = 'rgba(0,0,0,.55)'; tg.fillRect(0,8,256,48); tg.fillStyle = '#fff'; tg.font = 'bold 26px sans-serif'; tg.textAlign = 'center'; tg.textBaseline = 'middle'; tg.fillText('Kuba • fryzjer', 128, 33);
+    const tsp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(tc), transparent:true}));
+    tsp.scale.set(1.8, 0.45, 1); tsp.position.set(npc.position.x, 2.7, npc.position.z); scene.add(tsp);
+    barberLight.position.set(CX, 3.0, CZ); scene.add(barberLight);
+  })();
+  function updateBarberInterior(dt, time){
+    if(barberPoleTex) barberPoleTex.offset.y = (time*0.25) % 1;                               // kręcący się słupek
+    const dx = player.position.x - barberNpc.position.x, dz = player.position.z - barberNpc.position.z;
+    const target = (barberInside && Math.hypot(dx,dz) < 7) ? Math.atan2(dx, dz) : Math.PI/2;
+    barberNpc.rotation.y += Math.atan2(Math.sin(target - barberNpc.rotation.y), Math.cos(target - barberNpc.rotation.y)) * Math.min(1, dt*5);
+    const inside = Math.abs(player.position.x - BARBER.x) < BARBER.d/2 - 0.15 && Math.abs(player.position.z - BARBER.z) < BARBER.w/2 - 0.15;
+    if(inside === barberInside) return;
+    barberInside = inside;
+    barberExterior.forEach(m => m.visible = !inside);
+    barberWallMat.transparent = false; barberWallMat.opacity = 1; barberWallMat.depthWrite = true;
+  }
+  function pickHair(st){
+    if(hairCur === st.id){ openBarberTalk('Tę fryzurę już masz – wyglądasz świetnie! 💈'); return; }
+    if(!hairOwned.has(st.id)){
+      if(!payAny(st.p, 'fryzura w CUT\'S: ' + st.n.toLowerCase())){
+        toast(`Fryzura „${st.n}” kosztuje ${st.p} monet 🪙 (masz ${coins()}${bank.opened ? ' + ' + bank.balance + ' na koncie' : ''})`); return;
+      }
+      hairOwned.add(st.id); renderInv();
+    }
+    setHair(st.id);
+    toast(`Nowa fryzura: ${st.i} ${st.n}`);
+    openBarberTalk('Gotowe! Wyglądasz rewelacyjnie. 💈 Kupioną fryzurę możesz potem zmieniać za darmo. Chcesz coś jeszcze?');
+  }
+  // okno wyboru koloru włosów RGB (podgląd na żywo na postaci)
+  let hairUiOpen = false, hairPrevCol = null;
+  const hairUI = document.createElement('div'); hairUI.id = 'hairUI';
+  hairUI.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(330px,calc(100vw - 28px));background:rgba(20,24,30,.97);color:#fff;border-radius:14px;padding:16px;display:none;z-index:40;box-sizing:border-box;font-size:14px';
+  const hrRow = (id, name, col) => `<div style="display:flex;align-items:center;gap:8px;margin:8px 0"><b style="width:16px;color:${col}">${name}</b><input id="${id}" type="range" min="0" max="255" value="0" style="flex:1"><input id="${id}n" type="number" min="0" max="255" value="0" style="width:58px;padding:3px;border-radius:6px;border:0;background:#2b3340;color:#fff"></div>`;
+  const HAIR_PRESETS = [0x111111,0x4a2c12,0x8b5a2b,0xb4531a,0xe6d8a8,0xf5f5f5,0x9e9e9e,0xe91e8c,0x1e88e5,0x43a047,0x8e24aa,0xe53935];
+  hairUI.innerHTML = `<h3 style="margin:0 0 10px">🎨 Kolor włosów</h3>
+    <div id="hairSwatch" style="height:54px;border-radius:10px;border:2px solid rgba(255,255,255,.25);margin-bottom:10px"></div>
+    <div style="display:flex;align-items:center;gap:10px"><span>Paleta:</span><input id="hairPick" type="color" style="width:56px;height:32px;border:0;background:none;padding:0"><span id="hairHex" style="opacity:.8;font-family:monospace"></span></div>
+    <div id="hairPresets" style="display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 2px"></div>
+    ${hrRow('hairR','R','#ff6b6b')}${hrRow('hairG','G','#6bff8a')}${hrRow('hairB','B','#6bb5ff')}
+    <div style="opacity:.75;font-size:12px;margin:4px 0 10px">Podgląd widzisz na swojej postaci. Kolor działa na każdą fryzurę.</div>
+    <div style="display:flex;gap:8px"><button id="hairOk" type="button" style="flex:1;padding:10px;border:0;border-radius:8px;background:#2e7d32;color:#fff;cursor:pointer;font-size:14px">✔ Zatwierdź</button><button id="hairDef" type="button" style="padding:10px 12px;border:0;border-radius:8px;background:#3d4654;color:#fff;cursor:pointer;font-size:14px">Oryginalny</button><button id="hairNo" type="button" style="padding:10px 14px;border:0;border-radius:8px;background:#555;color:#fff;cursor:pointer;font-size:14px">Anuluj</button></div>`;
+  document.body.appendChild(hairUI);
+  const hrEl = id => document.getElementById(id);
+  HAIR_PRESETS.forEach(c => {
+    const b = document.createElement('button'); b.type = 'button'; b.title = '#' + c.toString(16).padStart(6,'0');
+    b.style.cssText = `width:26px;height:26px;border-radius:50%;border:2px solid rgba(255,255,255,.55);cursor:pointer;padding:0;background:#${c.toString(16).padStart(6,'0')}`;
+    b.onclick = () => hairSetRGB(c >> 16 & 255, c >> 8 & 255, c & 255);
+    hrEl('hairPresets').appendChild(b);
+  });
+  function hairSetRGB(r, g, b){
+    const c = v => Math.max(0, Math.min(255, Math.round(+v || 0)));
+    r = c(r); g = c(g); b = c(b);
+    const hex = '#' + [r,g,b].map(v => v.toString(16).padStart(2,'0')).join('');
+    hrEl('hairR').value = hrEl('hairRn').value = r; hrEl('hairG').value = hrEl('hairGn').value = g; hrEl('hairB').value = hrEl('hairBn').value = b;
+    hrEl('hairPick').value = hex; hrEl('hairHex').textContent = hex.toUpperCase() + `  (${r}, ${g}, ${b})`; hrEl('hairSwatch').style.background = hex;
+    hairCol = (r << 16) | (g << 8) | b; applyHairColor();                  // podgląd na postaci
+  }
+  ['R','G','B'].forEach(k => ['','n'].forEach(sfx => { hrEl('hair'+k+sfx).oninput = e => {
+    const v = {R:hrEl('hairR').value, G:hrEl('hairG').value, B:hrEl('hairB').value}; v[k] = e.target.value; hairSetRGB(v.R, v.G, v.B);
+  }; }));
+  hrEl('hairPick').oninput = () => { const h = hrEl('hairPick').value; hairSetRGB(parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)); };
+  function closeHairUI(cancel, reopenTalk){
+    if(!hairUiOpen) return;
+    if(cancel){ hairCol = hairPrevCol; applyHairColor(); }                  // anulowanie – wracamy do poprzedniego koloru
+    hairUiOpen = false; hairUI.style.display = 'none';
+    if(reopenTalk) openBarberTalk(cancel ? undefined : 'Świetny kolor! 💈 Chcesz coś jeszcze?');
+  }
+  function openHairColorPicker(){
+    closeDialog();
+    hairPrevCol = hairCol; hairUiOpen = true; hairUI.style.display = 'block';
+    const c0 = hairCol !== null ? hairCol : hairBaseCol();
+    hairSetRGB(c0 >> 16 & 255, c0 >> 8 & 255, c0 & 255);
+    if(document.pointerLockElement) try{ document.exitPointerLock(); }catch(e){}
+    hrEl('hairOk').focus();
+  }
+  hrEl('hairOk').onclick = () => { toast('Zmieniono kolor włosów 🎨'); closeHairUI(false, true); };
+  hrEl('hairDef').onclick = () => { hairCol = null; applyHairColor(); const c0 = hairBaseCol(); hairSetRGB(c0 >> 16 & 255, c0 >> 8 & 255, c0 & 255); hairCol = null; applyHairColor(); };   // oryginalne kolory fryzury
+  hrEl('hairNo').onclick = () => closeHairUI(true, true);
+  hairUI.addEventListener('keydown', e => { e.stopPropagation(); if(e.code === 'Escape') closeHairUI(true, true); });
+  hairUI.addEventListener('keyup', e => e.stopPropagation());
+  function openBarberTalk(msg){
+    say(msg || "Witaj w CUT'S! 💈 Kliknij fryzurę, którą chcesz. Za każdą płacisz tylko raz – potem możesz do niej wracać za darmo. Kolor włosów wybierzesz z palety RGB.",
+      [{label:'🎨 Kolor włosów', fn:openHairColorPicker}, {label:'Wyjdź', fn:closeDialog}], '💈 Kuba, fryzjer', 'barber');
+    const grid = document.createElement('div');                       // kwadraty z fryzurami – jak towary w Dom i AGD
+    grid.id = 'dlgGrid';
+    HAIR_STYLES.forEach(st => {
+      const el = document.createElement('div');
+      el.className = 'slot' + (st.id === hairCur ? ' sel' : '');
+      el.title = st.id === hairCur ? `${st.n} – masz ją na głowie` : hairOwned.has(st.id) ? `${st.n} – masz (kliknij, aby założyć)` : `${st.n} – ${st.p} monet`;
+      el.innerHTML = `<span class="nm">${st.n}</span>${st.i}<span class="n">${hairOwned.has(st.id) ? (st.id === hairCur ? '✔' : 'masz') : coinHTML(st.p + ' 🪙')}</span>`;
+      el.onclick = () => pickHair(st);
+      grid.appendChild(el);
+    });
+    $('dlgText').insertAdjacentElement('afterend', grid);
+  }
+
   // Drzewa (instancje – szybkie nawet przy setkach sztuk)
   const treeColl = [];
   const spots = [];
@@ -3988,9 +4306,11 @@
     (Math.abs(x - SIDE_ROAD_X) < streetEdge + m && z > SIDE_ROAD_START - m && z < SIDE_ROAD_END + m) ||  // boczna ulica z chodnikami
     onNewStreets(x, z, m);                                                                              // rondo, zjazd i supermarket
   for(let i=spots.length-1;i>=0;i--) if(onStreet(spots[i].x, spots[i].z, 1.2)) spots.splice(i,1);
-  for(let i=spots.length-1;i>=0;i--) if(inShop(spots[i].x, spots[i].z, 1.5) || HOMES.some(H => { const D = homeDimsOf(H); return Math.abs(spots[i].x-H.x) < D.ww/2+2 && Math.abs(spots[i].z-H.z) < D.wd/2+2; })) spots.splice(i,1);
+  for(let i=spots.length-1;i>=0;i--) if(inShop(spots[i].x, spots[i].z, 1.5) || HOMES.some(H => { const D = homeDimsOf(H); return Math.abs(spots[i].x-H.x) < D.ww/2+2 && Math.abs(spots[i].z-H.z) < D.wd/2+2; }) || (Math.abs(spots[i].x-BARBER.x) < BARBER.d/2+2.5 && Math.abs(spots[i].z-BARBER.z) < BARBER.w/2+2.5)) spots.splice(i,1);
   const FOUNT = {x:39, z:28};                                     // fontanna: środek między Krótką (x=0) a Poprzeczną (x=78), na wolnym placu za domami
   for(let i=spots.length-1;i>=0;i--) if(Math.hypot(spots[i].x-FOUNT.x, spots[i].z-FOUNT.z) < 9.5) spots.splice(i,1);   // bez drzew na placu fontanny
+  const BTREE = {x:39, z:41.5};                                  // drzewo z okrągłą ławką – tuż za placem fontanny
+  for(let i=spots.length-1;i>=0;i--) if(Math.hypot(spots[i].x-BTREE.x, spots[i].z-BTREE.z) < 5) spots.splice(i,1);   // bez zwykłych drzew obok
   const trunkM = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.25,0.35,3,7), new THREE.MeshLambertMaterial({color:0x6b4423}), spots.length);
   const crownM = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1.8,1), new THREE.MeshLambertMaterial({flatShading:true}), spots.length);
   trunkM.castShadow = crownM.castShadow = true;
@@ -4066,6 +4386,44 @@
       WALLS.push(wl);                                                                          // twarda ławka; siedzący gracz jest z niej „wyłączony” (pd.wall)
       BENCH_SEATS.push({x:bx, z:bz, pd:{kind:'bench', mesh:{rotation:{y:th}}, wall:wl}});     // F – usiądź / wstań (sitOn / standUp)
     });
+  })();
+  // ===== Duże drzewo z okrągłą ławką dookoła pnia (obok fontanny) =====
+  (function buildTreeBench(){
+    const g = new THREE.Group(); g.position.set(BTREE.x, 0, BTREE.z);
+    const lm = (c, o) => new THREE.MeshLambertMaterial(Object.assign({color:c}, o||{}));
+    const wood = lm(0x8a4a22, {side:THREE.DoubleSide}), woodDark = lm(0x6b3818, {side:THREE.DoubleSide}), iron = lm(0x23262b), conc = lm(0x9a9a94);
+    // pień i korona
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.72, 5.2, 10), lm(0x5e4028));
+    trunk.position.y = 2.6; trunk.castShadow = trunk.receiveShadow = true; g.add(trunk);
+    const crownMat = lm(0x3d7a2e, {flatShading:true});
+    [[0,6.6,0,2.9],[1.7,6.0,0.6,2.2],[-1.6,6.1,-0.5,2.3],[0.4,7.7,-0.3,2.0],[0.2,5.9,-1.8,2.0],[-0.4,6.0,1.8,2.1]].forEach(([x,y,z,r],i) => {
+      const m = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), i%2 ? lm(0x4a8a35,{flatShading:true}) : crownMat);
+      m.position.set(x,y,z); m.rotation.y = i; m.castShadow = true; g.add(m);
+    });
+    // ławka: pierścień z listewek (lathe), od r=1.0 do r=2.0, góra siedziska 0,5 m
+    const ring = (r0, r1, y0, y1, mat) => {
+      const pts = [[r0,y0],[r1,y0],[r1,y1],[r0,y1],[r0,y0]].map(([r,y]) => new THREE.Vector2(r,y));
+      const m = new THREE.Mesh(new THREE.LatheGeometry(pts, 56), mat); m.castShadow = m.receiveShadow = true; g.add(m);
+    };
+    for(let k=0;k<4;k++) ring(1.0 + k*0.25, 1.0 + k*0.25 + 0.21, 0.45, 0.52, wood);     // 4 listwy siedziska
+    ring(1.98, 2.04, 0.40, 0.52, woodDark);                                               // zewnętrzna opaska
+    ring(0.96, 1.04, 0.38, 0.52, woodDark);                                               // wewnętrzna opaska
+    for(let k=0;k<8;k++){                                                                  // stalowe nogi na betonowych stopkach
+      const a = (k + 0.5)*Math.PI/4, x = Math.cos(a)*1.5, z = Math.sin(a)*1.5;
+      const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.46, 8), iron); leg.position.set(x, 0.23, z); leg.castShadow = true; g.add(leg);
+      const foot = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.17, 0.1, 8), conc); foot.position.set(x, 0.05, z); foot.receiveShadow = true; g.add(foot);
+    }
+    scene.add(g);
+    treeColl.push({x:BTREE.x, z:BTREE.z, r:0.8});                                          // pień jest przeszkodą
+    // 8 miejsc siedzących dookoła, twarzą na zewnątrz; kolizja ławki = 8 kwadratów (siedzący nie jest z nich wypychany – patrz pd.ring)
+    const RING = 'treebench', SR = 1.72;      // biodra blisko zewnętrznej krawędzi, żeby kolana i łydki były już poza ławką
+    for(let k=0;k<8;k++){
+      const a = k*Math.PI/4, bx = BTREE.x + Math.cos(a)*SR, bz = BTREE.z + Math.sin(a)*SR;
+      const wl = {x:bx, z:bz, w:0.95, d:0.95, ring:RING};
+      WALLS.push(wl);
+      const th = Math.atan2(Math.cos(a), Math.sin(a));
+      BENCH_SEATS.push({x:bx, z:bz, pd:{kind:'bench', mesh:{rotation:{y:th}}, wall:wl, ring:RING}});
+    }
   })();
   function updateFountain(t){
     const F = fountainJets, p = player.position;
@@ -4177,6 +4535,11 @@
   shinL.visible = shinR.visible = false;
   const armL = limb(-0.48,0.85,0x2d6cdf,upper), armR = limb(0.48,0.85,0x2d6cdf,upper);
   const legL = limb(-0.18,0.8,0x333333,body), legR = limb(0.18,0.8,0x333333,body);
+  // Paski na spodniach (3 równoległe, po zewnętrznej stronie nogi) – widoczne tylko dla spodni z flagą PANTS_STRIPE
+  const stripeMat = mat(0xffffff), pantsStripes = [];
+  [[legL,-1,0.8,-0.4],[legR,1,0.8,-0.4],[shinL,-1,0.46,0],[shinR,1,0.46,0]].forEach(([par, side, h, y]) => {
+    [-0.07,0,0.07].forEach(z => { const st = box(0.02, h-0.02, 0.035, 0xffffff, side*0.13, y, z, par); st.material = stripeMat; st.visible = false; pantsStripes.push(st); });
+  });
   // Buty: ciemny but z jasną podeszwą na końcu nogi (chód, rower) oraz na podudziach (na siedząco)
   const shoeMat = mat(0x1d1d1f), soleMat = mat(0xe8e8e8);
   function addShoe(parent, y){
@@ -4185,6 +4548,24 @@
     const sole = new THREE.Mesh(new THREE.BoxGeometry(0.3,0.05,0.42), soleMat); sole.position.set(0,0.025,0.06);
     top.castShadow = sole.castShadow = true; g.add(top, sole); g.position.y = y; parent.add(g); return g;
   }
+  // Spódnica sukienki (na biodrach, nad nogami) – widoczna tylko, gdy założona jest sukienka
+  const skirtMat = mat(DRESS_DEF), skirtBelt = mat(0xffffff);
+  const skirt = box(0.84,0.54,0.52,DRESS_DEF,0,0.57,0,body); skirt.material = skirtMat; skirt.visible = false;
+  const skirtHem = box(0.86,0.05,0.54,0xffffff,0,0.32,0,body); skirtHem.material = skirtBelt; skirtHem.visible = false;
+  // Okulary: oprawki (jeden kolor) + przyciemnione szkła, na twarzy (przód = +z); warstwa 1 jak głowa
+  const glassesG = new THREE.Group(), glassesFrame = mat(GLASSES_DEF);
+  const glassesLens = new THREE.MeshLambertMaterial({color:0x1b2430, transparent:true, opacity:0.6});
+  [-0.13, 0.13].forEach(ox => {
+    const l = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.15,0.03), glassesLens); l.position.set(ox, 1.18, 0.275); glassesG.add(l);
+    const top = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.025,0.035), glassesFrame); top.position.set(ox, 1.26, 0.28);
+    const bot = new THREE.Mesh(new THREE.BoxGeometry(0.22,0.025,0.035), glassesFrame); bot.position.set(ox, 1.11, 0.28);
+    const sd1 = new THREE.Mesh(new THREE.BoxGeometry(0.025,0.15,0.035), glassesFrame); sd1.position.set(ox-0.105, 1.185, 0.28);
+    const sd2 = new THREE.Mesh(new THREE.BoxGeometry(0.025,0.15,0.035), glassesFrame); sd2.position.set(ox+0.105, 1.185, 0.28);
+    glassesG.add(top, bot, sd1, sd2);
+  });
+  const gBridge = new THREE.Mesh(new THREE.BoxGeometry(0.06,0.025,0.035), glassesFrame); gBridge.position.set(0, 1.23, 0.28); glassesG.add(gBridge);
+  [-0.255, 0.255].forEach(ox => { const t = new THREE.Mesh(new THREE.BoxGeometry(0.025,0.025,0.5), glassesFrame); t.position.set(ox, 1.23, 0.03); glassesG.add(t); });   // zauszniki
+  glassesG.visible = false; glassesG.traverse(o => { if(o.isMesh) o.layers.set(1); }); upper.add(glassesG);
   const legShoeL = addShoe(legL, -0.8), legShoeR = addShoe(legR, -0.8);
   addShoe(shinL, -0.25); addShoe(shinR, -0.25);
   // Zielony plecak dostawcy – widoczny na plecach (−z; postać patrzy w stronę +z), gdy niesiesz zamówienie z restauracji
@@ -4278,14 +4659,16 @@
   upper.children.forEach(o => { if((o.isMesh && o.position.y > 1) || o === hat || o === capG) o.traverse(m => m.layers.set(1)); });
   camera.layers.enable(1);
   let worn = null;                                                // {id:'hat'|'cap', color} albo null
-  const isWorn = s => s && (s.id === 'shirt' || s.id === 'shoes' || s.id === 'pants') ? false : !!(worn && s && s.id === worn.id && s.color === worn.color);   // założona koszulka nie leży w ekwipunku
+  const isWorn = s => s && (s.id === 'shirt' || s.id === 'shoes' || s.id === 'pants' || s.id === 'dress' || s.id === 'glasses') ? false : !!(worn && s && s.id === worn.id && s.color === worn.color);   // założona koszulka nie leży w ekwipunku
   // Koszulka: osobny slot od nakrycia głowy. Zdjęta = kolor konta gracza.
+  let wornDress = null;                                           // {id:'dress', color} albo null (zakrywa koszulkę i spodnie)
+  let wornGlasses = null;                                         // {id:'glasses', color} albo null
   let wornShirt = null;                                           // {id:'shirt', color} albo null
   let accShirtCol = 0x2d6cdf;                                     // kolor konta (domyślny niebieski)
   function refreshShirt(){
     const c = wornShirt ? wornShirt.color : accShirtCol;
-    upper.children[0].material.color.setHex(c);
-    armL.children[0].material.color.setHex(c); armR.children[0].material.color.setHex(c);
+    upper.children[0].material.color.setHex(wornDress ? wornDress.color : c);               // sukienka zakrywa koszulkę (bez rękawów)
+    armL.children[0].material.color.setHex(wornDress ? SKIN_COL : c); armR.children[0].material.color.setHex(wornDress ? SKIN_COL : c);
   }
   function setShirt(w){ wornShirt = w ? {id:'shirt', color:w.color} : null; refreshShirt(); }
   // Buty: osobny slot; zdjęte = czarne z białą podeszwą. Dwa kolory zakodowane w jednej liczbie (shoeEnc).
@@ -4298,19 +4681,89 @@
   // Spodnie: osobny slot, jeden kolor (nogi + podudzia na siedząco); zdjęte = domyślne ciemnoszare.
   let wornPants = null;
   function refreshPants(){
-    const c = wornPants ? wornPants.color : PANTS_DEF;
-    [legL.children[0], legR.children[0], shinL, shinR].forEach(o => o.material.color.setHex(c));
+    const raw = wornPants ? wornPants.color : PANTS_DEF, c = raw & 0xffffff, striped = !!(raw & PANTS_STRIPE);
+    [legL.children[0], legR.children[0], shinL, shinR].forEach(o => o.material.color.setHex(wornDress ? SKIN_COL : c));   // pod sukienką gołe nogi
+    const lum = (0.299*(c >> 16 & 255) + 0.587*(c >> 8 & 255) + 0.114*(c & 255)) / 255;
+    stripeMat.color.setHex(lum > 0.7 ? 0x111111 : 0xffffff);                  // jasne spodnie → czarne paski, ciemne → białe
+    pantsStripes.forEach(o => o.visible = striped && !wornDress);
+  }
+  function setGlasses(w){
+    wornGlasses = w ? {id:'glasses', color:w.color & 0xffffff} : null;
+    if(wornGlasses) glassesFrame.color.setHex(wornGlasses.color);
+    glassesG.visible = !!wornGlasses;
   }
   function setPants(w){ wornPants = w ? {id:'pants', color:w.color} : null; refreshPants(); }
-  const unwear = s => { if(s && s.id === 'shirt') setShirt(null); else if(s && s.id === 'shoes') setShoes(null); else if(s && s.id === 'pants') setPants(null); else setWorn(null); };
+  // Sukienka: osobny slot, jeden kolor; nadpisuje wygląd koszulki i spodni (te zostają w swoich slotach).
+  function setDress(w){
+    wornDress = w ? {id:'dress', color:w.color & 0xffffff} : null;
+    if(wornDress){ skirtMat.color.setHex(wornDress.color); const c = wornDress.color, lum = (0.299*(c >> 16 & 255) + 0.587*(c >> 8 & 255) + 0.114*(c & 255)) / 255; skirtBelt.color.setHex(lum > 0.7 ? 0x333333 : 0xffffff); }
+    skirt.visible = skirtHem.visible = !!wornDress;
+    refreshShirt(); refreshPants();
+  }
+  // Fryzury (kupowane u fryzjera CUT'S). Klasyczna = oryginalna bryła `hair`; pozostałe to grupy klocków dokładane do `upper`.
+  // Części: [szer, wys, głęb, x, y, z, (kolor)]. Głowa: środek y = 1,15, czubek y = 1,40, przód = +z.
+  const HAIR_STYLES = [
+    {id:'classic', n:'Klasyczna', i:'✂️', p:0, col:0x4a2c12},
+    {id:'quiff',   n:'Zaczes',    i:'😎', p:12, tall:true, col:0xe6d8a8, parts:[
+      [0.54,0.12,0.54, 0,1.44,-0.02], [0.54,0.34,0.10, 0,1.23,-0.28],
+      [0.07,0.28,0.42, -0.285,1.27,-0.04], [0.07,0.28,0.42, 0.285,1.27,-0.04],
+      [0.50,0.22,0.34, 0,1.60,0.10], [0.44,0.16,0.20, 0,1.76,0.20]]},
+    {id:'mohawk',  n:'Irokez',    i:'🤘', p:18, tall:true, col:0xe91e8c, parts:[
+      [0.52,0.05,0.52, 0,1.415,-0.02, 0x3a2a22],
+      [0.12,0.24,0.10, 0,1.52,0.20], [0.12,0.34,0.10, 0,1.57,0.10], [0.12,0.40,0.10, 0,1.60,0.00],
+      [0.12,0.34,0.10, 0,1.57,-0.10], [0.12,0.26,0.10, 0,1.53,-0.20]]},
+    {id:'long',    n:'Długie',    i:'🧑‍🦱', p:15, col:0xb4531a, parts:[
+      [0.56,0.15,0.56, 0,1.45,-0.02], [0.54,0.10,0.07, 0,1.37,0.27], [0.56,0.78,0.10, 0,1.00,-0.30],
+      [0.07,0.50,0.36, -0.295,1.14,-0.05], [0.07,0.50,0.36, 0.295,1.14,-0.05]]},
+    {id:'ponytails', n:'Dwa kucyki', i:'🎀', p:15, col:0x8b5a2b, parts:[
+      [0.56,0.15,0.56, 0,1.45,-0.02], [0.54,0.10,0.07, 0,1.37,0.27],
+      [0.07,0.30,0.36, -0.295,1.22,-0.05], [0.07,0.30,0.36, 0.295,1.22,-0.05],
+      [0.56,0.40,0.10, 0,1.20,-0.30],
+      [0.13,0.13,0.13, -0.34,1.30,-0.27, 0xe91e8c], [0.13,0.13,0.13, 0.34,1.30,-0.27, 0xe91e8c],
+      [0.16,0.50,0.16, -0.34,0.99,-0.28], [0.16,0.50,0.16, 0.34,0.99,-0.28]]}
+  ];
+  HAIR_STYLES.forEach(st => { st.meshes = []; });
+  HAIR_STYLES[0].meshes.push({m:hair, base:0x4a2c12, stub:false});
+  HAIR_STYLES.forEach(st => {
+    if(!st.parts) return;
+    st.group = new THREE.Group(); st.group.visible = false;
+    st.parts.forEach(q => { const m = box(q[0],q[1],q[2], q[6] !== undefined ? q[6] : st.col, q[3],q[4],q[5], st.group); st.meshes.push({m, base:m.material.color.getHex(), stub:q[6] !== undefined}); });
+    upper.add(st.group); st.group.traverse(m => m.layers.set(1));        // warstwa 1 – jak głowa (kamera 1. osoby ją pomija)
+  });
+  let hairCur = 'classic';
+  let hairCol = null;                                                    // własny kolor włosów (0xRRGGBB) albo null = kolory domyślne danej fryzury
+  const hairDark = c => ((((c >> 16 & 255) * 0.45) | 0) << 16) | ((((c >> 8 & 255) * 0.45) | 0) << 8) | (((c & 255) * 0.45) | 0);   // ogolone boki irokeza = ciemniejszy odcień
+  function applyHairColor(){
+    HAIR_STYLES.forEach(st => st.meshes.forEach(q => q.m.material.color.setHex(hairCol === null ? q.base : (q.stub ? hairDark(hairCol) : hairCol))));
+  }
+  const hairBaseCol = () => (HAIR_STYLES.find(st => st.id === hairCur) || HAIR_STYLES[0]).col;   // kolor domyślny wybranej fryzury
+  const hairOwned = new Set(['classic']);
+  function refreshHair(){                                                // widoczna jest tylko wybrana fryzura; czapka chowa włosy, kapelusz – wysokie fryzury
+    const w = worn;
+    HAIR_STYLES.forEach(st => {
+      const vis = st.id === hairCur && !(w && w.id === 'cap') && !(w && w.id === 'hat' && st.tall);
+      if(st.id === 'classic') hair.visible = vis; else st.group.visible = vis;
+    });
+  }
+  function setHair(id){ hairCur = HAIR_STYLES.some(st => st.id === id) ? id : 'classic'; hairOwned.add(hairCur); refreshHair(); }
+  function svApplyHair(h){
+    hairOwned.clear(); hairOwned.add('classic');
+    if(h && Array.isArray(h.o)) h.o.forEach(id => { if(HAIR_STYLES.some(st => st.id === id)) hairOwned.add(id); });
+    hairCur = h && hairOwned.has(h.c) ? h.c : 'classic';
+    hairCol = h && h.k != null && isFinite(+h.k) ? (+h.k & 0xffffff) : null;
+    applyHairColor(); refreshHair();
+  }
+  const unwear = s => { if(s && s.id === 'shirt') setShirt(null); else if(s && s.id === 'shoes') setShoes(null); else if(s && s.id === 'pants') setPants(null); else if(s && s.id === 'dress') setDress(null); else if(s && s.id === 'glasses') setGlasses(null); else setWorn(null); };
   function setWorn(w){
     if(w && w.id === 'shirt'){ setShirt(w); return; }
     if(w && w.id === 'shoes'){ setShoes(w); return; }
     if(w && w.id === 'pants'){ setPants(w); return; }
+    if(w && w.id === 'dress'){ setDress(w); return; }
+    if(w && w.id === 'glasses'){ setGlasses(w); return; }
     worn = w ? {id:w.id, color:w.color} : null;
     if(w){ const c = w.color !== undefined ? w.color : HEAD_DEF[w.id].def; (w.id === 'cap' ? capG.userData.mat : hm).color.setHex(c); }
     hat.visible = !!w && w.id === 'hat'; capG.visible = !!w && w.id === 'cap';
-    hair.visible = !(w && w.id === 'cap');                         // czapka z daszkiem: bez włosów
+    refreshHair();                                                 // czapka z daszkiem: bez włosów; kapelusz: bez wysokich fryzur
   }
 
   // ===== Działające lustro: płaskie odbicie – scena renderowana z „lustrzanej” kamery do tekstury szyby. Każde lustro (wbudowane w łazience Domu B
@@ -5564,7 +6017,7 @@
       ctx.fillRect(Math.min(q.x,r.x),r.y,Math.abs(r.x-q.x),q.y-r.y);ctx.strokeRect(Math.min(q.x,r.x),r.y,Math.abs(r.x-q.x),q.y-r.y);
     }
     // Podpisy najważniejszych miejsc
-    const labels=[['Real Shop',SHOP.x,SHOP.z],['Restauracja',REST.x,REST.z],['Bank',BANK.x,BANK.z],['Mebelek',FURN.x,FURN.z],...HOMES.map(H=>[H.owned?H.label+' (twój)':H.label,H.x,H.z]),['Supermarket Pandy (8–22)',SUPER.x,SUPER.z],['Dom i AGD',AGD.x,AGD.z],['Kopalnia ⛏️',MINE.x-9,MINE.z],['ZARA\'Z',CLOTH.x,CLOTH.z],['Salon samochodowy',CAR.x,CAR.z],['Lakiernik',PAINT.x,PAINT.z],['Mechanik',MECH.x,MECH.z],['Stacja paliw',STATION.x,STATION.z],['PKS',PKS_BLD.x,PKS_BLD.z],...BUS_STOPS.map(b=>['Przystanek',b.x,b.z])];
+    const labels=[['Zapka',SHOP.x,SHOP.z],['Restauracja',REST.x,REST.z],['Bank',BANK.x,BANK.z],['Mebelek',FURN.x,FURN.z],...HOMES.map(H=>[H.owned?H.label+' (twój)':H.label,H.x,H.z]),['Supermarket Pandy (8–22)',SUPER.x,SUPER.z],['Dom i AGD',AGD.x,AGD.z],['Kopalnia ⛏️',MINE.x-9,MINE.z],['ZARA\'Z',CLOTH.x,CLOTH.z],['Salon samochodowy',CAR.x,CAR.z],['Lakiernik',PAINT.x,PAINT.z],["CUT'S",BARBER.x,BARBER.z],['Mechanik',MECH.x,MECH.z],['Stacja paliw',STATION.x,STATION.z],['PKS',PKS_BLD.x,PKS_BLD.z],...BUS_STOPS.map(b=>['Przystanek',b.x,b.z])];
     const scaleUI=Math.max(.62,Math.min(1.35,w/660)), scale=scaleUI*(view?1.4/k:1);
     ctx.font=`bold ${12*scale}px system-ui`;ctx.textAlign='center';ctx.textBaseline='middle';
     for(const [name,x,z] of labels){const q=pt(x,z);ctx.fillStyle='#fff';ctx.shadowColor='#18232c';ctx.shadowBlur=4;ctx.fillText(name,q.x,q.y-10*scale);}
@@ -5706,7 +6159,7 @@
     for(const key in keys) keys[key] = false;
     joy.x = joy.y = 0;
     knob.style.transform = '';
-    closeShop(); closePhone(); closeDialog(); closeFridge(); closeWardrobe(); cancelPlacement();
+    closePhone(); closeDialog(); closeFridge(); closeWardrobe(); cancelPlacement();
     document.getElementById('deathScreen').style.display = 'flex';
   }
   document.getElementById('deathBtn').addEventListener('click', () => location.reload());
@@ -5719,11 +6172,13 @@
     coin:{n:'Moneta', i:'🪙', color:0xffc107},
     key:{n:'Klucz', i:'🔑', color:0xb0bec5},
     wood:{n:'Drewno', i:'🪵', color:0x8d5a2b},
-    hat:{n:'Kapelusz', i:'🎩', color:0x222222, use:'Załóż / zdejmij'},
-    cap:{n:'Czapka z daszkiem', i:'🧢', color:0xc62828, use:'Załóż / zdejmij'},
-    shirt:{n:'Koszulka', i:'👕', color:0x2d6cdf, use:'Załóż'},
-    shoes:{n:'Buty', i:'👟', color:0x1d1d1f, use:'Załóż'},
-    pants:{n:'Spodnie', i:'👖', color:0x333333, use:'Załóż'},
+    hat:{n:'Kapelusz', i:'🎩', color:0x222222, use:'Ubierz w szafie'},
+    cap:{n:'Czapka z daszkiem', i:'🧢', color:0xc62828, use:'Ubierz w szafie'},
+    shirt:{n:'Koszulka', i:'👕', color:0x2d6cdf, use:'Ubierz w szafie'},
+    shoes:{n:'Buty', i:'👟', color:0x1d1d1f, use:'Ubierz w szafie'},
+    pants:{n:'Spodnie', i:'👖', color:0x333333, use:'Ubierz w szafie'},
+    dress:{n:'Sukienka', i:'👗', color:0xc2185b, use:'Ubierz w szafie'},
+    glasses:{n:'Okulary', i:'🕶️', color:0x111111, use:'Ubierz w szafie'},
     phone:{n:'Telefon', i:'📱', color:0x2b2b30, use:'Otwórz'},
     charger:{n:'Ładowarka', i:'🔌', color:0xf2f2f2, use:'Podłącz do gniazdka'},
     computer:{n:'Komputer', i:'🖥️', color:0x343a40, use:'Ustaw na biurku'},
@@ -5746,6 +6201,7 @@
     blender:{n:'Blender', i:'🍹', color:0x2b2f35},
     microwave:{n:'Mikrofalówka', i:'🍲', color:0xc3ccd3},
     vacuum:{n:'Odkurzacz', i:'🧹', color:0xd9412f},
+    doormat:{n:'Wycieraczka z restauracji', i:'🟫', color:0x6e4a2a, use:'Połóż przed domem'},
     pickaxe:{n:'Kilof', i:'⛏️', color:0x8d6e63},
     stone:{n:'Kamień', i:'🪨', color:0x8a8a8a}
   };
@@ -5781,23 +6237,27 @@
   // Szafa: przechowuje ubrania (kapelusze i czapki, z zachowaniem koloru)
   const WARDROBE_MAX = 40;
   const wardrobeClothes = [];                                      // {id:'hat'|'cap', color, count}
-  const isClothing = id => id === 'hat' || id === 'cap' || id === 'shirt' || id === 'shoes' || id === 'pants';
+  const isClothing = id => id === 'hat' || id === 'cap' || id === 'shirt' || id === 'shoes' || id === 'pants' || id === 'dress' || id === 'glasses';
   const clothColor = c => c.color !== undefined ? c.color : ITEMS[c.id].color;
   // ===== Szafa: podgląd postaci + 4 sloty (nakrycie głowy, koszulka, spodnie, buty) z wymianą ubrań =====
   const WD_SLOTS = [
     {key:'head',  label:'Nakrycie głowy', ids:['hat','cap']},
+    {key:'glasses', label:'Okulary', ids:['glasses']},
     {key:'shirt', label:'Koszulka', ids:['shirt']},
     {key:'pants', label:'Spodnie', ids:['pants']},
+    {key:'dress', label:'Sukienka', ids:['dress']},
     {key:'shoes', label:'Buty', ids:['shoes']}
   ];
   let wdSel = 'head';
   const wdCurrent = key => key === 'head' ? (worn ? {id:worn.id, color:worn.color} : null)
     : key === 'shirt' ? {id:'shirt', color:wornShirt ? wornShirt.color : accShirtCol, def:!wornShirt}
     : key === 'pants' ? {id:'pants', color:wornPants ? wornPants.color : PANTS_DEF, def:!wornPants}
+    : key === 'dress' ? (wornDress ? {id:'dress', color:wornDress.color} : null)
+    : key === 'glasses' ? (wornGlasses ? {id:'glasses', color:wornGlasses.color} : null)
     : {id:'shoes', color:wornShoes ? wornShoes.color : shoeEnc(SH_DEF_UP, SH_DEF_SOLE), def:!wornShoes};
   const wdSw = h => `<span style="display:inline-block;width:13px;height:13px;border-radius:50%;border:1px solid rgba(255,255,255,.8);vertical-align:middle;margin-left:4px;background:#${h}"></span>`;
-  const wdDots = it => !it || it.color === undefined ? '' : it.id === 'shoes' ? wdSw(hex6(shoeUp(it.color))) + wdSw(hex6(shoeSole(it.color))) : wdSw(hex6(it.color));
-  const wdSet = (key, color) => key === 'shirt' ? setShirt({color}) : key === 'pants' ? setPants({color}) : setShoes({color});
+  const wdDots = it => !it || it.color === undefined ? '' : it.id === 'pants' && (it.color & PANTS_STRIPE) ? wdSw(hex6(it.color)) + ' <small style="opacity:.7">· 3 paski</small>' : it.id === 'shoes' ? wdSw(hex6(shoeUp(it.color))) + wdSw(hex6(shoeSole(it.color))) : wdSw(hex6(it.color));
+  const wdSet = (key, color) => key === 'shirt' ? setShirt({color}) : key === 'pants' ? setPants({color}) : key === 'dress' ? setDress({color}) : key === 'glasses' ? setGlasses({color}) : setShoes({color});
   function wdStore(id, color){                                     // dodaje sztukę do szafy
     const w = wardrobeClothes.find(c => c.id === id && c.color === color);
     if(w) w.count++; else wardrobeClothes.push(color === undefined ? {id, count:1} : {id, color, count:1});
@@ -5807,13 +6267,13 @@
     const s = inv[k]; if(!s || s.id !== key) return;
     const cur = wdCurrent(key), c = s.color;
     removeOne(k);
-    if(!addItem(key, cur.color)){ addItem(key, c); renderInv(); toast('Brak miejsca w ekwipunku na zdjęte ubranie'); return; }
+    if(cur && !addItem(key, cur.color)){ addItem(key, c); renderInv(); toast('Brak miejsca w ekwipunku na zdjęte ubranie'); return; }
     wdSet(key, c); toast('Założono: ' + ITEMS[key].n); renderInv(); renderWardrobe();
   }
   function wdWearStore(key, w){                                    // koszulka / spodnie / buty z szafy; zdjęte trafiają do szafy
     const cur = wdCurrent(key), c = w.color;
     if(--w.count <= 0) wardrobeClothes.splice(wardrobeClothes.indexOf(w), 1);
-    wdStore(key, cur.color);
+    if(cur) wdStore(key, cur.color);
     wdSet(key, c); toast('Założono: ' + ITEMS[key].n); renderInv(); renderWardrobe();
   }
   function wdWearHead(src){                                        // nakrycia głowy zostają w ekwipunku (jak dotąd), z szafy trafiają do ekwipunku
@@ -5875,9 +6335,9 @@
     WD_SLOTS.forEach(sl => {
       const it = wdCurrent(sl.key), on = wdSel === sl.key;
       const b = document.createElement('button'); b.type = 'button';
-      b.style.cssText = 'text-align:left;color:#fff;border-radius:10px;padding:6px 9px;cursor:pointer;font-size:13px;line-height:1.3;border:2px solid ' + (on ? '#fff' : 'transparent') + ';background:' + (on ? '#3a7bd5' : 'rgba(255,255,255,.1)');
+      b.style.cssText = 'text-align:left;color:#fff;border-radius:10px;padding:4px 9px;cursor:pointer;font-size:13px;line-height:1.3;border:2px solid ' + (on ? '#fff' : 'transparent') + ';background:' + (on ? '#3a7bd5' : 'rgba(255,255,255,.1)');
       b.innerHTML = '<div style="opacity:.75;font-size:10px;text-transform:uppercase;letter-spacing:.04em">' + sl.label + '</div>' +
-        (it ? ITEMS[it.id].i + ' ' + ITEMS[it.id].n + wdDots(it) + (it.def ? ' <small style="opacity:.65">· startowe</small>' : '') : '<span style="opacity:.6">— brak —</span>');
+        (it ? ITEMS[it.id].i + ' ' + ITEMS[it.id].n + wdDots(it) + (it.def ? ' <small style="opacity:.65">· startowe</small>' : '') + (wornDress && (sl.key === 'shirt' || sl.key === 'pants') ? ' <small style="opacity:.65">· pod sukienką</small>' : '') : '<span style="opacity:.6">— brak —</span>');
       b.onclick = () => { wdSel = sl.key; renderWardrobe(); };
       col.appendChild(b);
     });
@@ -5887,6 +6347,13 @@
     sec('Zmień: ' + sl.label);
     let any = false;
     if(sl.key === 'head' && cur){ any = true; row(cur, 'masz na sobie', 'Zdejmij', () => { setWorn(null); toast('Zdjęto: ' + ITEMS[cur.id].n); renderInv(); renderWardrobe(); }); }
+    if((sl.key === 'dress' || sl.key === 'glasses') && cur){ any = true; row(cur, 'masz na sobie', 'Zdejmij', () => {
+      if(!addItem(sl.key, cur.color)){
+        if(wdCount() >= WARDROBE_MAX){ toast('Brak miejsca w ekwipunku i w szafie'); return; }
+        wdStore(sl.key, cur.color);
+      }
+      (sl.key === 'dress' ? setDress : setGlasses)(null); toast('Zdjęto: ' + ITEMS[sl.key].n); renderInv(); renderWardrobe();
+    }); }
     inv.forEach((s, k) => {
       if(!s || sl.ids.indexOf(s.id) < 0) return;
       if(sl.key === 'head' && isWorn(s)) return;
@@ -5932,18 +6399,18 @@
     clearTimeout(toast.h); toast.h = setTimeout(() => t.style.opacity = 0, 1800);
   }
   function addItem(id, color){
-    color = ((id === 'hat' || id === 'cap' || id === 'shirt' || id === 'shoes' || id === 'pants') && typeof color === 'number') ? color : undefined;   // kolor mają tylko ubrania
+    color = ((id === 'hat' || id === 'cap' || id === 'shirt' || id === 'shoes' || id === 'pants' || id === 'dress' || id === 'glasses') && typeof color === 'number') ? color : undefined;   // kolor mają tylko ubrania
     const s = NOSTACK(id) ? null : inv.find(x => x && x.id === id && x.color === color);   // każda koszulka = osobny slot
     if(s){ s.count++; return true; }
     const k = inv.indexOf(null);
     if(k < 0) return false;
     inv[k] = color === undefined ? {id, count:1} : {id, count:1, color}; return true;
   }
-  const hex6 = c => (c >>> 0).toString(16).padStart(6, '0');
+  const hex6 = c => (c & 0xffffff).toString(16).padStart(6, '0');
   const colorDot = s => !s || s.color === undefined ? '' : s.id === 'shoes'
     ? `<span class="cdot" style="background:#${hex6(shoeUp(s.color))}"></span><span class="cdot" style="background:#${hex6(shoeSole(s.color))};left:17px"></span>`
     : `<span class="cdot" style="background:#${hex6(s.color)}"></span>`;
-  const colTxt = s => s.id === 'shoes' ? ' #' + hex6(shoeUp(s.color)).toUpperCase() + ' / #' + hex6(shoeSole(s.color)).toUpperCase() : ' #' + hex6(s.color).toUpperCase();
+  const colTxt = s => s.id === 'pants' && (s.color & PANTS_STRIPE) ? ' #' + hex6(s.color).toUpperCase() + ' · 3 paski' : s.id === 'shoes' ? ' #' + hex6(shoeUp(s.color)).toUpperCase() + ' / #' + hex6(shoeSole(s.color)).toUpperCase() : ' #' + hex6(s.color).toUpperCase();
   const DESK_SLOTS = 10, OVEN_SLOTS = 8;
   const BIG = {desk:{slots:DESK_SLOTS, part:'deskpart'}, oven:{slots:OVEN_SLOTS, part:'ovenpart'}};   // przedmioty zajmujące wiele slotów
   const freeSlots = () => inv.filter(x => !x).length;
@@ -6083,31 +6550,15 @@
     else if(s.id === 'cola'){ removeOne(sel); addStats(5, 15); toast('Orzeźwiająca cola! 🥤 +15 energii, +5 sytości'); }
     else if(s.id === 'phone'){ openPhone(); }
     else if(s.id === 'charger'){ if(homeInside && nearOutlet() < 2.2) plugCharger(); else toast('Podłącz ładowarkę do gniazdka w swoim domu 🏠'); }
+    else if(s.id === 'doormat'){ placeDoormat(sel); }
     else if(s.id === 'desk' || s.id === 'chair' || s.id === 'wardrobe' || s.id === 'computer' || s.id === 'lamp' || s.id === 'oven' || FIXT.includes(s.id)){ startPlacement(sel); }
-    else if(s.id === 'shirt'){
-      const c = s.color, old = wornShirt || {color:accShirtCol};   // pierwsza koszulka (w kolorze konta) też trafia do ekwipunku
-      removeOne(sel);
-      if(old && !addItem('shirt', old.color)){ addItem('shirt', c); renderInv(); toast('Brak miejsca w ekwipunku na zdjętą koszulkę'); return; }   // stara koszulka wraca do ekwipunku
-      setShirt({color:c}); toast(old ? 'Założono koszulkę – poprzednia wróciła do ekwipunku' : 'Założono: Koszulka');
-    }
-    else if(s.id === 'pants'){
-      const c = s.color, old = wornPants || {color:PANTS_DEF};   // pierwsze spodnie (ciemnoszare) też trafiają do ekwipunku
-      removeOne(sel);
-      if(!addItem('pants', old.color)){ addItem('pants', c); renderInv(); toast('Brak miejsca w ekwipunku na zdjęte spodnie'); return; }
-      setPants({color:c}); toast('Założono spodnie – poprzednie wróciły do ekwipunku');
-    }
-    else if(s.id === 'shoes'){
-      const c = s.color, old = wornShoes || {color:shoeEnc(SH_DEF_UP, SH_DEF_SOLE)};   // pierwsze buty (czarne z białą podeszwą) też trafiają do ekwipunku
-      removeOne(sel);
-      if(old && !addItem('shoes', old.color)){ addItem('shoes', c); renderInv(); toast('Brak miejsca w ekwipunku na zdjęte buty'); return; }   // stare buty wracają do ekwipunku
-      setShoes({color:c}); toast(old ? 'Założono buty – poprzednie wróciły do ekwipunku' : 'Założono: Buty');
-    }
-    else if(s.id === 'hat' || s.id === 'cap'){ if(isWorn(s)){ unwear(s); toast('Zdjęto: ' + ITEMS[s.id].n); } else { setWorn({id:s.id, color:s.color}); toast('Założono: ' + ITEMS[s.id].n); } }
+    else if(['shirt','pants','dress','glasses','shoes','hat','cap'].includes(s.id)){ toast('Ubrania zakładasz tylko w szafie 🚪 – ustaw ją w swoim domu i naciśnij F'); }
     renderInv();
   };
   dropBtn.onclick = () => {
     const s = inv[sel]; if(!s) return;
     if(s.id === 'order'){ toast('Nie możesz wyrzucić zamówienia'); return; }
+    if(s.id === 'doormat'){ toast('Wycieraczki nie wyrzucisz – połóż ją przed swoim domem 🏠'); return; }
     if(s.id === 'desk'){ toast('Biurka nie wyrzucisz – ustaw je w swoim domu 🏠'); return; }
     if(s.id === 'oven'){ toast('Piekarnika nie wyrzucisz – ustaw go w swoim domu 🏠'); return; }
     if(s.id === 'chair'){ toast('Krzesła nie wyrzucisz – ustaw je w swoim domu 🏠'); return; }
@@ -6128,10 +6579,10 @@
   });
 
   // Sklep i telefon
-  const shopEl = $('shop'), promptEl = $('prompt'), phoneEl = $('phone'), screenEl = $('pscreen');
+  const promptEl = $('prompt'), phoneEl = $('phone'), screenEl = $('pscreen');
   const hasPhone = () => inv.some(s => s && s.id === 'phone');
   const coins = () => { const s = inv.find(x => x && x.id === 'coin'); return s ? s.count : 0; };
-  function renderShop(){ $('coinCount').textContent = coins(); }
+  function renderShop(){}                                           // stary panel sklepu zastąpiony siatką w rozmowie (openShopTalk)
   // TESTOWO: dodaje 100 monet do ekwipunku (do usunięcia po testach)
   $('testCoinsBtn').onclick = () => {
     if(isDead || isPaused) return;
@@ -6149,7 +6600,7 @@
   (function(){
     const btn = $('avatarBtn'), menu = $('playerMenu');
     const open = () => menu.style.display === 'block';
-    const close = () => { menu.style.display = 'none'; btn.blur(); };
+    let close = () => { menu.style.display = 'none'; btn.blur(); };
     btn.addEventListener('pointerdown', e => e.stopPropagation());        // klik w awatar nie przechwytuje kursora
     btn.onclick = () => {
       if(isDead || isPaused) return;
@@ -6158,7 +6609,41 @@
       menu.style.display = 'block';                                         // najpierw okno (uiBlocking), potem zwolnienie kursora
       if(document.pointerLockElement) document.exitPointerLock();
     };
-    $('playerMenuClose').onclick = close;
+    const showMain = () => { $('pmAch').style.display = 'none'; $('pmMain').style.display = ''; };
+    const close0 = close;
+    close = () => { showMain(); close0(); };
+    $('playerMenuClose').onclick = () => close();
+
+    // ===== Osiągnięcia =====
+    const ACH_KEY = 'rl_achievements';
+    const ACH = [   // dopisuj: {id, ic, name, desc, prog?}, odblokowanie: window.rlUnlock('id')
+      {id:'deliver20', ic:'📦', name:'Kurier z restauracji', desc:'Dostarcz 20 zamówień w restauracji. Nagroda: wycieraczka z restauracji 🟫', prog:() => Math.min(job.delivered|0, 20) + '/20'}
+    ];
+    let achDone = {};
+    try{ achDone = JSON.parse(localStorage.getItem(ACH_KEY) || '{}') || {}; }catch(err){ achDone = {}; }
+    function achRender(){
+      const list = $('achList'); list.innerHTML = '';
+      if(!ACH.length){ const em = document.createElement('div'); em.className = 'achEmpty'; em.textContent = 'Brak osiągnięć.'; list.appendChild(em); }
+      ACH.forEach(a => {
+        const d = document.createElement('div'); d.className = 'achItem' + (achDone[a.id] ? '' : ' locked');
+        d.innerHTML = '<span class="achIc"></span><div><b></b><small></small></div>';
+        d.querySelector('.achIc').textContent = achDone[a.id] ? a.ic : '🔒';
+        d.querySelector('b').textContent = a.name;
+        d.querySelector('small').textContent = a.desc + (a.prog && !achDone[a.id] ? ' (' + a.prog() + ')' : '');
+        list.appendChild(d);
+      });
+      $('achCount').textContent = '(' + ACH.filter(a => achDone[a.id]).length + '/' + ACH.length + ')';
+    }
+    window.rlUnlock = function(id){
+      const a = ACH.find(x => x.id === id); if(!a || achDone[id]) return false;
+      achDone[id] = Date.now();
+      try{ localStorage.setItem(ACH_KEY, JSON.stringify(achDone)); }catch(err){}
+      toast('🏆 Osiągnięcie: ' + a.name); achRender();
+      return true;
+    };
+    window.rlHas = id => !!achDone[id];
+    $('pmAchBtn').onclick = () => { achRender(); $('pmMain').style.display = 'none'; $('pmAch').style.display = 'block'; };
+    $('pmAchBack').onclick = showMain;
 
     // ===== Żywy portret: renderujemy klon prawdziwego modelu gracza, więc awatar odzwierciedla czapkę, plecak, kolory ubrań itd. =====
     let pr = null, prScene = null, prCam = null, prClone = null, prSig = '';
@@ -6215,36 +6700,36 @@
     }
     setInterval(() => { if(!document.hidden && !isDead) refreshPortrait(false); }, 400);
     setTimeout(() => refreshPortrait(true), 300);
-    addEventListener('keydown', e => { if(e.code === 'Escape' && open()){ close(); e.stopImmediatePropagation(); } }, true);
+    addEventListener('keydown', e => { if(e.code === 'Escape' && open()){ if($('pmAch').style.display === 'block') showMain(); else close(); e.stopImmediatePropagation(); } }, true);
   })();
-  function openShop(){ shopEl.style.display = 'block'; promptEl.style.display = 'none'; renderShop(); }
-  function closeShop(){ shopEl.style.display = 'none'; }
-  $('shopClose').onclick = closeShop;
   promptEl.onclick = () => { if(curAct) curAct.run(); };
-  $('buyPhone').onclick = () => {
+  function shopPay(n){ for(let i=0;i<n;i++) removeOne(inv.findIndex(s => s && s.id === 'coin')); }
+  function shopRefund(n){ for(let i=0;i<n;i++) addItem('coin'); }
+  function buyPhone(){
     if(hasPhone() || phoneDocked){ toast('Masz już telefon'); return; }
     if(coins() < 5){ toast('Potrzebujesz 5 monet 🪙 (masz ' + coins() + ')'); return; }
-    const k = inv.findIndex(s => s && s.id === 'coin');
-    for(let i=0;i<5;i++) removeOne(k);
-    if(!addItem('phone')){ for(let i=0;i<5;i++) addItem('coin'); toast('Ekwipunek pełny!'); renderShop(); return; }
-    toast('Kupiono telefon 📱'); renderInv(); renderShop();
-  };
-  $('buyComputer').onclick = () => {
+    shopPay(5);
+    if(!addItem('phone')){ shopRefund(5); toast('Ekwipunek pełny!'); renderInv(); return; }
+    renderInv(); renderShop(); openShopTalk('Dziękuję za zakup telefonu! Czy mogę jeszcze w czymś pomóc?');
+    toast('Kupiono telefon 📱');
+  }
+  function buyComputer(){
     if(coins() < 100){ toast('Komputer kosztuje 100 monet 🪙 (masz ' + coins() + ')'); return; }
-    for(let i=0;i<100;i++) removeOne(inv.findIndex(s => s && s.id === 'coin'));
+    shopPay(100);
     if(!addItem('computer')){
-      for(let i=0;i<100;i++) addItem('coin');
-      toast('Ekwipunek pełny – zrób miejsce na komputer'); renderInv(); renderShop(); return;
+      shopRefund(100);
+      toast('Ekwipunek pełny – zrób miejsce na komputer'); renderInv(); return;
     }
+    renderInv(); renderShop(); openShopTalk('Dziękuję za zakup komputera! Czy mogę jeszcze w czymś pomóc?');
     toast('Kupiono komputer 🖥️ – ustaw go bezpośrednio na biurku');
-    renderInv(); renderShop();
-  };
-  $('buyCola').onclick = () => {
+  }
+  function buyCola(){
     if(coins() < 3){ toast('Potrzebujesz 3 monet 🪙 (masz ' + coins() + ')'); return; }
-    for(let i=0;i<3;i++) removeOne(inv.findIndex(s => s && s.id === 'coin'));
-    if(!addItem('cola')){ for(let i=0;i<3;i++) addItem('coin'); toast('Ekwipunek pełny!'); renderInv(); renderShop(); return; }
-    toast('Kupiono colę 🥤'); renderInv(); renderShop();
-  };
+    shopPay(3);
+    if(!addItem('cola')){ shopRefund(3); toast('Ekwipunek pełny!'); renderInv(); return; }
+    renderInv(); renderShop(); openShopTalk('Dziękuję za zakup coli! Czy mogę jeszcze w czymś pomóc?');
+    toast('Kupiono colę 🥤');
+  }
   // Bateria telefonu i ładowarka: telefon trzeba podłączyć do ładowarki w gniazdku i zostawić – ładuje się, dopóki go nie zabierzesz
   let chargerHome = null, phoneBattery = 100, chargerPlugged = false, phoneDocked = false, batFlag20 = false, batFlag10 = false, batFull = true;
   const hasCharger = () => chargerPlugged || inv.some(s => s && s.id === 'charger');
@@ -6294,22 +6779,29 @@
     const b = Math.floor(phoneBattery);
     el.textContent = '📶 ' + (b <= 15 ? '🪫' : '🔋') + ' ' + b + '%';
   }, 500);
-  $('buyCharger').onclick = () => {
+  function buyCharger(){
     if(hasCharger()){ toast('Masz już ładowarkę 🔌'); return; }
     if(coins() < 8){ toast('Potrzebujesz 8 monet 🪙 (masz ' + coins() + ')'); return; }
-    for(let i=0;i<8;i++) removeOne(inv.findIndex(s => s && s.id === 'coin'));
-    if(!addItem('charger')){ for(let i=0;i<8;i++) addItem('coin'); toast('Ekwipunek pełny!'); renderInv(); renderShop(); return; }
-    toast('Kupiono ładowarkę 🔌 – podłącz ją do gniazdka w swoim domu, a potem podłącz do niej telefon'); renderInv(); renderShop();
-  };
-  $('buyBike').onclick = () => {
+    shopPay(8);
+    if(!addItem('charger')){ shopRefund(8); toast('Ekwipunek pełny!'); renderInv(); return; }
+    renderInv(); renderShop(); openShopTalk('Dziękuję za zakup ładowarki! Czy mogę jeszcze w czymś pomóc?');
+    toast('Kupiono ładowarkę 🔌 – podłącz ją do gniazdka w swoim domu, a potem podłącz do niej telefon');
+  }
+  function buyBike(){
     if(bikePurchased){ toast('Masz już rower 🚲'); return; }
     if(coins() < 25){ toast('Potrzebujesz 25 monet 🪙 (masz ' + coins() + ')'); return; }
-    const k=inv.findIndex(s=>s&&s.id==='coin');
-    for(let i=0;i<25;i++) removeOne(k);
-    bikePurchased=true; placeBikeOutsideShop();
+    shopPay(25);
+    bikePurchased = true; placeBikeOutsideShop();
+    renderInv(); renderShop(); openShopTalk('Dziękuję za zakup roweru! Czeka na ciebie przed sklepem. Czy mogę jeszcze w czymś pomóc?');
     toast('Kupiono rower! Czeka przed sklepem 🚲');
-    renderInv(); renderShop();
-  };
+  }
+  const SHOP_GOODS = [
+    {id:'phone',    p:5,   n:'Telefon',  i:'📱', buy:() => buyPhone()},
+    {id:'bike',     p:25,  n:'Rower',    i:'🚲', buy:() => buyBike()},
+    {id:'computer', p:100, n:'Komputer', i:'🖥️', buy:() => buyComputer()},
+    {id:'cola',     p:3,   n:'Cola',     i:'🥤', buy:() => buyCola()},
+    {id:'charger',  p:8,   n:'Ładowarka', i:'🔌', buy:() => buyCharger()}
+  ];
 
   function tickClock(){ $('pclock').textContent = gameClock; }
   setInterval(tickClock, 10000);
@@ -6494,7 +6986,6 @@
   }
   const shopDoor = () => Math.hypot(player.position.x - SHOP.x, player.position.z - (SHOP.z - SHOP.d/2));
   function updateShop(){
-    if(shopEl.style.display === 'block' && shopNpcDist() > 6) closeShop();
     if(dlgEl.style.display === 'flex' && dlgDist() > 6) closeDialog();
     curAct = findAction();
     if(curAct){ promptEl.innerHTML = coinHTML(curAct.text); promptEl.style.display = 'block'; }
@@ -6506,8 +6997,7 @@
     if(e.code === 'KeyR' && placing) rotatePlacement();
     if(e.code === 'KeyF' && placing){ confirmPlacement(); return; }
     if(e.code === 'KeyF'){
-      if(shopEl.style.display === 'block') closeShop();
-      else if($('fridge').style.display === 'block') closeFridge();
+      if($('fridge').style.display === 'block') closeFridge();
       else if($('wardrobe').style.display === 'block') closeWardrobe();
       else if(trunkOpen()) closeTrunk();
       else if(ovenOpen()) closeOven();
@@ -6516,8 +7006,9 @@
       else if(curAct && !bikeMounted) curAct.run();
     }
     if(e.code === 'KeyG' && homeInside && !sitting && !placing){ const pc = nearDesk('chair') || nearDesk('wardrobe') || nearDesk('oven') || FIXT.map(k => nearDesk(k)).find(Boolean) || nearLamp(); if(pc) pickupDesk(pc); }
+    if(e.code === 'KeyG' && !e.repeat && !homeInside && !isDead && !isPaused) pickupDoormat();
     if(e.code === 'KeyP') phoneEl.style.display === 'flex' ? closePhone() : openPhone();
-    if(e.code === 'Escape'){ closeShop(); closePhone(); closeDialog(); closeFridge(); closeWardrobe(); cancelPlacement(); closePaintUI(true); closeHeadUI(true); }
+    if(e.code === 'Escape'){ closePhone(); closeDialog(); closeFridge(); closeWardrobe(); cancelPlacement(); closePaintUI(true); closeHeadUI(true); }
   });
 
   // NPC kucharz i praca dostawcy
@@ -6612,6 +7103,63 @@
     for(let i=0;i<4;i++) addItem('coin');
     job.carrying = false; job.order = null; job.delivered++;
     renderInv(); renderShop(); toast('Dostarczono! +4 🪙');
+    // Osiągnięcie: 20 dostaw → wycieraczka z restauracji (nagroda tylko raz; jeśli zabraknie miejsca, wpadnie przy kolejnej dostawie)
+    if(job.delivered >= 20 && window.rlHas && !window.rlHas('deliver20') && addItem('doormat')){
+      window.rlUnlock('deliver20'); renderInv();
+      setTimeout(() => toast('Nagroda: wycieraczka z restauracji 🟫 – połóż ją przed drzwiami swojego domu'), 1900);
+    }
+  }
+
+  // ===== Wycieraczka z restauracji: leży przed drzwiami domu (jedna na dom), G przy niej – podnieś =====
+  const doormats = {};                                            // id domu -> mesh
+  let doormatTex = null;
+  const doormatPos = H => { const o = (H.d || 8)/2 + 0.55; return {x: H.x + o*Math.sin(H.rot), z: H.z + o*Math.cos(H.rot)}; };   // tuż za zewnętrznym licem ściany z drzwiami
+  function makeDoormat(){
+    if(!doormatTex){
+      const c = document.createElement('canvas'); c.width = 256; c.height = 168; const g = c.getContext('2d');
+      g.fillStyle = '#6e4a2a'; g.fillRect(0, 0, 256, 168);
+      for(let i = 0; i < 600; i++){ g.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,.16)' : 'rgba(255,220,170,.12)'; g.fillRect(Math.random()*256, Math.random()*168, 1 + Math.random()*3, 1); }   // włókna kokosowe
+      g.strokeStyle = '#2b1a0d'; g.lineWidth = 8; g.strokeRect(6, 6, 244, 156);
+      g.strokeStyle = '#e8d3a8'; g.lineWidth = 2; g.strokeRect(16, 16, 224, 136);
+      g.fillStyle = '#f3e3c0'; g.textAlign = 'center'; g.textBaseline = 'middle';
+      let fs = 34; g.font = 'bold ' + fs + 'px sans-serif'; while(g.measureText('RESTAURACJA').width > 200 && fs > 14){ fs--; g.font = 'bold ' + fs + 'px sans-serif'; }
+      g.fillText('RESTAURACJA', 128, 64);
+      g.font = 'bold 28px sans-serif'; g.fillText('🍴 WITAJ 🍴', 128, 112);
+      doormatTex = new THREE.CanvasTexture(c);
+    }
+    const side = new THREE.MeshLambertMaterial({color:0x4a3118});
+    const top = new THREE.MeshLambertMaterial({map:doormatTex, polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-1});
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.04, 0.85), [side, side, top, side, side, side]);   // napis czytelny od strony wejścia
+    m.receiveShadow = true; return m;
+  }
+  function putDoormat(H){
+    if(doormats[H.id]) return;
+    const p = doormatPos(H), m = makeDoormat();
+    m.position.set(p.x, terrainH(p.x, p.z) + 0.03, p.z); m.rotation.y = H.rot; scene.add(m); doormats[H.id] = m;
+  }
+  function removeDoormat(id){ const m = doormats[id]; if(!m) return; scene.remove(m); m.geometry.dispose(); delete doormats[id]; }
+  function placeDoormat(k){
+    if(homeInside){ toast('Wycieraczkę połóż na zewnątrz, przed drzwiami swojego domu 🏠'); return; }
+    let H = null, bd = 6;
+    for(const q of HOMES){
+      if(!(q.rented || q.owned)) continue;
+      const p = doormatPos(q), d = Math.hypot(player.position.x - p.x, player.position.z - p.z);
+      if(d < bd){ bd = d; H = q; }
+    }
+    if(!H){ toast('Podejdź do drzwi swojego domu (wynajętego lub kupionego) 🏠'); return; }
+    if(doormats[H.id]){ toast(`Przed domem ${H.label} leży już wycieraczka`); return; }
+    removeOne(k); putDoormat(H); renderInv();
+    toast('Położono wycieraczkę 🟫 (G przy wycieraczce – podnieś)');
+  }
+  function pickupDoormat(){
+    if(homeInside) return;
+    for(const id in doormats){
+      const m = doormats[id];
+      if(Math.hypot(player.position.x - m.position.x, player.position.z - m.position.z) < 1.8){
+        if(!addItem('doormat')){ toast('Ekwipunek pełny!'); return; }
+        removeDoormat(id); renderInv(); toast('Podniesiono wycieraczkę 🟫'); return;
+      }
+    }
   }
 
   // ===== Kopalnia: górnik Staszek (praca + kilof) i teren do kopania za końcem sztolni =====
@@ -6823,7 +7371,7 @@
   // punkt docelowy (czerwone B). Oba punkty są też na minimapie i na pełnej mapie.
   const upperApp = {hired:false, done:0, earned:0, offer:null, ride:null};
   const UPPER_SPOTS = [                                                    // miejsca odbioru / celu (chodniki przy ulicach)
-    ['Real Shop',18,-7.4], ['Restauracja',-4,-20.6], ['Real Bank',-23,-7.4], ['Mebelek',-44,-7.4],
+    ['Zapka',18,-7.4], ['Restauracja',-4,-20.6], ['Real Bank',-23,-7.4], ['Mebelek',-44,-7.4],
     ['ul. Długa (zachód)',-68,-7.4], ['ul. Długa (zachód)',-56,-20.6], ['ul. Długa (środek)',40,-20.6],
     ['ul. Krótka',6.65,20], ['ul. Krótka',-6.65,52],
     ['ul. Poprzeczna',71.35,8], ['Mechanik',71.35,42], ['Salon samochodowy',84.65,25], ['Lakiernik',84.65,46], ['ul. Poprzeczna',84.65,58],
@@ -7054,8 +7602,8 @@
     return null;
   }
   function findAction(){
-    if(paintUiOpen || headUiKind) return null;
-    if(shopEl.style.display === 'block' || dlgEl.style.display === 'flex' || $('fridge').style.display === 'block' || $('wardrobe').style.display === 'block' || trunkOpen() || ovenOpen()) return null;
+    if(paintUiOpen || headUiKind || hairUiOpen) return null;
+    if(dlgEl.style.display === 'flex' || $('fridge').style.display === 'block' || $('wardrobe').style.display === 'block' || trunkOpen() || ovenOpen()) return null;
     if(placing) return null;
     if(busRide){                                                                  // pasażer autobusu: wysiadka tylko przy otwartych drzwiach
       if(BUS.door > 0.6) return {text:'F – wysiądź z autobusu 🚌', run:() => leaveBus(false)};
@@ -7070,7 +7618,8 @@
         if(d < bestPc){ bestPc = d; pcDesk = pd; }
       }
       if(pcDesk) return {text:computerUiOpen ? 'F – zamknij komputer' : 'F – włącz komputer 🖥️', run:turnOnComputer};
-      return {text:sitting.kind === 'bathtub' ? 'F – wyjdź z wanny' : sitting.kind === 'bench' ? 'F – wstań z ławki' : 'F – wstań z krzesła', run:standUp};
+      if(sitting.kind === 'bench') return {text:'Shift – wstań z ławki 🪑', run:()=>{}};   // z ławek wstaje się tylko Shiftem
+      return {text:sitting.kind === 'bathtub' ? 'F – wyjdź z wanny' : 'F – wstań z krzesła', run:standUp};
     }
     if(carDriving) return {text:'Shift – wysiądź z auta 🚗', run:()=>{}};
     { const ba = busBoardAction(); if(ba) return ba; }                           // F przy otwartych drzwiach autobusu
@@ -7138,6 +7687,7 @@
     if(paintInside && paintNpcDist() < 3.4) return {text:'F – porozmawiaj z lakiernikiem 🎨', run:openPaintTalk};
     if(carInside && carNpcDist() < 3.4) return {text:'F – porozmawiaj z doradcą salonu', run:openCarTalk};
     if(clothInside && clothNpcDist() < 3.4) return {text:'F – porozmawiaj ze sprzedawczynią ubrań', run:openClothTalk};
+    if(barberInside && barberNpcDist() < 3.4) return {text:'F – porozmawiaj z fryzjerem ✂️', run:openBarberTalk};
     return null;
   }
   function updateJob(dt, time){
@@ -7159,7 +7709,7 @@
   }
 
   // ===== Henryk – sąsiad z domu nr 7 =====
-  // Mieszka w domu nr 7 (nie da się do niego wejść). Wg zegara gry wychodzi na zakupy do Real Shop i na spacery po chodniku,
+  // Mieszka w domu nr 7 (nie da się do niego wejść). Wg zegara gry wychodzi na zakupy do Zapki i na spacery po chodniku,
   // a gdy jest w domu – można zapukać (F). Przy wyjściu z domu / na chodniku można z nim porozmawiać (F).
   const nbH7 = HOUSES.find(h => h.no === 7);
   const NB_DOOR = {x:nbH7.dx, z:nbH7.dz - 0.55};
@@ -7171,7 +7721,7 @@
   const NB_BUS_MAX_WAIT = 480, NB_BUS_AWAY = [70, 120];          // s: jak długo czeka na autobus zanim zrezygnuje; jak długo go nie ma po wysiadce
   const NB_TRIPS = [
     {id:'bus',   from:11,   to:17.4, goal:NB_BUS_WAIT, bus:true, what:'czekam na autobus – chcę się gdzieś przejechać'},
-    {id:'shop',  from:8.5,  to:11,   goal:{x:SHOP.x, z:NB_LANE}, enter:{x:SHOP.x, z:SHOP.z - SHOP.d/2 - 0.1}, stay:18, bag:true,  what:'idę na zakupy do Real Shop'},
+    {id:'shop',  from:8.5,  to:11,   goal:{x:SHOP.x, z:NB_LANE}, enter:{x:SHOP.x, z:SHOP.z - SHOP.d/2 - 0.1}, stay:18, bag:true,  what:'idę na zakupy do Zapki'},
     {id:'walk1', from:12.5, to:15,   goal:{x:-16, z:NB_LANE}, stay:10, what:'wyszedłem na spacer'},
     {id:'walk2', from:17.5, to:19.5, goal:{x:8,   z:NB_LANE}, stay:10, what:'wyszedłem na wieczorny spacer'}
   ];
@@ -7333,7 +7883,7 @@
   }
   // --- rozmowa ---
   const nbCanTalk = () => nbr.visible && nbrDist() < 3.2;
-  const nbOutdoors = () => !homeInside && !restInside && !shopInside && !bankInside && !furnInside && !agdInside && !mechInside && !paintInside && !carInside && !clothInside;
+  const nbOutdoors = () => !homeInside && !restInside && !shopInside && !bankInside && !furnInside && !agdInside && !mechInside && !paintInside && !carInside && !clothInside && !barberInside;
   function nbrAction(){
     if(!nbOutdoors()) return null;
     if(nbCanTalk()) return {text:'F – porozmawiaj z Henrykiem 👋', run:() => openNbrTalk(false)};
@@ -7366,7 +7916,7 @@
   }
   function nbNews(){
     const tips = [
-      'W sklepie „Real Shop” kupisz telefon za 5 monet, a rower za 25. Rower to wygoda, polecam 🚲',
+      'W sklepie „Zapka” kupisz telefon za 5 monet, a rower za 25. Rower to wygoda, polecam 🚲',
       'Marek, kucharz, szuka dostawców. Płaci 4 monety za każde dostarczone zamówienie. Ja mam już nogi nie te, ale tobie się przyda.',
       'W banku założysz konto za darmo – dostaniesz numer rachunku i saldo w aplikacji w telefonie.',
       'Dbaj o siebie: jedz i śpij na czas. Ja zawsze mam w domu coś w lodówce.',
@@ -7419,6 +7969,17 @@
         const t1 = new THREE.Mesh(new THREE.BoxGeometry(0.2,0.12,0.38), m); t1.position.set(ox, 0.11, 0);
         const s1 = new THREE.Mesh(new THREE.BoxGeometry(0.21,0.05,0.4), sm); s1.position.set(ox, 0.025, 0); mesh.add(t1, s1);
       });
+    }
+    else if(id === 'glasses'){
+      mesh = new THREE.Group(); const gl = new THREE.MeshLambertMaterial({color:0x1b2430});
+      [-0.12, 0.12].forEach(ox => { const l = new THREE.Mesh(new THREE.BoxGeometry(0.18,0.12,0.03), gl); l.position.set(ox, 0.15, 0); mesh.add(l); });
+      const br = new THREE.Mesh(new THREE.BoxGeometry(0.42,0.03,0.04), m); br.position.set(0, 0.2, 0); mesh.add(br);
+    }
+    else if(id === 'dress'){
+      mesh = new THREE.Group();
+      const dt2 = new THREE.Mesh(new THREE.BoxGeometry(0.4,0.3,0.2), m); dt2.position.y = 0.42;
+      const ds2 = new THREE.Mesh(new THREE.BoxGeometry(0.56,0.32,0.34), m); ds2.position.y = 0.16;
+      mesh.add(dt2, ds2);
     }
     else if(id === 'shirt'){
       mesh = new THREE.Group();
@@ -7555,7 +8116,7 @@
     // chmury
     cloudMat.color.copy(PAL.cloudNight).lerp(PAL.cloudDay, day).lerp(PAL.cloudDusk, dusk*0.4);
     // wnętrza i okna
-    restLight.intensity = shopLight.intensity = bankLight.intensity = furnLight.intensity = clothLight.intensity = carLight.intensity = paintLight.intensity = mechLight.intensity = 1.0*night;
+    restLight.intensity = shopLight.intensity = bankLight.intensity = furnLight.intensity = clothLight.intensity = barberLight.intensity = carLight.intensity = paintLight.intensity = mechLight.intensity = 1.0*night;
     lampPool.forEach(l => l.intensity = l.userData.used ? 1.25 + 0.75*night : 0);   // lampy w domu
     updateStreetLamps(night, p);   // lampy uliczne
     glowMats.forEach(m => m.emissive.setRGB(1, 0.78, 0.4).multiplyScalar(night*0.85));
@@ -7607,6 +8168,7 @@
       [bankWallMat, bankInside],
       [furnWallMat, furnInside],
       [clothWallMat, clothInside],
+      [barberWallMat, barberInside],
       [carWallMat, carInside],
       [paintWallMat, paintInside],
       [mechWallMat, mechInside],
@@ -7656,7 +8218,7 @@
   // Kursor znika i kamera podąża za myszką; gdy otwarte jest jakieś okno (sklep, ekwipunek, telefon...), kursor wraca
   function uiBlocking(){
     if(isDead || isPaused || computerUiOpen || fullMapOpen || placing) return true;
-    return ['shop','dlg','phone','fridge','wardrobe','trunk','ovenUI','inv','placeUI','paintUI','headUI','playerMenu'].some(id => {
+    return ['shop','dlg','phone','fridge','wardrobe','trunk','ovenUI','inv','placeUI','paintUI','headUI','hairUI','playerMenu','chatBox'].some(id => {
       const e = document.getElementById(id);
       return e && getComputedStyle(e).display !== 'none';
     });
@@ -7812,6 +8374,7 @@
       if(!R.init){ R.init = true; R.g.position.set(R.tx, R.ty, R.tz); R.g.rotation.y = R.tr; }
       const nm = String(d.n || 'Gracz').slice(0,16);
       if(nm !== R.name) mpDrawTag(R, nm);
+      chatRemote(R, d, nm);
       if(/^#[0-9a-f]{6}$/i.test(d.c || '') && d.c !== R.col){ R.col = d.c; R.torso.material.color.set(d.c); R.arms.forEach(a => a.color.set(d.c)); }
     }
     for(const id in mp.remotes) if(!v[id]) mpRemoveRemote(id);
@@ -7930,7 +8493,8 @@
   function svColOf(s){
     if(!s || s.col == null || !isFinite(+s.col)) return {};
     if(s.id === 'shoes') return {color:Math.max(0, Math.min(0xffffffffffff, Math.floor(+s.col)))};   // 2 kolory w jednej liczbie
-    return (s.id === 'hat' || s.id === 'cap' || s.id === 'shirt' || s.id === 'pants') ? {color:Math.max(0, Math.min(0xffffff, +s.col | 0))} : {};
+    if(s.id === 'pants') return {color:Math.max(0, Math.min(0x1ffffff, +s.col | 0))};   // bit 24 = 3 paski
+    return (s.id === 'hat' || s.id === 'cap' || s.id === 'shirt' || s.id === 'dress' || s.id === 'glasses') ? {color:Math.max(0, Math.min(0xffffff, +s.col | 0))} : {};
   }
   function svSnapshot(){
     return {
@@ -7947,8 +8511,13 @@
       shirt: wornShirt ? String(wornShirt.color) : '',
       shoes: wornShoes ? String(wornShoes.color) : '',
       pants: wornPants ? String(wornPants.color) : '',
+      dress: wornDress ? String(wornDress.color) : '',
+      glasses: wornGlasses ? String(wornGlasses.color) : '',
+      hair: JSON.stringify({c:hairCur, o:[...hairOwned], k:hairCol}),
       wardrobe: JSON.stringify(wardrobeClothes.map(c => Object.assign({id:c.id, count:c.count}, c.color !== undefined ? {col:c.color} : {}))),
       homes: JSON.stringify(HOMES.map(H => ({id:H.id, rented:!!H.rented, owned:!!H.owned, paid:H.owned ? 0 : Math.round(H.paidUntil||0), open:!!(H.door && H.door.open)}))),
+      deliv: job.delivered|0,
+      mats: JSON.stringify(Object.keys(doormats)),
       furn: JSON.stringify(placedDesks.slice(0,40).map(pd => ({k:pd.kind||'desk', x:+pd.wall.x.toFixed(2), z:+pd.wall.z.toFixed(2), r:svRot4(pd.mesh.rotation.y), c:pd.computer ? (Math.round(pd.computer.rotation.y/Math.PI) & 1) : -1, p:pd.pizza ? +pd.pizza.t.toFixed(1) : -1}))),
       car: JSON.stringify(hasCar ? {has:true, x:+pcar.group.position.x.toFixed(2), z:+pcar.group.position.z.toFixed(2), r:+carHeading.toFixed(3), c:pcar.bodyMat.color.getHex(), s:steerLvl, f:+carFuel.toFixed(1), hb:handbrake ? 1 : 0} : {has:false}),
       upper: JSON.stringify({h:upperApp.hired?1:0, n:upperApp.done|0, e:upperApp.earned|0}),
@@ -7959,6 +8528,7 @@
   // Dom jest częścią postępu na KONKRETNYM serwerze – przy zmianie serwera czyścimy domy, meble i ładowarkę,
   // żeby nie „przeszły” na nowy serwer (i nie zapisały się tam przy najbliższym zapisie).
   function svResetHomes(){
+    Object.keys(doormats).forEach(removeDoormat);              // wycieraczki też należą do postępu na serwerze
     for(const H of HOMES){
       if(!(H.rented || H.owned)) continue;
       H.owned = false; H.rented = false; H.paidUntil = 0; H.door.open = false; drawHomeSign(H);
@@ -7982,7 +8552,7 @@
   function svFresh(){
     if(bikeMounted){ bikeMounted = false; player.visible = true; riderBlend = 0; }   // zsiadamy bez przenoszenia postaci przy rowerze
     bikePurchased = false; bike.visible = false;
-    svApplyCar({has:false}); svApplyUpper(null); setShirt(null); setShoes(null); setPants(null);
+    svApplyCar({has:false}); svApplyUpper(null); setShirt(null); setShoes(null); setPants(null); setDress(null); setGlasses(null);
     job.accepted = false; job.order = null; job.carrying = false; job.delivered = 0;
     try{ closeDialog(); }catch(e){}
     svResetHomes();
@@ -8057,10 +8627,15 @@
       try{ const f = JSON.parse(d.fridge || '{}'); for(const k in fridgeStock) if(isFinite(+f[k])) fridgeStock[k] = Math.max(0, f[k]|0); }catch(e){}
       try{ const sc = d.shirt !== undefined && d.shirt !== '' ? +d.shirt : NaN; setShirt(isFinite(sc) ? {color:Math.max(0, Math.min(0xffffff, sc | 0))} : null); }catch(e){}
       try{ const hc = d.shoes !== undefined && d.shoes !== '' ? +d.shoes : NaN; setShoes(isFinite(hc) ? {color:Math.max(0, Math.min(0xffffffffffff, Math.floor(hc)))} : null); }catch(e){}
-      try{ const pc = d.pants !== undefined && d.pants !== '' ? +d.pants : NaN; setPants(isFinite(pc) ? {color:Math.max(0, Math.min(0xffffff, pc | 0))} : null); }catch(e){}
+      try{ const pc = d.pants !== undefined && d.pants !== '' ? +d.pants : NaN; setPants(isFinite(pc) ? {color:Math.max(0, Math.min(0x1ffffff, pc | 0))} : null); }catch(e){}
+      try{ const dc = d.dress !== undefined && d.dress !== '' ? +d.dress : NaN; setDress(isFinite(dc) ? {color:Math.max(0, Math.min(0xffffff, dc | 0))} : null); }catch(e){}
+      try{ const gc = d.glasses !== undefined && d.glasses !== '' ? +d.glasses : NaN; setGlasses(isFinite(gc) ? {color:Math.max(0, Math.min(0xffffff, gc | 0))} : null); }catch(e){}
       try{ wardrobeClothes.length = 0; (JSON.parse(d.wardrobe || '[]') || []).forEach(q => { if(q && isClothing(q.id)){ const c = svColOf(q); wardrobeClothes.push(Object.assign({id:q.id, count:Math.max(1, q.count|0)}, c)); } }); }catch(e){}
+      try{ svApplyHair(d.hair ? JSON.parse(d.hair) : null); }catch(e){}
       if(d.homes) try{ svApplyHomes(JSON.parse(d.homes)); }catch(e){}
       if(d.furn) try{ svApplyFurn(JSON.parse(d.furn)); }catch(e){}
+      if(isFinite(+d.deliv)) job.delivered = Math.max(0, d.deliv|0);
+      try{ Object.keys(doormats).forEach(removeDoormat); (JSON.parse(d.mats || '[]') || []).forEach(id => { const H = HOMES.find(q => q.id === id); if(H) putDoormat(H); }); }catch(e){}
       if(d.car) try{ svApplyCar(JSON.parse(d.car)); }catch(e){}
       if(d.upper) try{ svApplyUpper(JSON.parse(d.upper)); }catch(e){}
       if(d.phone) try{ svApplyPhone(JSON.parse(d.phone)); }catch(e){}
@@ -8145,10 +8720,158 @@
   addEventListener('pagehide', svSave);
   // Zapis jest inicjalizowany dopiero po wejściu na konkretny serwer.
 
+
+  // ===== CZAT: klawisz T, wiadomość w dymku nad głową (widzą ją też gracze w pokoju multiplayer) =====
+  const chatBox = document.createElement('div');
+  chatBox.id = 'chatBox';
+  chatBox.style.cssText = 'position:fixed;left:14px;bottom:14px;z-index:60;width:min(420px,70vw);display:none;font:14px sans-serif';
+  chatBox.innerHTML = '<input id="chatInput" type="text" maxlength="80" autocomplete="off" placeholder="Napisz wiadomość… (Enter – wyślij, Esc – zamknij)" style="width:100%;box-sizing:border-box;padding:9px 12px;border-radius:8px;border:2px solid #fff;background:rgba(0,0,0,.75);color:#fff;font:15px sans-serif;outline:none">';
+  document.body.appendChild(chatBox);
+  const chatLog = document.createElement('div');
+  chatLog.style.cssText = 'position:fixed;left:14px;bottom:62px;z-index:59;width:min(420px,70vw);pointer-events:none;font:14px sans-serif;color:#fff;text-shadow:0 1px 3px #000';
+  document.body.appendChild(chatLog);
+  const chatInput = chatBox.querySelector('input');
+  const chatBubbles = [];            // {sp, born, life}
+  function chatOpen(){ return chatBox.style.display !== 'none'; }
+  function chatShow(){
+    if(chatOpen() || isPaused || isDead || uiBlocking()) return;
+    chatBox.style.display = 'block'; chatInput.value = '';
+    for(const k in keys) keys[k] = false;
+    if(document.pointerLockElement){ relockAfterUi = true; try{ document.exitPointerLock(); }catch(e){} }
+    setTimeout(() => chatInput.focus(), 0);
+  }
+  function chatHide(){ chatBox.style.display = 'none'; chatInput.blur(); for(const k in keys) keys[k] = false; }
+  function chatLine(name, text){
+    const row = document.createElement('div');
+    row.style.cssText = 'background:rgba(0,0,0,.45);padding:3px 8px;border-radius:6px;margin-top:3px;transition:opacity 1s;word-break:break-word';
+    const b = document.createElement('b'); b.textContent = name + ': ';
+    row.appendChild(b); row.appendChild(document.createTextNode(text));
+    chatLog.appendChild(row);
+    while(chatLog.children.length > 6) chatLog.removeChild(chatLog.firstChild);
+    setTimeout(() => { row.style.opacity = 0; setTimeout(() => row.remove(), 1000); }, 9000);
+  }
+  function chatBubbleSprite(text){
+    const cv = document.createElement('canvas'), g = cv.getContext('2d');
+    const font = 'bold 46px sans-serif'; g.font = font;
+    const words = text.split(/\s+/), lines = []; let cur = '';
+    words.forEach(w => {
+      while(g.measureText(w).width > 520){ let i = w.length - 1; while(i > 1 && g.measureText(w.slice(0,i)).width > 520) i--; if(cur){ lines.push(cur); cur = ''; } lines.push(w.slice(0,i)); w = w.slice(i); }
+      const t = cur ? cur + ' ' + w : w;
+      if(g.measureText(t).width > 520 && cur){ lines.push(cur); cur = w; } else cur = t;
+    });
+    if(cur) lines.push(cur);
+    const L = lines.slice(0,5), lh = 56, pad = 20;
+    const tw = Math.max(...L.map(l => g.measureText(l).width));
+    cv.width = Math.ceil(tw + pad*2); cv.height = L.length*lh + pad*2 + 14;
+    g.font = font; g.textAlign = 'center'; g.textBaseline = 'middle';
+    const w = cv.width, h = cv.height - 14, r = 14;
+    g.fillStyle = '#fff'; g.strokeStyle = '#222'; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(r,1.5); g.lineTo(w-r,1.5); g.quadraticCurveTo(w-1.5,1.5,w-1.5,r); g.lineTo(w-1.5,h-r);
+    g.quadraticCurveTo(w-1.5,h-1.5,w-r,h-1.5); g.lineTo(w/2+12,h-1.5); g.lineTo(w/2,h+12); g.lineTo(w/2-12,h-1.5);
+    g.lineTo(r,h-1.5); g.quadraticCurveTo(1.5,h-1.5,1.5,h-r); g.lineTo(1.5,r); g.quadraticCurveTo(1.5,1.5,r,1.5); g.closePath();
+    g.fill(); g.stroke();
+    g.fillStyle = '#111'; L.forEach((l,i) => g.fillText(l, w/2, pad + lh*i + lh/2 + 1));
+    const tex = new THREE.CanvasTexture(cv); tex.anisotropy = 4;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:tex, transparent:true, depthTest:false}));
+    const sc = 0.0042; sp.scale.set(cv.width*sc, cv.height*sc, 1); sp.center.set(0.5, 0); sp.renderOrder = 11;
+    return sp;
+  }
+  function chatBubble(parent, y, text){
+    for(let i = chatBubbles.length - 1; i >= 0; i--){ if(chatBubbles[i].parent === parent) chatBubbleDrop(i); }   // jeden dymek na postać
+    const sp = chatBubbleSprite(text); sp.position.set(0, y, 0); parent.add(sp);
+    chatBubbles.push({sp, parent, born:performance.now(), life:6000 + Math.min(text.length, 80)*50});
+  }
+  function chatBubbleDrop(i){
+    const b = chatBubbles[i]; b.parent.remove(b.sp);
+    if(b.sp.material.map) b.sp.material.map.dispose(); b.sp.material.dispose();
+    chatBubbles.splice(i, 1);
+  }
+  function chatBubblesTick(){
+    const now = performance.now();
+    for(let i = chatBubbles.length - 1; i >= 0; i--){
+      const b = chatBubbles[i], age = now - b.born;
+      if(age > b.life){ chatBubbleDrop(i); continue; }
+      b.sp.material.opacity = Math.min(1, (b.life - age)/800);
+    }
+  }
+  function chatSend(){
+    const text = chatInput.value.replace(/\s+/g, ' ').trim().slice(0, 80);
+    chatHide();
+    if(!text) return;
+    const nm = mp.room ? mp.nick : 'Ty';
+    chatLine(nm, text);
+    chatBubble(player, 2.65, text);
+    if(mp.room && mp.me) mp.me.update({m:text, mt:Date.now()}).catch(() => {});
+    januszReply(text);
+  }
+
+  // ===== Janusz (sprzedawca mebli) odpowiada na czat, gdy stoisz w Mebelku blisko niego =====
+  let januszBusy = false, januszLast = '';
+  function januszAnswer(raw){
+    const t = raw.toLowerCase();
+    const has = (...w) => w.some(x => t.includes(x));
+    const pick = a => { let r; do { r = a[Math.floor(Math.random()*a.length)]; } while(a.length > 1 && r === januszLast); return januszLast = r; };
+    const h = nbHour();
+    if(has('cześć','czesc','hej','siema','witam','dzień dobry','dzien dobry','dobry wieczór','elo'))
+      return pick(['Witam w Mebelku! W czym mogę pomóc?', h < 18 ? 'Dzień dobry! Rozejrzyj się, mam świetne meble.' : 'Dobry wieczór! Jeszcze chwilę mam otwarte.', 'Hej! Szukasz czegoś do domu?']);
+    if(has('biurk')) return `Biurko kosztuje ${DESK_PRICE} monet i zajmuje ${DESK_SLOTS} sloty w ekwipunku. Solidna rzecz!`;
+    if(has('krzes')) return `Krzesło to ${CHAIR_PRICE} monet. Tanio, a siedzi się wygodnie.`;
+    if(has('szaf')) return `Szafa kosztuje ${WARDROBE_PRICE} monet. Pomieści całą Twoją garderobę!`;
+    if(has('lamp','światł','swiatl')) return `Lampa sufitowa to ${LAMP_PRICE} monet. Zamontujesz ją na suficie w swoim domu.`;
+    if(has('cen','ile kosz','koszt','drogo','tanio'))
+      return `Biurko ${DESK_PRICE}, krzesło ${CHAIR_PRICE}, szafa ${WARDROBE_PRICE}, lampa ${LAMP_PRICE} monet. Uczciwe ceny!`;
+    if(has('rabat','taniej','zniżk','znizk','upust')) return pick(['Rabat? Haha, ceny są już i tak najniższe w okolicy!','Z rabatami u mnie krucho, ale jakość za darmo.']);
+    if(has('polec','co kupi','co warto','doradź','doradz','pomoc','pomóż','pomoz')) return pick(['Na początek biurko i krzesło – bez tego ani rusz.','Jak masz dużo ubrań, weź szafę. A do ciemnego pokoju lampę!']);
+    if(has('dom','mieszk')) return 'Meble postawisz w dowolnym miejscu w swoim domu, a lampę zamontujesz na suficie.';
+    if(has('godzin','otwart','do kt','kiedy')) return `Teraz jest mniej więcej ${String(Math.floor(h)).padStart(2,'0')}:${String(Math.floor(h%1*60)).padStart(2,'0')}. Zapraszam o każdej porze, gdy drzwi są otwarte!`;
+    if(has('jak się masz','jak sie masz','co słychać','co slychac','jak leci','jak tam'))
+      return pick(['Dziękuję, nie narzekam – interes się kręci.','Dobrze! Tylko klientów mogłoby być więcej.']);
+    if(has('kim jeste','jak się nazy','jak sie nazy','imię','imie')) return 'Jestem Janusz, sprzedawca mebli. Mebelek to mój mały biznes!';
+    if(has('dzięki','dzieki','dziękuj','dziekuj','dziena')) return pick(['Nie ma za co! Zapraszam ponownie.','Polecam się na przyszłość!']);
+    if(has('pa','do widzenia','nara','na razie','żegnaj','zegnaj')) return pick(['Do zobaczenia! Wpadaj jeszcze.','Miłego dnia!']);
+    if(has('głup','glup','idiot','debil','kretyn')) return 'Ej, kulturalnie proszę! Tu jest porządny sklep.';
+    if(has('?')) return pick(['Hm, dobre pytanie… Ja się znam głównie na meblach!','Tego nie wiem, ale o meblach mogę godzinami.']);
+    return pick(['Ciekawe, ciekawe… A może jakiś mebelek?','Mhm, rozumiem. Rozejrzyj się po wystawie!','Hm, nie jestem pewien, o co chodzi, ale chętnie doradzę przy meblach.']);
+  }
+  function januszReply(text){
+    if(januszBusy || !furnNpc || !furnInside || furnNpcDist() > 7) return;
+    januszBusy = true;
+    const ans = januszAnswer(text);
+    setTimeout(() => {
+      januszBusy = false;
+      if(!furnNpc) return;
+      chatLine('Janusz', ans);
+      chatBubble(furnNpc, 3.0, ans);
+    }, 700 + Math.min(ans.length, 80) * 12);
+  }
+  function chatRemote(R, d, nm){
+    const mt = +d.mt || 0;
+    if(R.chatT === undefined){ R.chatT = mt; return; }          // wiadomości sprzed naszego wejścia pomijamy
+    if(mt && mt !== R.chatT){
+      R.chatT = mt;
+      const text = String(d.m || '').slice(0, 80);
+      if(text){ chatLine(nm, text); chatBubble(R.g, 3.2, text); }
+    }
+  }
+  chatInput.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if(e.code === 'Enter' || e.code === 'NumpadEnter'){ e.preventDefault(); chatSend(); }
+    else if(e.code === 'Escape'){ e.preventDefault(); chatHide(); }
+  });
+  chatInput.addEventListener('keyup', e => e.stopPropagation());
+  chatInput.addEventListener('keypress', e => e.stopPropagation());
+  addEventListener('keydown', e => {
+    if(e.code !== 'KeyT' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    const t = e.target; if(t && t.closest && t.closest('input,textarea,select,[contenteditable="true"]')) return;
+    if(chatOpen()) return;
+    e.preventDefault(); chatShow();
+  });
+
   function loop(){
     requestAnimationFrame(loop);
     const frameDelta = clock.getDelta();
     mpTick(Math.min(frameDelta, 0.05));
+    chatBubblesTick();
     if(isDead){
       renderer.render(scene, camera);
       return;
@@ -8240,7 +8963,7 @@
       }
     }
     for(const w of WALLS){ // ściany i meble restauracji
-      if(sitting && w === sitting.wall) continue;
+      if(sitting && (w === sitting.wall || (sitting.ring && w.ring === sitting.ring))) continue;
       if(w.enter !== undefined && player.position.y >= w.enter) continue;   // wskoczono nad krawędź platformy
       const px = player.position.x, pz = player.position.z;
       if(Math.abs(px - w.x) > w.w/2 + 1 + CR || Math.abs(pz - w.z) > w.d/2 + 1 + CR) continue;
@@ -8350,6 +9073,7 @@
     updateBankInterior(dt, gameElapsed);
     updateFurnInterior(dt, gameElapsed);
     updateClothInterior(dt, gameElapsed);
+    updateBarberInterior(dt, gameElapsed);
     updateCarInterior(dt, gameElapsed);
     updatePaintInterior(dt, gameElapsed);
     updateMechInterior(dt, gameElapsed);

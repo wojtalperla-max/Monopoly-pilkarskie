@@ -61,7 +61,11 @@ if(!ok){try{Object.defineProperty(window,n,{value:mem(),configurable:true})}catc
 <div id="playerMenu">
   <div id="pmAvatar"><svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true"><rect width="64" height="64" fill="#9ed0ff"/><rect x="10" y="46" width="44" height="22" rx="4" fill="#2d6cdf"/><rect x="22" y="40" width="20" height="8" fill="#e5b36a"/><rect x="17" y="14" width="30" height="30" rx="2" fill="#f1c27d"/><rect x="16" y="11" width="32" height="9" fill="#4a2c12"/><rect x="24" y="28" width="5" height="5" fill="#000"/><rect x="35" y="28" width="5" height="5" fill="#000"/><rect x="27" y="37" width="10" height="2" fill="#a0603a"/></svg><canvas id="pmCanvas" width="256" height="256"></canvas></div>
   <h3>👤 Menu gracza</h3>
-  <p>Tu wkrótce pojawią się opcje postaci.</p>
+  <div id="pmMain"><p>Tu wkrótce pojawią się opcje postaci.</p>
+    <button id="pmAchBtn" type="button" class="pmOpt">🏆 Osiągnięcia</button></div>
+  <div id="pmAch" style="display:none"><h4>🏆 Osiągnięcia <span id="achCount"></span></h4>
+    <div id="achList"></div>
+    <button id="pmAchBack" type="button" class="pmOpt">← Wróć</button></div>
   <button id="playerMenuClose" type="button">Zamknij (Esc)</button>
 </div>
 <div id="deathScreen"><h1>Koniec gry, umarłeś!</h1><div id="deathCause"></div><button id="deathBtn" type="button">Zagraj od nowa</button></div>
@@ -127,16 +131,6 @@ if(!ok){try{Object.defineProperty(window,n,{value:mem(),configurable:true})}catc
   <button id="ovenPut" type="button">🍕 Włóż pizzę</button>
   <button id="ovenTake" type="button">✋ Wyjmij</button>
   <button id="ovenClose" type="button" class="no">Zamknij (F / Esc)</button>
-</div>
-<div id="shop">
-  <h3>🛒 Sklep „Real Shop”</h3>
-  <div class="shopitem"><span>📱 Telefon</span><span>5 <i class="coin"></i></span><button id="buyPhone">Kup</button></div>
-  <div class="shopitem" style="margin-top:8px"><span>🚲 Rower</span><span>25 <i class="coin"></i></span><button id="buyBike">Kup</button></div>
-   <div class="shopitem" style="margin-top:8px"><span>🖥️ Komputer</span><span>100 <i class="coin"></i></span><button id="buyComputer">Kup</button></div>
-  <div class="shopitem" style="margin-top:8px"><span>🥤 Cola</span><span>3 <i class="coin"></i></span><button id="buyCola">Kup</button></div>
-  <div class="shopitem" style="margin-top:8px"><span>🔌 Ładowarka do telefonu</span><span>8 <i class="coin"></i></span><button id="buyCharger">Kup</button></div>
-  <div id="shopInfo">Twoje monety: <b id="coinCount">0</b><i class="coin"></i></div>
-  <button id="shopClose">Wyjdź</button>
 </div>
  <div id="computerUI" aria-hidden="true">
   <div id="computerBoot"><div class="logo">REAL OS</div><div class="sub">Uruchamianie komputera…</div><div class="loader"></div></div>
