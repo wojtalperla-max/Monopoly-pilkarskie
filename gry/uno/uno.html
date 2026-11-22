@@ -12,7 +12,7 @@
 (function(){
   const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   let last='';
-  const FL={uno:['🟥','🟨','🟩','🟦','🃏','⛔','🔄','✨','➕','🎴']};
+  const FL={uno:['c:#e53935:7','c:#f9b208:+2','c:#2e9e4a:★','c:#1e7be0:⇄','c:#e53935:⊘','c:#f9b208:5','c:#2e9e4a:9','c:#1e7be0:+4','c:#e53935:2','c:#f9b208:⊘','c:#2e9e4a:+2','c:#1e7be0:3']};
   window.obEsc=esc;
   /* tło (pływające emotki) żyje w kontenerze gry i nie jest odtwarzane przy każdym odświeżeniu */
   function ensureBg(host,floats){
@@ -26,7 +26,8 @@
       const key=(floats||[]).join('');
       if(bg.dataset.k!==key){
         bg.dataset.k=key;bg.innerHTML='';
-        (floats||[]).forEach((e,i)=>{const s=document.createElement('span');s.textContent=e;
+        (floats||[]).forEach((e,i)=>{const s=document.createElement('span');
+          if(String(e).indexOf('c:')===0){const q=e.split(':');s.className='ob-uc';s.style.setProperty('--c',q[1]);s.style.setProperty('--z',(38+(i*13)%34)+'px');s.style.setProperty('--r',(((i*47)%50)-25)+'deg');s.innerHTML='<b>'+q[2]+'</b>'}else s.textContent=e;
           s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)});
       }
     },0);
@@ -199,20 +200,21 @@ function unoBack(color){
   const bc=unoHex(color)||'#ff5fa2',bi=unoInk(bc),bs=bi==='#ffffff'?'0 2px 0 #0006':'0 1px 0 #ffffff66';
   return `<div class="unc unbk" style="--bc:${bc};--bi:${bi};--bs:${bs}"><i>✦</i><b>DGW</b><i>✦</i></div>`;
 }
+function unoToHub(){try{const d=window.parent.document;const q=d.querySelector('[id*="uno" i] .gmenu')||d.querySelector('.gmenu');if(q){q.click();return}}catch(e){}location.reload()}
+function unoTog(w){const o=UNO.pane===w?'':w;UNO.pane=o;['join','bots'].forEach(k=>{const e=document.getElementById('unoP-'+k);if(e)e.style.display=o===k?'block':'none'});if(o==='join')setTimeout(()=>{const i=document.getElementById('unojoin');if(i)i.focus()},60)}
 function unoStartHTML(m){
-  const net=unoNet(),last=unoLastGet();
-  return obShell({key:'uno-start',host:'#uno',theme:'uno',words:['UNO'],tiles:['🟥','🟨','🟩','🟦'],sub:'Pozbądź się wszystkich kart jako pierwszy.',msg:m,
-  body:`<div class="ob-pane"><label for="unonick">Twój nick</label><input id="unonick" maxlength="14" autocomplete="off" value="${lgEsc(UNO.nick||unoNickVal())}" oninput="UNO.nick=this.value">
-    <div class="ob-opt"><span>Kolor pionka</span><input id="unocol" type="color" value="${lgEsc(unoColor())}" oninput="UNO.col=this.value"></div>
-    ${net&&last&&!UNO.ref?obBtn('Wróć do ostatniej gry ('+lgEsc(last)+')','↩',"unoResume('"+lgEsc(last)+"')",'white','','ob-sm')+'<div style="height:12px"></div>':''}
-    ${obBtn('Stwórz pokój','🎲','unoCreate()','gold',!net)}</div>
-  <div class="ob-or">albo</div>
-  <div class="ob-pane"><label for="unojoin">Kod pokoju</label><input id="unojoin" class="cd" maxlength="5" placeholder="KOD" autocomplete="off" value="${lgEsc(UNO.joinCode||'')}" oninput="UNO.joinCode=this.value">
-    ${obBtn('Dołącz do pokoju','🚪','unoJoin()','white',!net)}</div>
-  <div class="ob-or">albo solo</div>
-  <div class="ob-pane"><label for="unobots">Liczba botów</label><select id="unobots" class="unbots" onchange="UNO.nbots=+this.value">${[1,2,3].map(n=>`<option value="${n}" ${n===UNO.nbots?'selected':''}>${n}</option>`).join('')}</select>
-    ${obBtn('Graj z botami','🤖','unoLocal()','white')}</div>
-  ${net?'':'<p class="ob-net">Pokoje online działają po wgraniu gry na własny hosting z Firebase. Z botami możesz grać bez sieci.</p>'}
+  const net=unoNet(),last=unoLastGet(),pn=UNO.pane||'';
+  return obShell({key:'uno-start',host:'#uno',theme:'uno',words:['UNO'],sub:'Pozbądź się wszystkich kart jako pierwszy.',msg:m,back:{label:'← Menu główne',onclick:'unoToHub()'},
+  body:`<div class="ob-main">
+    ${net&&last&&!UNO.ref?obBtn('Wróć do ostatniej gry ('+lgEsc(last)+')','↩',"unoResume('"+lgEsc(last)+"')",'white',false,'ob-sm'):''}
+    ${obBtn('Utwórz pokój','🎲','unoCreate()','gold',!net)}
+    ${obBtn('Dołącz do znajomego','🚪',"unoTog('join')",'white',!net)}</div>
+  <div id="unoP-join" class="ob-pane ob-center" style="display:${pn==='join'?'block':'none'}"><label for="unojoin">Kod pokoju od znajomego</label>
+    <div class="ob-join"><input id="unojoin" class="cd" maxlength="5" placeholder="KOD" autocomplete="off" value="${lgEsc(UNO.joinCode||'')}" oninput="UNO.joinCode=this.value" onkeydown="if(event.key==='Enter')unoJoin()">${obBtn('Dołącz','','unoJoin()','green',!net)}</div></div>
+  ${obBtn('Graj z botami','🤖',"unoTog('bots')",'ghost',false,'ob-sm')}
+  <div id="unoP-bots" class="ob-pane ob-center" style="display:${pn==='bots'?'block':'none'}"><label for="unobots">Liczba botów</label><select id="unobots" class="unbots" onchange="UNO.nbots=+this.value">${[1,2,3].map(n=>`<option value="${n}" ${n===UNO.nbots?'selected':''}>${n}</option>`).join('')}</select>
+    <div style="height:12px"></div>${obBtn('Start','🤖','unoLocal()','gold')}</div>
+  ${net?'':'<p class="ob-net">Pokoje online są niedostępne. Z botami możesz grać bez sieci.</p>'}
   ${obRules('<p>Do 6 graczy w pokoju online albo solo z botami. Zagrywasz kartę w tym samym kolorze lub z tym samym symbolem/liczbą co karta na stosie. Karty specjalne: ⊘ stop, ⇄ zmiana kierunku, +2, ★ zmiana koloru i +4 (zmiana koloru + 4 karty). Stackowanie: gdy ktoś rzuci +2 lub +4, możesz dołożyć własne +2 lub +4 (kara rośnie) — kto nie ma, bierze całą karę. Kilka kart o tym samym znaku (np. dwie piątki w różnych kolorach) możesz zagrać w jednym ruchu: pierwsza musi pasować, ostatnia zostaje na wierzchu i wyznacza kolor. Nie masz co zagrać? Dobierz kartę — jeśli pasuje, możesz ją od razu zagrać, jeśli nie, tracisz kolejkę. Kto pierwszy pozbędzie się wszystkich kart, wygrywa. Rewers kart każdego gracza ma jego kolor.</p>')}`});
 }
 function unoLobbyHTML(m){
