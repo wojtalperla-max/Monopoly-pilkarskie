@@ -112,7 +112,7 @@ function lgDot(c){return '<i class="lgd" style="background:'+(/^#[0-9a-f]{6}$/i.
 </script>
 <script>
 /* ===== ŁAMANIE KODU ===== */
-let KOD={screen:'start',mode:null,names:[],n:3,wi:0,players:[],codes:{},game:null,msg:'',ref:null,status:null,code:'',host:null,listener:null,promoting:false,showHistory:false,slots:[null,null,null,null],act:0,hide:false,turnKey:'',nick:'',col:'',joinCode:''};
+let KOD={screen:'start',mode:null,names:[],n:3,wi:0,players:[],codes:{},game:null,msg:'',ref:null,status:null,code:'',host:null,listener:null,promoting:false,showHistory:false,slots:[null,null,null,null],act:0,hide:false,turnKey:'',nick:'',col:'',joinCode:'',pane:''};
 const kodEmpty=()=>[null,null,null,null];
 const kodMeId=()=>typeof onlinePlayerId!=='undefined'?onlinePlayerId:null;
 const kodNewGame=()=>({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),turn:0,round:1,seq:0,guessed:false,guesses:[],solved:[],done:false,winners:[]});
@@ -249,10 +249,23 @@ function kodPadHTML(ban){
     ?`<span class="kdd no" aria-label="Cyfra ${d} odpadła">${d}</span>`
     :`<button class="kdd" onclick="kodPick('${d}')">${d}</button>`).join('')+'</div>';
 }
+function kodPane(p){KOD.pane=KOD.pane==='join'?'':p;kodRefresh();if(KOD.pane==='join')setTimeout(()=>{const e=document.getElementById('kodjoin');if(e)e.focus()},60)}
+/* jedyny przycisk „Menu główne” w lobby (jak w Monopoly) – klik w pasek rodzica, który jest wtedy ukryty */
+function kodHub(){
+  try{const g=parent.document.querySelector('#kod .gmenu')||parent.document.querySelector('.gmenu');if(g){g.click();return}}catch(e){}
+  try{parent.postMessage({type:'gmenu-back'},'*')}catch(e){}
+}
+function kodCreateNow(){kodAccSync();KOD.mode='online';kodCreate()}
+function kodJoinNow(){kodAccSync();KOD.mode='online';kodJoin()}
 function kodStartHTML(m){
-  const online=typeof fbDB!=='undefined'&&fbDB&&typeof onlineEnsureAuth==='function';
+  const online=typeof fbDB!=='undefined'&&fbDB&&typeof onlineEnsureAuth==='function',pn=KOD.pane||'';
+  const join=pn==='join'?`<div class="ob-pane ob-center"><label for="kodjoin">Kod pokoju od znajomego</label><input id="kodjoin" class="cd" maxlength="5" placeholder="A8K2Q" autocomplete="off" value="${lgEsc(KOD.joinCode||'')}" oninput="KOD.joinCode=this.value" onkeydown="if(event.key==='Enter')kodJoinNow()">
+    ${obBtn('Dołącz','🚪','kodJoinNow()','gold',!online)}</div>`:'';
   return obShell({key:'kod-start',host:'#kod',theme:'kod',words:['ŁAMANIE','KODU'],tiles:['4','7','1','9'],sub:'Złam tajny kod znajomych.',msg:m,
-  body:`<div class="ob-pane">${obBtn('Gra lokalna','🎲',"kodGo('lsetup',{mode:'local',names:[],n:3})",'gold')}<div style="height:12px"></div>${obBtn('Gra online','🌐',"kodGo('olobby',{mode:'online'})",'white',!online)}</div>
+  back:{label:'← Menu główne',onclick:'kodHub()'},
+  body:`${obBtn('Utwórz pokój','🏠','kodCreateNow()','gold',!online)}${obBtn('Dołącz do znajomego','🚪',"kodPane('join')",'white',!online)}
+  ${join}
+  <button class="ob-local" onclick="kodGo('lsetup',{mode:'local',names:[],n:3})"><span>🎲</span><span>Gra lokalnie na jednym urządzeniu</span></button>
   ${online?'':'<p class="ob-net">Tryb online działa tylko po wgraniu gry na własny hosting (z Firebase).</p>'}
   ${obRules('<p>Każdy gracz ustawia swój tajny, 4-cyfrowy kod. Potem gracze zgadują po kolei: pierwszy kod drugiego, drugi kod trzeciego… a ostatni kod pierwszego. W swojej turze klikasz każde z czterech pól osobno i wybierasz cyfrę od 0 do 9. Gdy wpiszesz wszystkie cztery, wciskasz <b>Zgaduj</b> i dowiadujesz się, które cyfry są <b>dobre</b> (zielone), a które <b>złe</b> (czerwone). Po próbie tura automatycznie przechodzi do następnego gracza. W kolejnej turze trafione pola są już zablokowane, a w pozostałych odpadają cyfry, które były złe — tak jak w zgadywaniu literek. Kto pierwszy złamie kod, wygrywa (runda jest dokańczana, więc każdy ma tyle samo prób).</p>')}`});
 }
