@@ -276,7 +276,7 @@ function moveU(u,q,r){
 const CITY_NAMES=['Złotogród','Biały Gród','Kamienna Wola','Srebrna Góra','Wysoka Warta','Czarny Bór','Lwi Gród','Orlia Skała','Dębowa Twierdza','Szafirowe Wrota','Kruszwica','Wolin','Stary Bród','Zielona Dolina','Wilcze Wzgórze','Mglisty Gród','Jantarowa Przystań','Żelazna Brama','Królewska Wola','Granitowy Szczyt','Brzask','Wrzosowisko','Miodowa','Łabędzi Gród','Sokole Gniazdo','Burzogród','Krasnogród','Ostoja','Nowa Nadzieja','Gwiezdny Gród','Rubinowa Warta','Szmaragdowy Bór','Cisowa','Jaskółcza Wola','Bursztynowo','Szronowa Twierdza'];
 function pickCityName(st){const used=new Set(((st||S).cities||[]).map(c=>c.nm)),pool=CITY_NAMES.filter(n=>!used.has(n));return pool.length?pool[rnd(pool.length)]:'Gród '+(rnd(900)+100)}
 const CITY_UP=[0,0,50,100];
-function cityPanel(c,en){const lv=c.lv||1,mx=lv>=3;return `<b>🏰 ${esc(c.nm||'Miasto')}</b> · poziom ${lv}${lv>1?' '+'★'.repeat(lv-1):''}<br><small>Fortyfikacje dają obrońcom osłonę +${lv-1} więcej w bitwie.</small><br>`+(mx?'<small>Maksymalny poziom ulepszenia.</small><br>':`<button ${en?'':'disabled'} onclick="upgradeCity()">Ulepsz miasto do poz. ${lv+1} – ${CITY_UP[lv+1]} 🪙 (+1 osłona murów)</button><br>`)}
+function cityPanel(c,en){const lv=c.lv||1,mx=lv>=3;return `<b>🏰 ${esc(c.nm||'Miasto')}</b> · poziom ${lv}${lv>1?' '+'★'.repeat(lv-1):''}<br><small>Fortyfikacje dają obrońcom osłonę +${lv-1} więcej w bitwie.</small><br>`+(mx?'<small>Maksymalny poziom ulepszenia.</small><br>':`<button ${en?'':'disabled'} onclick="upgradeCity()">Ulepsz miasto do poz. ${lv+1} – ${CITY_UP[lv+1]} <i class="coin"></i> (+1 osłona murów)</button><br>`)}
 function upgradeCity(){if(!mineTurn()||!sel||sel.k!='c')return;const c=S.cities[sel.i],p=S.pl[S.turn],lv=c.lv||1;if(!c||c.o!=S.turn)return;if(lv>=3){msg='Miasto ma już maksymalny poziom.';return render()}const cost=CITY_UP[lv+1];if((p.g||0)<cost){msg='Za mało złota ('+cost+').';return render()}p.g-=cost;c.lv=lv+1;sfx('build');msg='Miasto '+(c.nm||'')+' ulepszone do poziomu '+c.lv+' – mocniejsze mury i cytadela!';save();render()}
 function found(){const u=S.units.find(x=>sel&&x.id==sel.id);if(!u||!mineTurn()||u.k!='S')return;
   if(tt(u.q,u.r)==4)return msg='Nie można w górach.',render();
@@ -324,7 +324,7 @@ function chart(ser,cols,h){const W_=320,H_=120,m=26,n=ser[0].length,mv=Math.max(
  ser.forEach((a,k)=>{s+=`<polyline fill="none" stroke="${cols[k]}" stroke-width="2" points="${a.map((v,i)=>xx(i)+','+yy(v)).join(' ')}"/>`+a.map((v,i)=>`<circle cx="${xx(i)}" cy="${yy(v)}" r="2.5" fill="${cols[k]}"/>`).join('')});
  s+=`<text x="${m}" y="${H_-6}" font-size="9" fill="currentColor">tura ${h[0][0]}</text><text x="${W_-8}" y="${H_-6}" font-size="9" text-anchor="end" fill="currentColor">tura ${h[h.length-1][0]}</text></svg>`;return s}
 function stats(){const mi=meIdx(),p=S.pl[mi],h=p.h&&p.h.length?p.h:[[S.round,p.g||0,0,0]],g=p.g||0,e=p.e||0;
- $('stc').innerHTML=`<h3 style="margin-top:0">Statystyki – ${esc(p.name)}</h3><div>🪙 Złoto teraz: <b>${g}</b><br>Zarobione łącznie: <b>${e}</b><br>Wydane łącznie: <b>${Math.max(0,10+e-g)}</b><br>Przychód na turę: <b>+${income(mi)}</b></div><p><b>Złoto</b> <span style="color:#2ecc71">■</span> i <b>zarobione łącznie</b> <span style="color:#3498db">■</span> w kolejnych turach</p>${chart([h.map(x=>x[1]),h.map(x=>x[3])],['#2ecc71','#3498db'],h)}<p><b>Przychód na turę</b> <span style="color:#e67e22">■</span></p>${chart([h.map(x=>x[2])],['#e67e22'],h)}<p><button class="p" onclick="$('st').style.display='none'">Zamknij</button></p>`;$('st').style.display='block'}
+ $('stc').innerHTML=`<h3 style="margin-top:0">Statystyki – ${esc(p.name)}</h3><div><i class="coin"></i> Złoto teraz: <b>${g}</b><br>Zarobione łącznie: <b>${e}</b><br>Wydane łącznie: <b>${Math.max(0,10+e-g)}</b><br>Przychód na turę: <b>+${income(mi)}</b></div><p><b>Złoto</b> <span style="color:#2ecc71">■</span> i <b>zarobione łącznie</b> <span style="color:#3498db">■</span> w kolejnych turach</p>${chart([h.map(x=>x[1]),h.map(x=>x[3])],['#2ecc71','#3498db'],h)}<p><b>Przychód na turę</b> <span style="color:#e67e22">■</span></p>${chart([h.map(x=>x[2])],['#e67e22'],h)}<p><button class="p" onclick="$('st').style.display='none'">Zamknij</button></p>`;$('st').style.display='block'}
 function noteMet(a,b){const m=S.pl[a];m.met=m.met||[];if(!m.met.includes(b))m.met.push(b)}
 function colHtmlOld(m){const my=m&&(m.col||(m.ni>=0?N0[m.ni]:null));let h='<h3>Kolor państwa</h3><div class="row" style="flex-wrap:wrap">';PAL.forEach(([n,c])=>{const tk=LP.some(p=>p.id!=myId&&(p.col||(p.ni>=0?N0[p.ni]:null))==c);h+=`<button title="${n}" ${tk?'disabled':''} onclick="pickCol('${c}')" style="background:${c};width:34px;height:34px;padding:0;border:3px solid ${my==c?'var(--fg)':'var(--bd)'}"></button>`});return h+'</div>'}
 function colHtml(m){const my=m&&(m.col||(m.ni>=0?N0[m.ni]:null))||'#d94f4f';return `<h3>Kolor państwa</h3><div class="row"><input type="color" value="${my}" onchange="pickCol(this.value)" style="width:56px;height:40px;padding:2px"> <small>dowolny kolor – wybierz i zatwierdź</small></div>`}
@@ -355,7 +355,7 @@ function initCharts(){document.querySelectorAll('#stc .chw').forEach(el=>{const 
  const up=e=>{P.delete(e.pointerId);last=0;drag=null};el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up)})}
 function stats(){const mi=meIdx(),met=spec?S.pl.map((_,i)=>i):[mi,...(S.pl[mi].met||[]).filter(i=>S.pl[i]&&i!=mi)];
  const rl=p=>p.h&&p.h.length?p.h:[[S.round,p.g||0,0,0]],lim=Math.max(...met.map(i=>rl(S.pl[i]).slice(-1)[0][0])),pts=(p,k)=>rl(p).map(x=>[x[0],x[k]]),mk=k=>met.map(i=>({c:N[S.pl[i].ni].c,p:pts(S.pl[i],k)}));
- let t='<table style="width:100%;border-collapse:collapse"><tr><th align="left">Państwo</th><th>🪙</th><th>Zarobione</th><th>Wydane</th><th>Przychód</th></tr>';
+ let t='<table style="width:100%;border-collapse:collapse"><tr><th align="left">Państwo</th><th><i class="coin"></i></th><th>Zarobione</th><th>Wydane</th><th>Przychód</th></tr>';
  met.forEach(i=>{const p=S.pl[i],hh=rl(p),ls=hh[hh.length-1],g=ls[1],e=ls[3],inc=ls[2];t+=`<tr><td><i class="d" style="background:${N[p.ni].c}"></i> ${esc(p.name)}${i==mi&&!spec?' (Ty)':''}</td><td align="center">${g}</td><td align="center">${e}</td><td align="center">${Math.max(0,10+e-g)}</td><td align="center">${inc>=0?'+':''}${inc}</td></tr>`});
  $('stc').innerHTML=`<h3 style="margin-top:0">Statystyki</h3>${t}</table>${battleStats(met)}<p><b>Złoto</b></p>${chart(mk(1))}<p><b>Zarobione łącznie</b></p>${chart(mk(3))}<p><b>Przychód na turę</b></p>${chart(mk(2))}<p><small>Pełna historia do tury ${lim}. Kółko myszy / szczypanie = przybliżenie wykresu, przeciągnięcie = przesuwanie, dwuklik = reset. Widzisz tu siebie i państwa, z którymi kiedykolwiek graniczyłeś. Kolor linii = kolor państwa.</small></p><p><button class="p" onclick="$('st').style.display='none'">Zamknij</button></p>`;$('st').style.display='block';initCharts()}
 function claim(o,q,r,rad,mode,s=S){if(!s.own)return;const a=s.own.split(''),v=String(o+1);for(let y=0;y<s.h;y++)for(let x=0;x<s.w;x++){if(HD(q,r,x,y)>rad||+s.t[y*s.w+x]<2)continue;const i=y*s.w+x,c=a[i];if(c=='0'||mode==2||(mode==1&&x==q&&y==r&&!s.cities.some(k=>k.o!=o&&HD(k.q,k.r,q,r)<=1)))a[i]=v}s.own=a.join('')}
@@ -434,8 +434,10 @@ function doEnd(){const m=S.turn,p=S.pl[m];
   let n=m;do{n++;if(n>=S.pl.length){n=0;S.round++}}while(!S.pl[n].alive);
   S.turn=n;S.units.forEach(u=>{if(u.o==n)u.mp=mx(S,n)+(u.k=='C'?2:0)});(S.q||[]).filter(x=>x.o==n&&S.cities.some(c=>c.q==x.q&&c.r==x.r&&c.o==n)).forEach(x=>add(S,n,x.k,x.q,x.r));S.q=(S.q||[]).filter(x=>x.o!=n);sel=null;msg='';{const pn=S.pl[n],inc=income(n);let ng=(pn.g||0)+inc;if(ng<0){ng=0;const ml=S.units.filter(u=>u.o==n&&MIL(u.k));if(ml.length>1){const d=ml[ml.length-1];S.units=S.units.filter(x=>x!==d);pn.dr=S.round}}pn.g=ng;pn.e=(pn.e||0)+Math.max(0,inc);(pn.h=pn.h||[]).push([S.round,pn.g,inc,pn.e])}hold=false;holdFor=null;save();render()}
 /* jednostki stojące razem na jednym polu zawsze mają wspólny zapas ruchu – idą razem, nie rozdzielają się */
+function normStack(o,q,r){const st=S.units.filter(x=>x.o==o&&x.q==q&&x.r==r&&x.k!='C');if(st.length>1){const m=Math.max(...st.map(x=>x.mp));st.forEach(x=>{x.mp=m})}}
 function mergeStack(q,r,o){const st=S.units.filter(x=>x.o==o&&x.q==q&&x.r==r&&x.k!='C');if(st.length>1){const m=Math.max(...st.map(x=>x.mp));st.forEach(x=>{x.mp=m})}}
 function tap(q,r){const mi=meIdx(),own=S.units.filter(u=>u.o==mi&&u.q==q&&u.r==r),su=sel&&sel.k=='u'?S.units.find(u=>u.id==sel.id):null;
+  if(su&&su.o==mi&&mineTurn())normStack(su.o,su.q,su.r);
   if(su&&mineTurn()&&su.mp>0&&!(su.q==q&&su.r==r)&&adj(su,q,r)){let gl=grpMode?S.units.filter(x=>x.o==su.o&&x.q==su.q&&x.r==su.r&&x.mp>0):[su];if(grpMode&&grpN>0)gl=[su,...gl.filter(x=>x!==su)].slice(0,grpN);{const en=S.units.filter(x=>x.q==q&&x.r==r&&x.o!=su.o),atk=gl.filter(x=>S.units.includes(x)&&x.mp>0&&MIL(x.k));if(en.length&&tt(q,r)>=2&&atk.length&&S.pl[mi].seen[r*S.w+q]=='1'&&typeof beginBattle==='function'&&!S.bt&&!(typeof FZ!=='undefined'&&FZ)){beginBattle(atk,en,q,r);return}}const gids=gl.map(x=>x.id);_mvB=new Set(gids);quiet=true;try{gids.forEach(id=>{const x=S.units.find(v=>v.id==id);if(x&&x.mp>0)moveU(x,q,r)})}finally{quiet=false;_mvB=new Set()}mergeStack(q,r,su.o);save();render();return}
   const ci=S.cities.findIndex(c=>c.o==mi&&c.q==q&&c.r==r);msg='';
   if(own.length){sfx('select');{const tk=q+','+r;if(tk!==_grpTile){grpN=0;_grpTile=tk}}const i=su?own.findIndex(u=>u.id==su.id):-1;
@@ -717,7 +719,7 @@ function renderSpec(){
   const sp=[[2000,'Bardzo wolno'],[800,'Normalnie'],[250,'Szybko'],[0,'Błyskawicznie']].map(([v,n])=>`<option value="${v}"${spec.speed==v?' selected':''}>${n}</option>`).join('');
   $('hd').innerHTML=`<b>👁 Obserwator</b><span>Runda ${S.round}</span><span>${S.over>=0?'Koniec! Wygrywa '+esc(S.pl[S.over].name)+' ('+N[S.pl[S.over].ni].n+')':'Tura: '+esc(cur.name)}</span><button class="p" onclick="specSet('toggle')" ${S.over>=0?'disabled':''}>${spec.paused?'▶ Wznów':'⏸ Pauza'}</button><button onclick="specSet('step')" ${S.over>=0?'disabled':''}>⏭ Następny ruch</button><button onclick="specSet('skip',1)" ${S.over>=0?'disabled':''}>⏩ +1 runda</button><button onclick="specSet('skip',10)" ${S.over>=0?'disabled':''}>⏩ +10 rund</button><select onchange="specSet('speed',this.value)" title="Szybkość">${sp}</select><span class="zoom-hint">Scroll: zoom <b id="zoomval">${Math.round(zoom*100)}%</b></span><button onclick="stats()">📊 Statystyki</button><button class="sound" onclick="soundOn=!soundOn;this.textContent=soundOn?'🔊 Dźwięk':'🔇 Wycisz'">🔊 Dźwięk</button>`;
   let h='<b>Gracze</b><small style="display:block;margin:4px 0 8px">Tryb obserwatora – brak mgły wojny, widzisz całą mapę.</small>';
-  S.pl.forEach((p,i)=>{const inc=income(i);h+=`<div class="row" style="flex-wrap:wrap;opacity:${p.alive?1:.5}"><i class="d" style="background:${N[p.ni].c}"></i><b>${esc(p.kingdom||('Królestwo '+p.name))}</b> (${N[p.ni].n})${i==S.turn&&S.over<0?' ◀':''}${p.alive?'':' ✖'}<br><small>🪙 ${p.g||0} (${inc>=0?'+':''}${inc}/turę) · ◈ ${terr(i)} · 🏰 ${S.cities.filter(c=>c.o==i).length} · ⚔ ${milCount(i,false)*100} · 🏠 ${(S.hs||[]).filter(k=>+S.own[k]===i+1).length}</small></div>`});
+  S.pl.forEach((p,i)=>{const inc=income(i);h+=`<div class="row" style="flex-wrap:wrap;opacity:${p.alive?1:.5}"><i class="d" style="background:${N[p.ni].c}"></i><b>${esc(p.kingdom||('Królestwo '+p.name))}</b> (${N[p.ni].n})${i==S.turn&&S.over<0?' ◀':''}${p.alive?'':' ✖'}<br><small><i class="coin"></i> ${p.g||0} (${inc>=0?'+':''}${inc}/turę) · ◈ ${terr(i)} · 🏰 ${S.cities.filter(c=>c.o==i).length} · ⚔ ${milCount(i,false)*100} · 🏠 ${(S.hs||[]).filter(k=>+S.own[k]===i+1).length}</small></div>`});
   h+='<hr><small>Dwuklik na pole: szczegóły pola. „Następny ruch” wykonuje turę jednego gracza AI i zatrzymuje grę.</small>';
   $('side').innerHTML=h;computeCuts();draw(vision(0));applyZoom();aiCheck();if(typeof focusRefresh==='function')focusRefresh();
 }
@@ -732,7 +734,7 @@ function goldFx(pill,d){
   if(!pill||!d)return;
   const r=pill.getBoundingClientRect(),e=document.createElement('div');
   e.className='gold-fx '+(d<0?'neg':'pos');
-  e.innerHTML='<i class="gfx-c">🪙</i><b>'+(d<0?'−':'+')+Math.abs(d)+'</b>';
+  e.innerHTML='<i class="gfx-c coin"></i><b>'+(d<0?'−':'+')+Math.abs(d)+'</b>';
   e.style.left=(r.left+r.width/2)+'px';e.style.top=(r.bottom-6)+'px';
   document.body.appendChild(e);setTimeout(()=>e.remove(),1700);
   const ic=pill.querySelector('.gold-icon');if(ic){ic.classList.remove('bump');void ic.offsetWidth;ic.classList.add('bump')}
@@ -808,16 +810,17 @@ function grpComp(su,cur){const l=grpList(su,cur),c={};l.forEach(x=>c[x.k]=(c[x.k
 function grpLive(v,max){const su=S.units.find(x=>sel&&x.id==sel.id);if(!su)return;const n=Math.max(1,Math.min(max,v|0));grpMode=true;grpN=n>=max?0:n;
   const a=document.getElementById('gcur'),b=document.getElementById('gcomp');if(a)a.textContent=n;if(b)b.textContent=grpComp(su,n)}
 function renderAct(mi){
+  try{const _u=sel&&sel.k=='u'?S.units.find(x=>x.id==sel.id):null;if(_u&&_u.o==mi&&mineTurn())normStack(_u.o,_u.q,_u.r)}catch(e){}
   if(!sel||S.over>=0||!S.pl[mi]){actHide();return}
   const my=mineTurn(),g=S.pl[mi].g||0;let key='',h='';
-  const tile=(e,n,sub,pr,ok,on,tip)=>`<button class="tile" ${ok?'':'disabled'} onclick="${on}" title="${esc(tip||'')}"><span class="e">${e}</span><span class="n">${n}</span>${sub?`<span class="s">${sub}</span>`:''}${pr==null?'':`<span class="pr${typeof pr=='object'?(pr.cls?' '+pr.cls:''):(g<pr?' short':'')}">${typeof pr=='object'?pr.t:pr+' 🪙'}</span>`}</button>`;
+  const tile=(e,n,sub,pr,ok,on,tip)=>`<button class="tile" ${ok?'':'disabled'} onclick="${on}" title="${esc(tip||'')}"><span class="e">${e}</span><span class="n">${n}</span>${sub?`<span class="s">${sub}</span>`:''}${pr==null?'':`<span class="pr${typeof pr=='object'?(pr.cls?' '+pr.cls:''):(g<pr?' short':'')}">${typeof pr=='object'?pr.t:pr+' <i class="coin"></i>'}</span>`}</button>`;
   const head=(ic,t,sub)=>`<div class="ac-h"><div class="ac-ic">${ic}</div><div class="ac-t"><b>${t}</b><small>${sub}</small></div><button class="ac-x" onclick="closeAct()" title="Zamknij (Esc)">✕</button></div>`;
   const wait=my?'':`<div class="ac-w">⏳ To nie Twoja tura – akcje odblokują się, gdy przyjdzie na Ciebie kolej.</div>`;
   if(sel.k=='c'){
     const c=S.cities[sel.i];if(!c||c.o!=mi){actHide();return}
     key='c'+sel.i;const lv=c.lv||1,mc=milCount(mi),q=(S.q||[]).filter(x=>x.o==mi&&x.q==c.q&&x.r==c.r);
     const stat={W:'Atak 3 · Obrona 2',A:'Zasięg 3 pól',S:'Zakłada miasta',C:'Szybki zwiad'};
-    h=head('🏰',esc(c.nm||'Miasto'),`Poziom ${lv}${lv>1?' '+'★'.repeat(lv-1):''} · masz <b style="color:#f0cc83">${g} 🪙</b>`)+`<div class="ac-l">Rekrutacja</div><div class="tiles">`+
+    h=head('🏰',esc(c.nm||'Miasto'),`Poziom ${lv}${lv>1?' '+'★'.repeat(lv-1):''} · masz <b style="color:#f0cc83">${g} <i class="coin"></i></b>`)+`<div class="ac-l">Rekrutacja</div><div class="tiles">`+
       [['W','Wojownik'],['A','Łucznik'],['S','Osadnik'],['C','Zwiadowca']].map(([k,n])=>{const cost=unitPrice(mi,k),up=MIL(k)?armyUpkeep(mc+1)-armyUpkeep(mc):1;
         return tile(UIC[k],n,stat[k]+`<br>utrzymanie −${up}/turę`,cost,my&&g>=cost,`buy('${k}')`,g<cost?'Za mało złota':'Kup: '+n)}).join('')+`</div>`;
     h+=`<div class="ac-l">Rozwój miasta</div><div class="tiles">`+(lv>=3?tile('🏰','Maks. poziom','Mury i cytadela na maksimum',{t:'✔ gotowe',cls:'free'},false,'',''):tile('🧱',`Ulepsz do poz. ${lv+1}`,'+1 osłona murów w bitwie',CITY_UP[lv+1],my&&g>=CITY_UP[lv+1],'upgradeCity()',''))+`</div>`;
@@ -825,9 +828,9 @@ function renderAct(mi){
   }else if(sel.k=='t'){
     const ti=sel.r*S.w+sel.q;if(+S.own[ti]!==mi+1){actHide();return}
     key='t'+ti;const has=(S.hs||[]).includes(ti),hup=(S.hup||[]).includes(ti),hc=houseCost(mi);
-    h=head(has?'🏠':'🌾',has?'Domek'+(hup?' · ulepszony':''):T[tt(sel.q,sel.r)],`Twoje ziemie · pole ${sel.q+1}:${sel.r+1} · masz <b style="color:#f0cc83">${g} 🪙</b>`)+`<div class="ac-l">${has?'Ulepszenia':'Budowa'}</div><div class="tiles">`+
+    h=head(has?'🏠':'🌾',has?'Domek'+(hup?' · ulepszony':''):T[tt(sel.q,sel.r)],`Twoje ziemie · pole ${sel.q+1}:${sel.r+1} · masz <b style="color:#f0cc83">${g} <i class="coin"></i></b>`)+`<div class="ac-l">${has?'Ulepszenia':'Budowa'}</div><div class="tiles">`+
       (has?(hup?tile('💰','Dochód +5/turę','Ulepszenie aktywne',{t:'✔ gotowe',cls:'free'},false,'',''):tile('💰','Ulepsz dochód','+5 złota na turę',100,my&&g>=100,'upgradeHouse()','')):
-        tile('🏠','Domek','+2 🪙/turę · +1 ruch przy przejściu',hc,my&&g>=hc,'buildHouse()','')+tile('🗼','Wieża','Zasięg widzenia + obrona',25,my&&g>=25,'buildTower()',''))+`</div>`+
+        tile('🏠','Domek','+2 <i class="coin"></i>/turę · +1 ruch przy przejściu',hc,my&&g>=hc,'buildHouse()','')+tile('🗼','Wieża','Zasięg widzenia + obrona',25,my&&g>=25,'buildTower()',''))+`</div>`+
       `<div class="ac-n">${has?'Przejście jednostki przez domek daje +1 punkt ruchu.':'Domek kosztuje więcej z każdym kolejnym. Wieża daje dużą osłonę obrońcom.'}</div>`+wait;
   }else if(sel.k=='u'){
     const u=S.units.find(x=>x.id==sel.id);if(!u||u.o!=mi){actHide();return}
@@ -1385,7 +1388,7 @@ function battleHook(){
   if(cur)closeBattleView();openBattleView(B)}
 const UPRICE={W:15,A:20,S:15,C:8};
 function battleLosses(Bt){const alive=new Set(Bt.units.map(u=>u.gid));return[Bt.atkIds,Bt.defIds].map(ids=>{const L={W:0,A:0,S:0,C:0};ids.forEach(id=>{if(alive.has(id))return;const u=S.units.find(x=>x.id==id);if(u&&L[u.k]!=null)L[u.k]++});const gold=Object.keys(L).reduce((a,k)=>a+L[k]*UPRICE[k],0),n=Object.values(L).reduce((a,b)=>a+b,0);return{L,gold,n}})}
-function battleSummaryHtml(Bt){const NM={W:'Wojownik',A:'Łucznik',S:'Osadnik',C:'Zwiadowca'},R=battleLosses(Bt);let h='<h4>Podsumowanie strat</h4>';[0,1].forEach(s=>{const r=R[s];h+=`<div class="sd" style="border-left-color:${Bt.col[s]}"><b>${s?'🛡':'⚔'} ${esc(sideLabel(Bt,s))}</b>: `+(r.n?Object.keys(r.L).filter(k=>r.L[k]).map(k=>`${NM[k]} ×${r.L[k]}`).join(', ')+` · <b>${r.n}</b> jedn. (~${r.n*100} żołn.) · wartość <b>${r.gold} 🪙</b>`:'brak strat')+'</div>'});return h}
+function battleSummaryHtml(Bt){const NM={W:'Wojownik',A:'Łucznik',S:'Osadnik',C:'Zwiadowca'},R=battleLosses(Bt);let h='<h4>Podsumowanie strat</h4>';[0,1].forEach(s=>{const r=R[s];h+=`<div class="sd" style="border-left-color:${Bt.col[s]}"><b>${s?'🛡':'⚔'} ${esc(sideLabel(Bt,s))}</b>: `+(r.n?Object.keys(r.L).filter(k=>r.L[k]).map(k=>`${NM[k]} ×${r.L[k]}`).join(', ')+` · <b>${r.n}</b> jedn. (~${r.n*100} żołn.) · wartość <b>${r.gold} <i class="coin"></i></b>`:'brak strat')+'</div>'});return h}
 function ackBattle(){const B=FZ&&FZ.battle;if(!B||B.phase!=='over')return;
   if(hot)[B.atkP,B.defP].filter(p=>!S.pl[p].ai).forEach(p=>{if(!B.ack.includes(p))B.ack.push(p)});else if(!B.ack.includes(meIdx()))B.ack.push(meIdx());
   bsave(B);fzHud();tryFinalize(B)}
