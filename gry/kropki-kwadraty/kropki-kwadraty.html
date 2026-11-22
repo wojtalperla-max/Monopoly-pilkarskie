@@ -24,27 +24,26 @@
 <header><b class="logo">Kropki i Kwadraty</b><button id="mu">🔊</button></header>
 <section id="menu" class="scr on">
 <div class="km-bg" aria-hidden="true" id="kmBg"></div>
+<button class="km-back" id="kmBack">← Menu główne</button>
 <div class="km-wrap">
   <div class="km-logo" role="img" aria-label="Kropki i Kwadraty">
     <div class="km-row" id="kmR1"></div>
     <div class="km-i">i</div>
     <div class="km-row" id="kmR2"></div>
   </div>
-  <div class="km-tiles" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
   <p class="km-sub">Zamykaj kwadraty i zbieraj punkty.</p>
-  <div class="km-pane">
-    <div class="me" id="me"><i></i><input id="nick" maxlength="14" placeholder="Twój nick" autocomplete="off" aria-label="Twój nick"></div>
+  <div class="km-main">
     <button id="bC" class="km-btn km-gold"><span class="km-ic">🎲</span><span>Utwórz pokój</span></button>
+    <button id="bSJ" class="km-btn km-white"><span class="km-ic">🚪</span><span>Dołącz do znajomego</span></button>
   </div>
-  <div class="km-or">albo dołącz do znajomych</div>
-  <div class="km-pane">
-    <label for="cd">Kod pokoju</label>
-    <input id="cd" class="km-code" maxlength="5" placeholder="KOD" autocomplete="off">
-    <button id="bJ" class="km-btn km-white"><span class="km-ic">🚪</span><span>Dołącz</span></button>
+  <div id="joinArea" class="km-pane"><label for="cd">Kod pokoju od znajomego</label>
+    <div class="km-join"><input id="cd" class="km-code" maxlength="5" placeholder="KOD" autocomplete="off"><button id="bJ" class="km-btn km-green">Dołącz</button></div>
   </div>
   <button id="bL" class="km-btn km-ghost"><span class="km-ic">👥</span><span>Gra lokalna na jednym ekranie</span></button>
-  <p id="nt">2–6 graczy · Zamykaj kwadraty i zbieraj punkty</p><p id="nt2" class="hint km-hint"></p>
-</div></section>
+  <p id="nt2" class="km-hint"></p>
+</div>
+<div id="me" hidden><i></i><input id="nick" readonly tabindex="-1" aria-hidden="true"></div>
+</section>
 <section id="lobby" class="scr">
 <div class="top"><button id="lv" class="ghost">← Wyjdź</button><div class="code" id="lc" title="Kopiuj kod"></div><span></span></div>
 <div class="pl" id="pls"></div>
@@ -258,6 +257,7 @@ function leave(){if(R){try{R.leave()}catch(e){}R=null}S=null;ctx={mode:'menu'};i
 const mkCode=()=>{const a='ABCDEFGHJKMNPQRSTUVWXYZ';let s='';for(let i=0;i<4;i++)s+=a[Math.floor(Math.random()*a.length)];return s};
 $('#bC').onclick=()=>{au();SF.ui();joinNet(mkCode(),true)};
 $('#bJ').onclick=()=>{au();SF.ui();const c=$('#cd').value.trim().toUpperCase();if(c.length<4){toast('Wpisz kod pokoju');return}joinNet(c,false)};
+$('#bSJ').onclick=()=>{au();SF.ui();const p=$('#joinArea'),o=p.style.display==='block';p.style.display=o?'none':'block';if(!o)setTimeout(()=>$('#cd').focus(),60)};
 $('#cd').onkeydown=e=>{if(e.key==='Enter')$('#bJ').click()};
 $('#bL').onclick=()=>{au();SF.ui();ctx={mode:'local'};S={ph:'lobby',b:'k',pl:localPl(2),mv:[],sid:0};render()};
 $('#lv').onclick=()=>{SF.ui();leave()};$('#bk').onclick=()=>{SF.ui();leave()};
@@ -274,16 +274,21 @@ function initPrefs(){
   if(n){me.name=cleanN(n)||'Gracz';$('#nick').readOnly=true;$('#nick').title='Nick z Twojego konta'}
   else{$('#nick').readOnly=false;try{const v=cleanN(localStorage.getItem('kro_nick'));if(v)me.name=v}catch(e){}}
   paintMe();
-  if(!window.__kroNet){$('#bC').disabled=$('#bJ').disabled=true;$('#nt2').textContent='Pokoje online są niedostępne (brak połączenia z Firebase) – zagraj lokalnie.'}
-  else if(n)$('#nt2').textContent='Grasz jako '+me.name+' – wyniki trafią do Twoich statystyk.';
-  else $('#nt2').textContent='Zaloguj się na konto, aby wyniki liczyły się do statystyk.'}
+  if(!window.__kroNet){$('#bC').disabled=$('#bJ').disabled=$('#bSJ').disabled=true;$('#nt2').textContent='Pokoje online są niedostępne (brak połączenia z Firebase). Możesz zagrać lokalnie.'}
+  else $('#nt2').textContent=''}
 $('#nick').addEventListener('input',e=>{if(e.target.readOnly)return;me.name=cleanN(e.target.value)||'Gracz';try{localStorage.setItem('kro_nick',me.name)}catch(x){}paintMe()});
 window.__kroLeave=function(){try{if(R)leave()}catch(e){}};
 window.__kroRefresh=function(){if(!R)initPrefs()};
 initPrefs();
 </script><script>
-(function(){var cols=['#ff5d73','#ffc928','#2fd68f','#2fb8ff','#d3b8ff'];
-[['kmR1','KROPKI',0],['kmR2','KWADRATY',6]].forEach(function(x){var r=document.getElementById(x[0]);x[1].split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i+x[2]);b.style.color=cols[(i+x[2])%5];b.textContent=c;r.appendChild(b)})});
-var bg=document.getElementById('kmBg');['🔴','🟦','🟨','🟩','🟪','⭐','🔴','🟦','🟨','🟩','🟪','⭐'].forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})})();
+(function(){
+[['kmR1','KROPKI',0],['kmR2','KWADRATY',6]].forEach(function(x){var r=document.getElementById(x[0]);x[1].split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i+x[2]);b.textContent=c;r.appendChild(b)})});
+var bg=document.getElementById('kmBg'),CL=['#ff5d73','#ffc928','#2fd68f','#2fb8ff','#a77bff'],T=['sq','dot','gr','sq','dot','gr','dot','sq','gr','dot','sq','gr','dot','sq'];
+T.forEach(function(t,i){var s=document.createElement('span');s.className='km-'+t;
+ s.style.cssText='--c:'+CL[i%5]+';--z:'+(32+(i*23)%46)+'px;--r:'+(((i*47)%40)-20)+'deg;left:'+((i*7.3+2)%94)+'%;animation-duration:'+(15+(i*5)%12)+'s;animation-delay:-'+((i*3.1)%15)+'s';bg.appendChild(s)});
+document.getElementById('kmBack').onclick=function(){var d=null;try{d=window.parent.document}catch(e){}
+ var q=d&&(d.querySelector('[id*="kropki" i] .gmenu')||d.querySelector('.gmenu'));
+ if(q)q.click();else location.reload()};
+})();
 </script>
 </body></html>
