@@ -663,7 +663,7 @@ function onlinePanel(){
       <p class="og-sub">Kupuj. Handluj. Bankrutuj znajomych.</p>
       <div class="og-main">
         <button id="createOnline" class="og-btn og-gold"><span class="og-ic">🏠</span><span>Utwórz pokój</span></button>
-        <button id="showJoin" class="og-btn og-red"><span class="og-ic">🚪</span><span>Dołącz do znajomego</span></button>
+        <button id="showJoin" class="og-btn og-red"><span class="og-ic">🚪</span><span>Dołącz do znajomego</span></button><button class="og-btn og-ghost" id="localMode" type="button"><span class="og-ic">🎲</span><span>Gra lokalnie na jednym urządzeniu</span></button>
       </div>
       <div id="ogMode" class="og-pane"><h3>Jaką grę tworzysz?</h3>
         <div class="og-modes">
@@ -681,8 +681,7 @@ function onlinePanel(){
         <button id="copyRoom" class="og-btn og-ghost" style="margin-top:10px">📋 Kopiuj kod pokoju</button>
       </div>
       <div id="onlineError" role="alert"></div>
-      <button id="localMode" class="og-local">🎲 Gra lokalnie na jednym urządzeniu</button>
-    </div>`;
+      </div>`;
   document.body.appendChild(el);
   const $=s=>el.querySelector(s),show=(s,on)=>{$(s).style.display=on?'block':'none'};
   $('#ogBack').onclick=()=>monoLeaveToHub();
