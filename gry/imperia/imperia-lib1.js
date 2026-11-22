@@ -115,15 +115,18 @@ function impLobbyInfo(){
 }
 
 /* ---------- pokój / lobby ---------- */
+function genCode(){const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<5;i++)s+=a[Math.floor(Math.random()*a.length)];return s}
 async function enter(create){
-  const ia=impAcc();name=ia.nick||$('nm').value.trim().slice(0,16)||'Gracz';code=$('cd').value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8);
+  const ia=impAcc();name=ia.nick||$('nm').value.trim().slice(0,16)||'Gracz';code=create?genCode():$('cd').value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8);
   const er=m=>$('er').textContent=m;
-  if(code.length<3)return er('Kod pokoju: min. 3 znaki (litery/cyfry).');
+  if(!create&&code.length<3)return er('Wpisz kod pokoju od znajomego (min. 3 znaki).');
   const db=await impDb();
   if(!db)return er('Brak połączenia z serwerem gry (Firebase). Odśwież stronę i spróbuj ponownie.');myId=db.uid;
   try{
-    ref=db.doc('rooms/'+code);const snap=await ref.get(),pc=ref.collection('players'),pd=pc.doc(myId);
-    if(create){if(snap.exists)return er('Taki pokój już istnieje.');await ref.set({host:myId,size:'m',started:false,game:''})}
+    ref=db.doc('rooms/'+code);let snap=await ref.get();
+    if(create)for(let k=0;k<8&&snap.exists;k++){code=genCode();ref=db.doc('rooms/'+code);snap=await ref.get()}
+    const pc=ref.collection('players'),pd=pc.doc(myId);
+    if(create){if(snap.exists)return er('Nie udało się wygenerować kodu pokoju. Spróbuj ponownie.');await ref.set({host:myId,size:'m',started:false,game:''})}
     else if(!snap.exists)return er('Nie ma takiego pokoju.');
     const mine=await pd.get();
     if(!mine.exists){
@@ -149,31 +152,65 @@ async function start(){
   if(local){S=s;hold=false;render();return}
   await ref.update({started:true,game:JSON.stringify(s)});
 }
+const CIV_IC=['🦅','🪓','🏛️','🐎','🏺','☀️'];
+const MAP_SZ=[['s','Mała'],['m','Średnia'],['l','Duża'],['xl','Bardzo duża'],['xxl','Ogromna']];
+/* wspólne kafelki wyboru cywilizacji (pokój online + gra lokalna) */
+function civCards(sel,taken,fn){return N.map((n,i)=>{const t=taken[i],on=sel===i;
+  return `<button type="button" class="civ${on?' on':''}${t?' taken':''}" ${t?'disabled':''} style="--cc:${N0[i]}" onclick="${fn(i)}"><span class="civ-ic">${CIV_IC[i]||'🏰'}</span><b>${esc(n.n)}</b><span class="civ-b">＋ ${esc(n.b)}</span><span class="civ-d">－ ${esc(n.d)}</span>${t?`<em class="civ-t">Zajęte: ${esc(t)}</em>`:''}${on?'<em class="civ-ok">✓</em>':''}</button>`}).join('')}
+const civGrid=(sel,taken,fn)=>`<div class="civ-grid">${civCards(sel,taken,fn)}</div>`;
+let _rmLast='';
+function roomSet(html){
+  const b=$('rmBody');if(!b){$('room').innerHTML=html;return}
+  if(html===_rmLast)return;_rmLast=html;
+  const a=document.activeElement,keep=a&&b.contains(a)&&a.id?{id:a.id,v:a.value,s:a.selectionStart,e:a.selectionEnd}:null,sc=$('room').scrollTop;
+  b.innerHTML=html;
+  if(keep){const n=$(keep.id);if(n){if(n.id==='kingdomEdit'&&keep.v!==undefined)n.value=keep.v;try{n.focus();n.setSelectionRange(keep.s,keep.e)}catch(e){}}}
+  $('room').scrollTop=sc;
+}
+function copyCode(btn){
+  const t=code||'',done=()=>{if(btn){btn.textContent='✅ Skopiowano!';setTimeout(()=>{btn.textContent='📋 Kopiuj kod pokoju'},1600)}};
+  const fb=()=>{const ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;opacity:0;left:-999px';document.body.appendChild(ta);ta.select();try{document.execCommand('copy')}catch(e){}ta.remove();done()};
+  try{navigator.clipboard.writeText(t).then(done,fb)}catch(e){fb()}
+}
+function roomMsg(txt){return `<div class="rm-card"><div class="rm-badge">👑 Imperia</div><p class="rm-info">${txt}</p></div>`}
 function lobbyView(){
   const host=RD.host==myId,m=me();applyCols(LP);
-  let h=`<h2 style="margin-top:0">Pokój ${esc(code)}</h2><p>Gracze (${LP.length}/6) – udostępnij kod znajomym:</p>`;
-  LP.forEach(p=>h+=`<div class="row">${p.ni>=0&&p.id==myId?`<i class="d" style="background:${N[p.ni].c}"></i>`:'<i class="d" style="background:#999"></i>'}${esc(p.name)}${p.id==RD.host?' (host)':''}${p.ai?' [AI] '+(host?`<button onclick="rmAI('${p.id}')">usuń</button>`:''):''}${p.ni>=0?(p.id==myId?' – '+N[p.ni].n:' – wybrał naród'):''}</div>`);
-  h+='<h3>Wybierz swój naród</h3><div class="grid">';
-  N.forEach((n,i)=>{const tk=LP.some(p=>p.ni==i&&p.id!=myId);h+=`<button ${tk?'disabled':''} class="${m&&m.ni==i?'on':''}" onclick="pick(${i})" style="border-color:${n.c}"><b>${n.n}</b><br><small>＋ ${n.b}<br>－ ${n.d}</small></button>`});
-  h+='</div>';
-  h+=`<h3>Nazwa królestwa</h3><div class="row"><input id="kingdomEdit" maxlength="24" value="${esc(m&&m.kingdom||'Królestwo '+(m&&m.name||'Gracza'))}" placeholder="Nazwa królestwa"><button onclick="pickKingdom()">Zapisz</button></div>`;
-  h+=colHtml(m);
-  if(host){const ok=LP.length>=2&&LP.every(p=>p.ni>=0);
-    h+=`<div class="row">Rozmiar mapy: <select onchange="setSize(this.value)">${[['s','Mała'],['m','Średnia'],['l','Duża'],['xl','Bardzo duża'],['xxl','Ogromna']].map(([k,l])=>`<option value="${k}" ${RD.size==k?'selected':''}>${l}</option>`).join('')}</select></div><button ${LP.length<6?'':'disabled'} onclick="addAI()">+ Dodaj AI</button> <button class="p" ${ok?'':'disabled'} onclick="start()">Start gry</button><p><small>Potrzeba 2–6 graczy, każdy z wybranym narodem.</small></p>`}
-  else h+='<p><small>Czekamy aż host rozpocznie grę…</small></p>';
+  const ready=LP.length>=2&&LP.every(p=>p.ni>=0),taken={};
+  LP.forEach(p=>{if(p.ni>=0&&p.id!=myId)taken[p.ni]=p.name});
+  const info=LP.length<2?'Możesz rozpocząć grę, gdy dołączy co najmniej 2 osoby.':!ready?'Czekamy, aż każdy wybierze cywilizację.':host?'Wszyscy gotowi – możesz rozpocząć grę!':'Wszyscy gotowi – czekamy na hosta.';
+  let h=`<div class="rm-card"><div class="rm-badge">👑 Imperia · gra online</div><div class="rm-lbl">Kod pokoju</div><div class="rm-code">${esc(code)}</div><p class="rm-info">Gracze: ${LP.length}/6. ${info}</p>`;
+  h+='<div class="rm-players">'+LP.map((p,k)=>`<div class="rm-pl"><i class="rm-dot${p.ni>=0?' ok':''}"></i><span class="rm-nm">${k+1}. ${esc(p.name)}${p.id==RD.host?' <b class="rm-tag">(host)</b>':''}${p.id==myId?' <b class="rm-me">(Ty)</b>':''}${p.ai?' <b class="rm-tag">[AI]</b>':''}</span>${p.ni>=0?`<span class="rm-civ" style="--cc:${p.col||N0[p.ni]}">${CIV_IC[p.ni]||'🏰'} ${esc(N[p.ni].n)}</span>`:'<span class="rm-civ none">wybiera…</span>'}${p.ai&&host?`<button type="button" class="rm-x" title="Usuń AI" onclick="rmAI('${p.id}')">✕</button>`:''}</div>`).join('')+'</div>';
+  h+='<div class="rm-sec">Twoja cywilizacja</div>'+civGrid(m?m.ni:-1,taken,i=>`pick(${i})`);
+  const mc=(m&&(m.col||(m.ni>=0?N0[m.ni]:null)))||'#d94f4f';
+  h+=`<div class="rm-sec">Twoje królestwo</div><div class="rm-row"><input id="kingdomEdit" maxlength="24" value="${esc(m&&m.kingdom||'Królestwo '+(m&&m.name||'Gracza'))}" placeholder="Nazwa królestwa"><button type="button" class="rm-sm" onclick="pickKingdom()">Zapisz</button></div><div class="rm-row"><span>Kolor państwa:</span><input type="color" value="${mc}" onchange="pickCol(this.value)"></div>`;
+  h+='<div class="rm-sep"></div>';
+  if(host){
+    h+=`<div class="rm-row"><span>Rozmiar mapy:</span><select onchange="setSize(this.value)">${MAP_SZ.map(([k,l])=>`<option value="${k}" ${RD.size==k?'selected':''}>${l}</option>`).join('')}</select></div>`;
+    h+=`<button type="button" class="il-btn il-gold il-go" ${ready?'':'disabled'} onclick="start()"><span class="il-ic">⚔️</span><span>Rozpocznij grę</span></button>`;
+    h+=`<button type="button" class="rm-ghost" ${LP.length<6?'':'disabled'} onclick="addAI()">🤖 Dodaj AI</button>`;
+  }else{
+    const sz=(MAP_SZ.find(x=>x[0]==(RD.size||'m'))||MAP_SZ[1])[1];
+    h+=`<div class="rm-row"><span>Rozmiar mapy:</span><b class="rm-val">${sz}</b></div><div class="rm-wait">⏳ Czekamy, aż host rozpocznie grę…</div>`;
+  }
+  h+='<button type="button" class="rm-ghost" onclick="copyCode(this)">📋 Kopiuj kod pokoju</button></div>';
   return h;
 }
 
+function localCivPaint(){
+  const n=document.querySelectorAll('#local-civs input[id^=local-ni-]').length,vals=[];
+  for(let i=0;i<n;i++)vals.push(+$('local-ni-'+i).value);
+  for(let i=0;i<n;i++){const t={};vals.forEach((v,k)=>{if(k!==i)t[v]='Gracz '+(k+1)});const g=$('lg-'+i);if(g)g.innerHTML=civCards(vals[i],t,j=>`localPick(${i},${j})`)}
+}
+function localPick(i,j){const h=$('local-ni-'+i);if(!h)return;h.value=j;const c=$('local-col-'+i);if(c&&!c.dataset.u)c.value=N0[j];localCivPaint();try{sfx('tap')}catch(e){}}
 function localCivUI(){
   const n=Math.max(0,Math.min(6,+$('ln').value||0)),box=$('local-civs');if(!box)return;
-  const old=[...box.querySelectorAll('select')].map(x=>+x.value),oc=[...box.querySelectorAll('input[type=color]')].map(x=>x.dataset.u?x.value:null);box.innerHTML='';
-  for(let i=0;i<n;i++){const label=document.createElement('label');label.textContent='Gracz '+(i+1)+' – cywilizacja';const select=document.createElement('select');select.id='local-ni-'+i;
-    N.forEach((c,j)=>{const op=document.createElement('option');op.value=j;op.textContent=c.n+' · +'+c.b+' / −'+c.d;select.appendChild(op)});
-    select.value=String(old[i]!==undefined?old[i]:i%N.length);
-    const row=document.createElement('div');row.className='lcol';const inp=document.createElement('input');inp.type='color';inp.id='local-col-'+i;
-    if(oc[i]){inp.value=oc[i];inp.dataset.u='1'}else if(i===0&&impAcc().col){inp.value=impAcc().col;inp.dataset.u='1'}else inp.value=N0[+select.value];
-    inp.oninput=()=>inp.dataset.u='1';select.onchange=()=>{if(!inp.dataset.u)inp.value=N0[+select.value]};
-    row.append('Kolor: ',inp);label.appendChild(select);label.appendChild(row);box.appendChild(label)}
+  const oldN=[...box.querySelectorAll('input[id^=local-ni-]')].map(x=>+x.value),oc=[...box.querySelectorAll('input[type=color]')].map(x=>x.dataset.u?x.value:null);
+  if(!n){box.innerHTML='<p class="rm-info">👁 Tryb obserwatora – wszystkie cywilizacje zagrają jako AI.</p>';return}
+  const used=new Set(),vals=[];
+  for(let i=0;i<n;i++){let v=oldN[i];if(!(v>=0)||used.has(v))v=N.findIndex((_,j)=>!used.has(j));if(v<0)v=0;used.add(v);vals.push(v)}
+  box.innerHTML=vals.map((v,i)=>{const user=oc[i]||(i===0&&impAcc().col);const col=oc[i]||(i===0&&impAcc().col)||N0[v];
+    return `<div class="lc"><div class="lc-h"><span>👤 Gracz ${i+1}</span><label class="lcol">Kolor <input type="color" id="local-col-${i}" value="${col}" ${user?'data-u="1"':''} oninput="this.dataset.u='1'"></label></div><input type="hidden" id="local-ni-${i}" value="${v}"><div class="civ-grid" id="lg-${i}"></div></div>`}).join('');
+  localCivPaint();
 }
 function localGame(){const n=+$('ln').value,m=+$('la').value;if(n+m<2)return $('er').textContent=n==0?'Tryb obserwatora: ustaw min. 2 AI.':'Potrzeba min. 2 graczy (ludzie + AI).';if(n+m>6)return $('er').textContent='Max 6 graczy łącznie.';spec=n==0?{paused:false,speed:800,target:0,step:0}:null;local=true;ref={update:()=>Promise.resolve()};code='LOKALNIE';RD={size:$('ls').value,started:true};
   const chosen=Array.from({length:n},(_,i)=>+$('local-ni-'+i).value),used=new Set(chosen);if(used.size<n)return $('er').textContent='Każdy gracz musi wybrać inną cywilizację.';if(new Set(chosen.map((_,i)=>$('local-col-'+i).value)).size<n)return $('er').textContent='Każdy gracz musi mieć inny kolor.';
@@ -699,15 +736,21 @@ const TOAST=document.createElement('div');TOAST.id='toast';$('game').appendChild
   const prevClean=window.__impCleanup;window.__impCleanup=()=>{try{prevClean&&prevClean()}catch(e){}restoreParentBtn();restorePortalBar();};
   let leaving=false,syncT=0;
   function goMenu(){
+    if(leaving)return;
     leaving=true;clearInterval(syncT);
     try{window.__impCleanup()}catch(e){}
-    try{const g=window.parent.document.querySelector('#imp .gmenu');if(g){g.click();return}}catch(e){}
-    const p=pmenu();
-    if(p.length){try{p[0].click();return}catch(e){}}
-    const B=impBridge();
-    try{if(B){for(const k of ['menu','mainMenu','home','exit','back','close']){if(typeof B[k]==='function'){B[k]();return}}}}catch(e){}
-    try{window.parent.postMessage({type:'imperia:menu',imperia:'menu'},'*')}catch(e){}
-    setTimeout(()=>{try{window.top.location.href='/'}catch(e){try{window.parent.location.href='/'}catch(e2){location.href='/'}}},150);
+    let fe=null;try{fe=window.frameElement}catch(e){}
+    /* czy portal już nas schował / usunął? (wtedy nic więcej nie robimy) */
+    const gone=()=>{try{if(fe)return !fe.isConnected||fe.offsetWidth===0||fe.offsetHeight===0||getComputedStyle(fe).display==='none'}catch(e){return true}return false};
+    const viaParent=()=>{try{const d=window.parent.document,g=d.querySelector('#imp .gmenu')||d.querySelector('.gmenu');if(g){g.click();return true}const p=pmenu();if(p.length){p[0].click();return true}}catch(e){}return false};
+    const viaBridge=()=>{try{const B=impBridge();if(B)for(const k of ['menu','mainMenu','home','exit','back','close'])if(typeof B[k]==='function'){B[k]();return true}}catch(e){}return false};
+    if(!viaParent()&&!viaBridge()){try{window.parent.postMessage({type:'imperia:menu',imperia:'menu'},'*')}catch(e){}}
+    /* jeśli portal nie zareagował – wracamy na stronę główną sami */
+    setTimeout(()=>{
+      if(gone())return;
+      try{window.top.location.href='/'}catch(e){try{window.parent.location.href='/'}catch(e2){try{location.href='/'}catch(e3){}}}
+      setTimeout(()=>{if(!gone()){leaving=false;syncT=setInterval(sync,700)}},1500);
+    },600);
   }
   $('ilMenu').onclick=goMenu;
   function hidePortalBar(){try{
@@ -777,14 +820,14 @@ function render(){
   if(quiet)return;const inRoom=!!ref;$('lobby').style.display=inRoom?'none':'';
   if(!inRoom)return;
   if(!S||meIdx()<0){$('game').style.display='none';$('room').style.display='';
-    $('room').innerHTML=RD.started&&!S?'Ładowanie…':RD.started?'Gra już trwa bez Ciebie.':lobbyView();return}
+    roomSet(RD.started&&!S?roomMsg('Ładowanie…'):RD.started?roomMsg('Gra już trwa bez Ciebie.'):lobbyView());return}
   $('room').style.display='none';$('game').style.display='flex';applyCols(S.pl);
   if(local&&hold){hold=false;holdFor=null;}
   if(spec){actHide();renderSpec();return}
   const mi=meIdx(),V=vision(mi),sn=S.pl[mi].seen.split('');V.forEach((v,i)=>{if(v)sn[i]='1'});S.pl[mi].seen=sn.join('');
   if(S.own)for(let r=0;r<S.h;r++)for(let q=0;q<S.w;q++){if(S.own[r*S.w+q]!=mi+1)continue;NB(r).forEach(([a,b])=>{const x=q+a,y=r+b;if(x<0||y<0||x>=S.w||y>=S.h)return;const o=+S.own[y*S.w+x];if(o&&o!=mi+1)noteMet(mi,o-1)})}
   computeCuts();const cur=S.pl[S.turn];
-  $('hd').innerHTML=`<b>${esc(S.pl[mi].kingdom||('Królestwo '+S.pl[mi].name))}</b><span>Pokój ${esc(code)}</span><span>Runda ${S.round}</span><span class="gold-pill"><i class="gold-icon">✦</i> ${S.pl[mi].g||0} złota <small style="font-weight:600;color:#e7c987">${income(mi)>=0?'+':''}${income(mi)}/turę</small></span><span>◈ Ziemia: ${terr(mi)}</span><span>⚔ Armia: ${milCount(mi,false)*100} (−${armyUpkeep(milCount(mi))}🪙)</span><span class="zoom-hint">Scroll: zoom <b id="zoomval">${Math.round(zoom*100)}%</b></span><span>${S.over>=0?'Koniec! Wygrywa '+esc(S.pl[S.over].name)+' ('+N[S.pl[S.over].ni].n+')':mineTurn()?'<b>Twoja tura</b>':'Tura: '+esc(cur.name)}</span><button class="p" ${mineTurn()?'':'disabled'} onclick="endTurn()">Zakończ turę</button><button onclick="stats()">📊 Statystyki</button><button class="sound" onclick="soundOn=!soundOn;this.textContent=soundOn?'🔊 Dźwięk':'🔇 Wycisz'">🔊 Dźwięk</button>`;
+  $('hd').innerHTML=`<b>${esc(S.pl[mi].kingdom||('Królestwo '+S.pl[mi].name))}</b><span>Pokój ${esc(code)}</span><span>Runda ${S.round}</span><span class="gold-pill"><i class="gold-icon">✦</i> ${S.pl[mi].g||0} złota <small style="font-weight:600;color:#e7c987">${income(mi)>=0?'+':''}${income(mi)}/turę</small></span><span>◈ Ziemia: ${terr(mi)}</span><span title="Utrzymanie armii: −${armyUpkeep(milCount(mi))} złota na turę (wliczone w dochód)">⚔ Armia: <b>${milCount(mi,false)*100}</b></span><span class="zoom-hint">Scroll: zoom <b id="zoomval">${Math.round(zoom*100)}%</b></span><span>${S.over>=0?'Koniec! Wygrywa '+esc(S.pl[S.over].name)+' ('+N[S.pl[S.over].ni].n+')':mineTurn()?'<b>Twoja tura</b>':'Tura: '+esc(cur.name)}</span><button class="p" ${mineTurn()?'':'disabled'} onclick="endTurn()">Zakończ turę</button><button onclick="stats()">📊 Statystyki</button><button class="sound" onclick="soundOn=!soundOn;this.textContent=soundOn?'🔊 Dźwięk':'🔇 Wycisz'">🔊 Dźwięk</button>`;
   let h='<b>Gracze</b>';
   S.pl.forEach((p,i)=>h+=`<div class="row"><i class="d" style="background:${N[p.ni].c}"></i>${esc(p.kingdom||('Królestwo '+p.name))} (${esc(p.name)})${p.ai?' [AI]':(i==mi?' – '+N[p.ni].n:'')}${i==S.turn?' ◀':''}${p.alive?'':' ✖'}</div>`);
   {let nm=0,ne=0;CUTS.forEach(k=>{const[o,rest]=k.split(':'),[q,r]=rest.split(',').map(Number);if(!V[r*S.w+q])return;if(+o===mi)nm++;else ne++});if(nm)h+=`<div class=err>⚠ OKRĄŻONE Twoje oddziały: ${nm} (−1 atak, −1 obrona)</div>`;if(ne)h+=`<div class=err style="color:#ffb86b">⚠ Okrążone oddziały wroga: ${ne} (osłabione)</div>`}
