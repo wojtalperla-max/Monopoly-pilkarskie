@@ -45,39 +45,40 @@
     </div>
     <div class="gh-tiles" aria-hidden="true"><i>🍄</i><i>🧺</i><i>🌲</i><i>🍂</i></div>
     <p class="gh-sub">Rzuć kostką, sam wybierz drogę przez las i zbieraj borowiki. Uważaj na muchomory!</p>
-    <div class="gh-pane">
-      <label for="name">Twój nick</label>
-      <input id="name" maxlength="14" placeholder="np. Kasia" autocomplete="off">
-      <div class="colrow"><span>Kolor pionka</span><input id="pcol" type="color" value="#e53935" aria-label="Kolor pionka"></div>
-      <div id="net" class="gh-net"></div>
+    <div class="gh-main">
+      <button id="create" class="gh-btn gh-gold"><span class="gh-ic">🏠</span><span>Utwórz pokój</span></button>
+      <button id="joinBtn" class="gh-btn gh-white" type="button"><span class="gh-ic">🚪</span><span>Dołącz do znajomego</span></button>
     </div>
-    <div class="gh-pane">
-      <button id="create" class="gh-btn gh-gold"><span class="gh-ic">🌲</span><span>Stwórz nowy pokój</span></button>
-      <div class="gh-or">albo dołącz do znajomych</div>
-      <input id="code" class="code" maxlength="4" placeholder="KOD" autocomplete="off">
-      <button id="join" class="gh-btn gh-white"><span class="gh-ic">🧺</span><span>Dołącz do pokoju</span></button>
-      <div id="err" class="err"></div>
-    </div>
-    <button id="localBtn" class="gh-link" type="button"><span aria-hidden="true">🎲</span> Gra lokalnie na jednym urządzeniu</button>
+    <div id="joinPane" class="gh-joinpane hide"><label for="code">Kod pokoju od znajomego</label>
+      <div class="gh-join"><input id="code" class="code" maxlength="4" placeholder="KOD" autocomplete="off"><button id="join" class="gh-btn gh-green"><span>Dołącz</span></button></div></div>
+    <div id="err" class="err" role="alert"></div>
+    <button id="localBtn" class="gh-local" type="button"><span aria-hidden="true">🎲</span> Gra lokalnie na jednym urządzeniu</button>
     <div id="localPane" class="gh-pane hide">
       <label>Ilu graczy przy tym urządzeniu?</label>
       <div class="row" id="localN"><button class="gh-btn gh-gold" data-n="1">1</button><button class="gh-btn gh-white" data-n="2">2</button><button class="gh-btn gh-white" data-n="3">3</button><button class="gh-btn gh-white" data-n="4">4</button></div>
       <p class="gh-net">1 = gra solo. Przy kilku graczach każdy w swojej turze rzuca i wybiera trasę. Nie trzeba internetu ani pokoju.</p>
     </div>
+    <div id="net" class="gh-net"></div>
     <p class="gh-note">Znajomi wybierają Grzybobranie w menu gier i wpisują kod pokoju (do 4 osób).</p>
   </div>
 </div>
 
 <div id="lobby" class="home hide">
-  <div class="card center">
-    <div class="muted">Kod pokoju</div>
-    <div class="big" id="lcode"></div>
-    <button class="ghost" id="copy">📋 Skopiuj kod</button>
-    <div class="plist" id="lplayers"></div>
-    <button id="start">▶ Zaczynamy grzybobranie!</button>
-    <div id="lwait" class="muted hide">Czekamy aż gospodarz rozpocznie grę…</div>
-    <div id="lerr" class="err"></div>
-    <button class="ghost" id="leave1">← wyjdź</button>
+  <div class="gh-bg" aria-hidden="true" id="ghBg2"></div>
+  <div class="gh-wrap">
+    <div class="gh-tiles" aria-hidden="true"><i>🍄</i><i>🧺</i><i>🌲</i><i>🍂</i></div>
+    <div class="gh-logo" role="img" aria-label="Pokój"><div class="gh-row" id="ghR3"></div></div>
+    <div class="gh-lobby">
+      <span class="gh-badge">⏳ Poczekalnia</span>
+      <div class="gh-lt">Podaj ten kod znajomym (do 4 osób)</div>
+      <div class="gh-code" id="lcode"></div>
+      <div class="gh-waitl" id="lwait2">Czekam na graczy<span class="dots"></span></div>
+      <div class="plist" id="lplayers"></div>
+      <div class="row"><button class="gh-btn gh-gold" id="copy">KOPIUJ KOD</button><button class="gh-btn gh-ghost" id="leave1">ANULUJ</button></div>
+      <button id="start" class="gh-btn gh-white">▶ Zaczynamy grzybobranie!</button>
+      <div id="lwait" class="gh-waitl hide">Czekamy aż gospodarz rozpocznie grę…</div>
+      <div id="lerr" class="err" role="alert"></div>
+    </div>
   </div>
 </div>
 
@@ -312,7 +313,7 @@ function newMush(){
 }
 function startLocal(n){
   n=Math.max(1,Math.min(MAXP,n|0||1));
-  const nick=cleanN($('#name').value),cols=uniqCols([myCol(),...FALL]).slice(0,n);
+  const nick=myName()==='Gracz'?'':myName(),cols=uniqCols([myCol(),...FALL]).slice(0,n);
   local=true;room=null;isHost=true;code='';doneRec='';lastGid='';shownWin='';plan=[];planRn=-1;rPlan=null;
   S={gid:Date.now().toString(36)+Math.random().toString(36).slice(2,6),phase:'play',
     players:Array.from({length:n},(_,i)=>({id:'L'+i,name:i?'Gracz '+(i+1):(nick||'Gracz 1'),col:cols[i],pos:0,b:0,r:0,gone:false})),
@@ -395,8 +396,8 @@ function plist(){
   return L.sort((a,b)=>(b.presence.h?1:0)-(a.presence.h?1:0)||(+a.presence.ts||0)-(+b.presence.ts||0)||(a.peer<b.peer?-1:1));
 }
 const netOk=()=>!!(window.__grzNet&&window.__grzNet());
-const myName=()=>cleanN($('#name').value)||'Gracz';
-const myCol=()=>HEX.test($('#pcol').value)?$('#pcol').value:'#e53935';
+const myName=()=>cleanN(window.__grzNick&&window.__grzNick())||'Gracz';
+const myCol=()=>{const c=window.__grzCol&&window.__grzCol();return HEX.test(c||'')?c.toLowerCase():'#e53935'};
 const genCode=()=>{const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';return Array.from({length:4},()=>a[Math.floor(Math.random()*a.length)]).join('')};
 function setBusy(b){$('#create').disabled=$('#join').disabled=b||!netOk()}
 async function connect(host){
@@ -415,7 +416,7 @@ async function connect(host){
     me=room.uid;code=c;isHost=host;S=null;doneRec='';lastGid='';shownWin='';
     await room.presence({n:myName(),c:myCol(),h:host,ts:Date.now()});
     unsubs=[room.on('state',onStateMsg),room.on('act',onActMsg),room.on('plan',onPlanMsg),room.onPeers(onPeers)];
-    $('#lcode').textContent=c;$('#lerr').textContent='';show('lobby');renderLobby();
+    setCode(c);$('#copy').textContent='KOPIUJ KOD';$('#lerr').textContent='';show('lobby');renderLobby();
     if(host){beat=setInterval(()=>{if(S&&room)room.emit('state',S).catch(()=>{})},6000)}
     else{
       const t0=Date.now();
@@ -436,7 +437,7 @@ function leave(){
   clearInterval(beat);beat=null;clearInterval(stepT);anim=false;
   if(room){try{room.leave().catch(()=>{})}catch(e){}}
   room=null;S=null;me=null;isHost=false;disp={};animGot=[];lastEv=0;lastRn=0;lastGid='';shownWin='';plan=[];planRn=-1;rPlan=null;
-  $('#winbox').classList.add('hide');show('home');setBusy(false);
+  $('#winbox').classList.add('hide');show('home');setBusy(false);$('#joinPane').classList.add('hide');
 }
 function show(w){['home','lobby','game'].forEach(x=>$('#'+x).classList.toggle('hide',x!==w))}
 function send(a){if(!room&&!local)return;if(isHost)act(me,a);else room.emit('act',{a}).catch(()=>{})}
@@ -460,13 +461,14 @@ function onPeers(ch){
   }
   if(!S)renderLobby();
 }
+function setCode(c){$('#lcode').innerHTML=[...c].map(x=>`<b>${x}</b>`).join('')}
 function renderLobby(){
   if(S||!room)return;
   const L=plist(),V=L.slice(0,MAXP),cols=uniqCols(V.map(p=>p.presence.c));
   $('#lplayers').innerHTML=V.map((p,i)=>`<div class="pl"><span class="dot" style="background:${cols[i]}"></span><b>${esc(cleanN(p.presence.n))}${p.isMe?' (ty)':''}${p.presence.h?' 👑':''}</b></div>`).join('')||'<div class="muted">Łączenie…</div>';
   if(L.length>MAXP)$('#lplayers').insertAdjacentHTML('beforeend',`<div class="muted center" style="font-size:14px">+${L.length-MAXP} czeka na wolne miejsce (max ${MAXP})</div>`);
   $('#start').classList.toggle('hide',!isHost);$('#lwait').classList.toggle('hide',isHost);
-  $('#start').disabled=!V.length;
+  $('#start').disabled=!V.length;$('#lwait2').classList.toggle('hide',V.length>=2);
   $('#start').textContent=V.length<2?'▶ Zagraj solo (bez statystyk)':'▶ Zaczynamy grzybobranie! ('+V.length+')';
 }
 
@@ -546,17 +548,10 @@ function recStats(){
 
 // ---------- nick i kolor z konta ----------
 function initPrefs(){
-  const n=window.__grzNick&&window.__grzNick(),c=window.__grzCol&&window.__grzCol();
-  let sv=null;try{sv=JSON.parse(localStorage.getItem('grzyb_pref')||'null')}catch(e){}
-  const nm=$('#name'),pc=$('#pcol');
-  if(n){nm.value=cleanN(n);nm.readOnly=true;nm.title='Nick z Twojego konta'}
-  else{nm.readOnly=false;nm.title='';if(sv&&sv.n&&!nm.value)nm.value=cleanN(sv.n)}
-  if(c&&HEX.test(c)){pc.value=c.toLowerCase();pc.disabled=true;pc.title='Kolor z Twojego konta'}
-  else{pc.disabled=false;pc.title='';if(sv&&HEX.test(sv.c||''))pc.value=sv.c}
-  $('#net').textContent=!netOk()?'Pokoje online są niedostępne (brak połączenia z Firebase).':n?'Grasz jako '+cleanN(n)+' – wyniki trafią do Twoich statystyk.':'Zaloguj się na konto, aby nick i kolor pochodziły z konta, a wyniki liczyły się do statystyk.';
+  const n=cleanN(window.__grzNick&&window.__grzNick());
+  $('#net').textContent=!netOk()?'Pokoje online są niedostępne (brak połączenia z Firebase).':n?'Grasz jako '+n+' – wyniki trafią do Twoich statystyk.':'Zaloguj się na konto, aby nick i kolor pochodziły z konta, a wyniki liczyły się do statystyk.';
   setBusy(!!room);
 }
-const savePref=()=>{if(window.__grzNick&&window.__grzNick())return;try{localStorage.setItem('grzyb_pref',JSON.stringify({n:$('#name').value,c:$('#pcol').value}))}catch(e){}};
 window.__grzRefresh=()=>{if(!room)initPrefs()};
 window.__grzLeave=()=>{try{leave()}catch(e){}};
 
@@ -565,7 +560,6 @@ $('#create').onclick=()=>connect(true);
 $('#join').onclick=()=>connect(false);
 $('#code').addEventListener('input',e=>e.target.value=e.target.value.toUpperCase());
 $('#code').addEventListener('keydown',e=>{if(e.key==='Enter')connect(false)});
-$('#name').addEventListener('input',savePref);$('#pcol').addEventListener('input',savePref);
 $('#start').onclick=startGame;
 $('#localBtn').onclick=()=>{const p=$('#localPane');p.classList.toggle('hide');if(!p.classList.contains('hide'))setTimeout(()=>p.scrollIntoView({behavior:'smooth',block:'nearest'}),50)};
 document.querySelectorAll('#localN [data-n]').forEach(b=>b.onclick=()=>startLocal(+b.dataset.n));
@@ -575,12 +569,15 @@ $('#undo').onclick=undoStep;
 $('#go').onclick=()=>{if(!planDone())return;$('#go').disabled=true;send('go:'+plan.join(','))};
 $('#leave1').onclick=leave;
 $('#leave2').onclick=()=>{if(!local&&S&&S.phase==='play'&&S.players.length>1&&!confirm('Wyjść z gry? Stracisz możliwość zapisania wyniku.'))return;leave()};
-$('#copy').onclick=()=>{try{navigator.clipboard.writeText(code)}catch(e){}$('#copy').textContent='✅ Skopiowano'};
+$('#copy').onclick=()=>{try{navigator.clipboard.writeText(code)}catch(e){}$('#copy').textContent='SKOPIOWANO ✓';setTimeout(()=>$('#copy').textContent='KOPIUJ KOD',1800)};
+$('#joinBtn').onclick=()=>{const p=$('#joinPane');p.classList.toggle('hide');if(!p.classList.contains('hide'))setTimeout(()=>$('#code').focus(),60)};
 initPrefs();drawBoard();drawDie(0);
 </script>
 <script>
 (function(){[['ghR1','GRZYBO',0],['ghR2','BRANIE',6]].forEach(function(x){var r=document.getElementById(x[0]);x[1].split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i+x[2]);b.textContent=c;r.appendChild(b)})});
-var bg=document.getElementById('ghBg');['🍄','🌲','🍂','🧺','🌰','🍄','🐿️','🍁','🌲','🍄','🌰','🍂'].forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})})();
+document.querySelectorAll('.gh-bg').forEach(function(bg){['🍄','🌲','🍂','🧺','🌰','🍄','🐿️','🍁','🌲','🍄','🌰','🍂'].forEach(function(e,i){var s=document.createElement('span');s.textContent=e;s.style.left=((i*8.7+3)%96)+'%';s.style.animationDuration=(14+(i*5)%11)+'s';s.style.animationDelay='-'+((i*3.3)%14)+'s';bg.appendChild(s)})});
+[['ghR3','POKÓJ',0]].forEach(function(x){var r=document.getElementById(x[0]);x[1].split('').forEach(function(c,i){var b=document.createElement('b');b.style.setProperty('--i',i+x[2]);b.textContent=c;r.appendChild(b)})});
+})();
 </script>
 </body>
 </html>
