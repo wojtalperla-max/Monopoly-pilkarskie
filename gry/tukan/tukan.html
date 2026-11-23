@@ -324,8 +324,7 @@ startGame(randCode());
     var b=e.target.closest('.tk-kbtn');if(!b)return;
     var v=b.dataset.v;kind.style.display='none';
     showRoom(v);post({action:'create',variant:v});
-    /* brak odpowiedzi od strony z pokojami → stare zachowanie (schowaj ekran) */
-    clearTimeout(roomTimer);roomTimer=setTimeout(hide,3000);
+    clearTimeout(roomTimer);roomTimer=setTimeout(function(){$('tkRInfo').textContent='Brak połączenia z serwerem pokoi. Spróbuj ponownie.'},8000);
   });
   function renderRoom(d){
     clearTimeout(roomTimer);
@@ -347,7 +346,7 @@ startGame(randCode());
   };
   addEventListener('message',function(e){if(e.source!==parent)return;var d=e.data;if(d&&d.islaCmd&&d.cmd==='room')renderRoom(d)});
   $('tkJoinBtn').onclick=function(){var o=ja.style.display==='block';ja.style.display=o?'none':'block';if(!o)setTimeout(function(){$('tkCode').focus()},60)};
-  function join(){var c=$('tkCode').value.trim().toUpperCase();if(!c){$('tkNote').textContent='Wpisz kod pokoju.';return}post({action:'join',code:c});hide()}
+  function join(){var c=$('tkCode').value.trim().toUpperCase();if(!c){$('tkNote').textContent='Wpisz kod pokoju.';return}showRoom();$('tkRBadge').textContent='🚪 Dołączanie…';$('tkRCode').textContent=c;post({action:'join',code:c});clearTimeout(roomTimer);roomTimer=setTimeout(function(){$('tkRInfo').textContent='Brak połączenia z serwerem pokoi. Spróbuj ponownie.'},8000)}
   $('tkJoin').onclick=join;
   $('tkCode').addEventListener('keydown',function(e){if(e.key==='Enter')join()});
   /* gdy rodzic włączy tryb pokoju / wystartuje partię – schowaj ekran startowy */
