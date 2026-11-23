@@ -82,6 +82,28 @@ button:disabled{opacity:.5}
 .tk-local:hover{background:#ffffff3a;transform:translateY(-2px)}
 @keyframes tkPulse{50%{box-shadow:0 6px 0 #a26b00,0 14px 22px #0006,0 0 0 8px #ffd84a44}}
 .tk-note{font-size:14px;opacity:.85;min-height:1.2em;text-shadow:0 1px 4px #0006;animation:tkUp .7s 1.5s both}
+/* --- wybór wyspy (po „Utwórz pokój”) --- */
+.tk-kind{display:flex;gap:12px;margin-top:10px}
+.tk-kbtn{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font:inherit;color:#fff;background:#ffffff1f;border:2px solid #ffffff55;border-radius:16px;padding:14px 8px;margin:0;cursor:pointer;transition:transform .18s cubic-bezier(.2,1.5,.4,1),background .15s,border-color .15s}
+.tk-kbtn:hover{background:#ffffff38;border-color:#ffd84a;transform:translateY(-3px)}
+.tk-kbtn:active{transform:scale(.97)}
+.tk-kbtn .tk-kic{font-size:44px;line-height:1}
+.tk-kbtn b{font-size:clamp(16px,3.6vw,19px)}
+.tk-kbtn small{font-size:12px;opacity:.85}
+/* --- ekran pokoju --- */
+.tk-badge{display:inline-flex;align-items:center;gap:6px;background:linear-gradient(180deg,#ffd84a,#f2a900);color:#3b2400;font-weight:700;font-size:14px;padding:5px 14px;border-radius:999px;box-shadow:0 3px 0 #a26b00}
+.tk-rlabel{margin:10px 0 0;font-size:14px;opacity:.9}
+.tk-rcode{font-family:"Bowlby One","Impact",sans-serif;font-size:clamp(38px,11vw,60px);letter-spacing:.12em;line-height:1.1;color:#ffd84a;text-shadow:0 3px 0 #a26b00,0 6px 10px #0008;margin:2px 0 8px;user-select:all}
+.tk-rinfo{font-size:14px;opacity:.9;margin:0 0 10px}
+.tk-plist{list-style:none;margin:0 0 12px;padding:10px 0 0;border-top:1px solid #ffffff3a;text-align:left;display:flex;flex-direction:column;gap:6px}
+.tk-plist li{font-weight:600;font-size:16px;display:flex;align-items:center;gap:8px}
+.tk-plist li i{width:10px;height:10px;border-radius:50%;background:#ffd84a;flex:0 0 auto}
+.tk-plist em{font-style:normal;color:#ffd84a}
+.tk-rstart{width:100%;margin-top:4px}
+.tk-rcopy{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;font:inherit;font-weight:600;font-size:15px;background:#0000004d;color:#fff;border:1px solid #ffffff59;border-radius:14px;padding:11px 16px;margin:10px 0 0;cursor:pointer;transition:background .15s}
+.tk-rcopy:hover{background:#00000070}
+.tk-rwait{font-size:14px;opacity:.85;margin:8px 0 0}
+#tkStart.inroom .tk-bird,#tkStart.inroom .tk-main,#tkStart.inroom #tkLocal,#tkStart.inroom #tkJoinArea,#tkStart.inroom #tkKind{display:none!important}
 @media(prefers-reduced-motion:reduce){#tkStart *,#tkStart::before{animation:none!important}}
 
 /* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */

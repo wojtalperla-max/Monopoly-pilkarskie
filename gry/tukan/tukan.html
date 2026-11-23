@@ -32,6 +32,21 @@
     </div>
     <div id="tkJoinArea" class="tk-pane"><label for="tkCode"><b>Kod pokoju od znajomego</b></label>
       <div class="tk-join"><input id="tkCode" maxlength="5" placeholder="A8K2Q" autocomplete="off"><button id="tkJoin" class="tk-btn tk-green">Dołącz</button></div></div>
+    <div id="tkKind" class="tk-pane"><b>Którą wyspę tworzysz?</b>
+      <div class="tk-kind">
+        <button class="tk-kbtn" data-v="petit"><span class="tk-kic">🏝️</span><b>Isla Petit</b><small>Mniejsza plansza</small></button>
+        <button class="tk-kbtn" data-v="grande"><span class="tk-kic">🌋</span><b>Isla Grande</b><small>Większa plansza</small></button>
+      </div></div>
+    <div id="tkRoom" class="tk-pane">
+      <div class="tk-badge" id="tkRBadge">🏝️ Isla Petit</div>
+      <p class="tk-rlabel">Kod pokoju</p>
+      <div class="tk-rcode" id="tkRCode">·····</div>
+      <p class="tk-rinfo" id="tkRInfo">Tworzę pokój…</p>
+      <ul class="tk-plist" id="tkRList"></ul>
+      <button id="tkRStart" class="tk-btn tk-gold tk-rstart">Rozpocznij grę</button>
+      <p class="tk-rwait" id="tkRWait" style="display:none">Czekamy, aż host rozpocznie grę…</p>
+      <button id="tkRCopy" class="tk-rcopy">📋 Kopiuj kod pokoju</button>
+    </div>
     <button id="tkLocal" class="tk-local">🎲 Gra lokalnie na jednym urządzeniu</button>
     <div class="tk-note" id="tkNote"></div>
   </div>
@@ -296,7 +311,41 @@ startGame(randCode());
   var $=function(i){return document.getElementById(i)},ja=$('tkJoinArea');
   function post(o){try{parent.postMessage(Object.assign({isla:1,type:'lobby'},o),'*')}catch(e){}}
   if(!inFrame){['tkCreate','tkJoinBtn','tkJoin'].forEach(function(i){$(i).disabled=true});$('tkNote').textContent='Pokoje online działają po wgraniu gry na hosting z Firebase.'}
-  $('tkCreate').onclick=function(){ja.style.display='none';post({action:'create'});hide()};
+  var kind=$('tkKind'),room=$('tkRoom'),VN={petit:'🏝️ Isla Petit',grande:'🌋 Isla Grande'},roomTimer=null;
+  $('tkCreate').onclick=function(){ja.style.display='none';var o=kind.style.display==='block';kind.style.display=o?'none':'block'};
+  function showRoom(v){
+    st.classList.add('inroom');
+    $('tkRBadge').textContent=VN[v]||VN.petit;
+    $('tkRCode').textContent='·····';$('tkRInfo').textContent='Tworzę pokój…';$('tkRList').innerHTML='';
+    $('tkRStart').style.display='none';$('tkRWait').style.display='none';
+    room.style.display='block';
+  }
+  kind.addEventListener('click',function(e){
+    var b=e.target.closest('.tk-kbtn');if(!b)return;
+    var v=b.dataset.v;kind.style.display='none';
+    showRoom(v);post({action:'create',variant:v});
+    /* brak odpowiedzi od strony z pokojami → stare zachowanie (schowaj ekran) */
+    clearTimeout(roomTimer);roomTimer=setTimeout(hide,3000);
+  });
+  function renderRoom(d){
+    clearTimeout(roomTimer);
+    if(d.variant)$('tkRBadge').textContent=VN[d.variant]||VN.petit;
+    $('tkRCode').textContent=d.code||'·····';
+    var ps=d.players||[],max=d.max||4,min=d.min||2;
+    $('tkRInfo').textContent='Gracze: '+ps.length+'/'+max+'.'+(d.host?' Możesz rozpocząć grę, gdy dołączy co najmniej '+min+' osoby.':'');
+    $('tkRList').innerHTML=ps.map(function(p,i){
+      var n=String(p.name||'Gracz').replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]});
+      return '<li><i></i>'+(i+1)+'. '+n+(p.host?' <em>(host)</em>':'')+(p.me?' <em>(Ty)</em>':'')+'</li>'}).join('');
+    var s=$('tkRStart');s.style.display=d.host?'flex':'none';s.disabled=ps.length<min;
+    $('tkRWait').style.display=d.host?'none':'block';
+  }
+  $('tkRStart').onclick=function(){post({action:'startRoom'})};
+  $('tkRCopy').onclick=function(){
+    var c=$('tkRCode').textContent,b=this,old='📋 Kopiuj kod pokoju';
+    function ok(){b.textContent='✅ Skopiowano';setTimeout(function(){b.textContent=old},1500)}
+    try{navigator.clipboard.writeText(c).then(ok,ok)}catch(x){ok()}
+  };
+  addEventListener('message',function(e){if(e.source!==parent)return;var d=e.data;if(d&&d.islaCmd&&d.cmd==='room')renderRoom(d)});
   $('tkJoinBtn').onclick=function(){var o=ja.style.display==='block';ja.style.display=o?'none':'block';if(!o)setTimeout(function(){$('tkCode').focus()},60)};
   function join(){var c=$('tkCode').value.trim().toUpperCase();if(!c){$('tkNote').textContent='Wpisz kod pokoju.';return}post({action:'join',code:c});hide()}
   $('tkJoin').onclick=join;
