@@ -335,7 +335,8 @@ startGame(randCode());
     $('tkRInfo').textContent='Gracze: '+ps.length+'/'+max+'.'+(d.host?(min>1?' Możesz rozpocząć grę, gdy dołączy co najmniej '+min+' osoby.':' Możesz rozpocząć grę, gdy wszyscy są w pokoju.'):'');
     $('tkRList').innerHTML=ps.map(function(p,i){
       var n=String(p.name||'Gracz').replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]});
-      return '<li><i></i>'+(i+1)+'. '+n+(p.host?' <em>(host)</em>':'')+(p.me?' <em>(Ty)</em>':'')+'</li>'}).join('');
+      var col=/^#[0-9a-f]{6}$/i.test(p.color||'')?p.color:'#ffd84a';
+      return '<li><i style="background:'+col+';box-shadow:0 0 0 2px #ffffffaa"></i>'+(i+1)+'. '+n+(p.host?' <em>(host)</em>':'')+(p.me?' <em>(Ty)</em>':'')+'</li>'}).join('');
     var s=$('tkRStart');s.style.display=d.host?'flex':'none';s.disabled=ps.length<min;
     $('tkRWait').style.display=d.host?'none':'block';
   }
