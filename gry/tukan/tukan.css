@@ -103,7 +103,12 @@ button:disabled{opacity:.5}
 .tk-rcopy{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;font:inherit;font-weight:600;font-size:15px;background:#0000004d;color:#fff;border:1px solid #ffffff59;border-radius:14px;padding:11px 16px;margin:10px 0 0;cursor:pointer;transition:background .15s}
 .tk-rcopy:hover{background:#00000070}
 .tk-rwait{font-size:14px;opacity:.85;margin:8px 0 0}
-#tkStart.inroom .tk-bird,#tkStart.inroom .tk-main,#tkStart.inroom #tkLocal,#tkStart.inroom #tkJoinArea,#tkStart.inroom #tkKind{display:none!important}
+.tk-prof{display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;font-weight:600;font-size:15px;animation:tkUp .7s 1.2s both}
+.tk-prof label{display:flex;align-items:center;gap:8px}
+.tk-prof input[type=text],.tk-prof #tkNick{font:inherit;font-weight:700;width:150px;padding:8px 12px;border-radius:12px;border:2px solid #fff;background:#032a1a;color:#fff;outline:none}
+.tk-prof #tkNick:focus{border-color:#ffd84a}
+.tk-prof #tkCol{width:44px;height:36px;padding:0;border:2px solid #fff;border-radius:10px;background:#032a1a;cursor:pointer}
+#tkStart.inroom .tk-prof,#tkStart.inroom .tk-bird,#tkStart.inroom .tk-main,#tkStart.inroom #tkLocal,#tkStart.inroom #tkJoinArea,#tkStart.inroom #tkKind{display:none!important}
 @media(prefers-reduced-motion:reduce){#tkStart *,#tkStart::before{animation:none!important}}
 
 /* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
