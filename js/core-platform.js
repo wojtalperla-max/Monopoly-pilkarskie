@@ -32,12 +32,12 @@ function islaExit(){islaLeave();document.getElementById('isla').hidden=true;cons
 window.addEventListener('message',e=>{
   const f=islaFrame();if(!f||e.source!==f.contentWindow)return;
   const d=e.data;if(!d||!d.isla)return;
-  if(d.type==='ready'){ISL.ready=true;islaPost({cmd:'profile',nick:__gameNick(),col:__gameCol()});islaSync()}
+  if(d.type==='ready'){ISL.ready=true;islaSync()}
   else if(d.type==='lobby'){
     if(d.action==='create'||d.action==='join'){
       if(!islaNet()){islaPost({cmd:'roomError',msg:'Pokoje online wymagają połączenia z Firebase.'});return}
-      ISL.nick=islaClean(d.nick)||__gameNick()||ISL.nick||'Gracz';
-      ISL.col=/^#[0-9a-f]{6}$/i.test(d.col||'')?d.col:(__gameCol()||ISL.col||'#2a9df4');
+      ISL.nick=islaClean(__gameNick())||'Gracz';   /* nick i kolor z konta gracza */
+      ISL.col=__gameCol()||'#2a9df4';
     }
     if(d.action==='create'){ISL.board=d.variant==='grande'?'isla-grande':'isla-petit';islaCreate()}
     else if(d.action==='join'){ISL.joinCode=d.code||'';islaJoin()}
