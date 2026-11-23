@@ -26,7 +26,6 @@
     <div class="tk-logo" role="img" aria-label="Tukan" id="tkLogo"></div>
     <div class="tk-bird" aria-hidden="true">🦜</div>
     <p class="tk-sub">Odkryj wyspę. Zbierz symbole. Wyprzedź znajomych.</p>
-    <div class="tk-prof" id="tkProf"><label>Twój nick <input id="tkNick" maxlength="14" placeholder="Gracz" autocomplete="off"></label><label>Kolor <input id="tkCol" type="color" value="#2a9df4"></label></div>
     <div class="tk-main">
       <button id="tkCreate" class="tk-btn tk-gold"><span class="tk-ic">🏠</span><span>Utwórz pokój</span></button>
       <button id="tkJoinBtn" class="tk-btn tk-white"><span class="tk-ic">🚪</span><span>Dołącz do znajomego</span></button>
@@ -312,8 +311,6 @@ startGame(randCode());
   var $=function(i){return document.getElementById(i)},ja=$('tkJoinArea');
   function post(o){try{parent.postMessage(Object.assign({isla:1,type:'lobby'},o),'*')}catch(e){}}
   if(!inFrame){['tkCreate','tkJoinBtn','tkJoin'].forEach(function(i){$(i).disabled=true});$('tkNote').textContent='Pokoje online działają po wgraniu gry na hosting z Firebase.'}
-  function prof(){var n=$('tkNick').value.trim(),c=$('tkCol').value;try{localStorage.setItem('tkNick',n);localStorage.setItem('tkCol',c)}catch(x){}return{nick:n,col:c}}
-  try{var sn=localStorage.getItem('tkNick'),sc=localStorage.getItem('tkCol');if(sn)$('tkNick').value=sn;if(sc)$('tkCol').value=sc}catch(x){}
   function resetMenu(msg){clearTimeout(roomTimer);st.classList.remove('inroom','out');st.style.display='';room.style.display='none';kind.style.display='none';ja.style.display='none';$('tkNote').textContent=msg||''}
   var kind=$('tkKind'),room=$('tkRoom'),VN={petit:'🏝️ Isla Petit',grande:'🌋 Isla Grande'},roomTimer=null;
   $('tkCreate').onclick=function(){ja.style.display='none';var o=kind.style.display==='block';kind.style.display=o?'none':'block'};
@@ -327,7 +324,7 @@ startGame(randCode());
   kind.addEventListener('click',function(e){
     var b=e.target.closest('.tk-kbtn');if(!b)return;
     var v=b.dataset.v;kind.style.display='none';
-    showRoom(v);post(Object.assign({action:'create',variant:v},prof()));
+    showRoom(v);post({action:'create',variant:v});
     clearTimeout(roomTimer);roomTimer=setTimeout(function(){$('tkRInfo').textContent='Brak połączenia z serwerem pokoi. Spróbuj ponownie.'},8000);
   });
   function renderRoom(d){
@@ -350,13 +347,11 @@ startGame(randCode());
   };
   addEventListener('message',function(e){if(e.source!==parent)return;var d=e.data;if(!d||!d.islaCmd)return;
     if(d.cmd==='room'){if(!st.classList.contains('inroom'))showRoom();renderRoom(d)}
-    else if(d.cmd==='profile'){if(d.nick&&!$('tkNick').value)$('tkNick').value=d.nick;if(d.col&&!localStorageHas('tkCol'))$('tkCol').value=d.col}
     else if(d.cmd==='roomError')resetMenu(d.msg||'Nie udało się.');
     else if(d.cmd==='unlock')resetMenu('');
   });
-  function localStorageHas(k){try{return !!localStorage.getItem(k)}catch(x){return false}}
   $('tkJoinBtn').onclick=function(){var o=ja.style.display==='block';ja.style.display=o?'none':'block';if(!o)setTimeout(function(){$('tkCode').focus()},60)};
-  function join(){var c=$('tkCode').value.trim().toUpperCase();if(!c){$('tkNote').textContent='Wpisz kod pokoju.';return}showRoom();$('tkRBadge').textContent='🚪 Dołączanie…';$('tkRCode').textContent=c;post(Object.assign({action:'join',code:c},prof()));clearTimeout(roomTimer);roomTimer=setTimeout(function(){$('tkRInfo').textContent='Brak połączenia z serwerem pokoi. Spróbuj ponownie.'},8000)}
+  function join(){var c=$('tkCode').value.trim().toUpperCase();if(!c){$('tkNote').textContent='Wpisz kod pokoju.';return}showRoom();$('tkRBadge').textContent='🚪 Dołączanie…';$('tkRCode').textContent=c;post({action:'join',code:c});clearTimeout(roomTimer);roomTimer=setTimeout(function(){$('tkRInfo').textContent='Brak połączenia z serwerem pokoi. Spróbuj ponownie.'},8000)}
   $('tkJoin').onclick=join;
   $('tkCode').addEventListener('keydown',function(e){if(e.key==='Enter')join()});
   /* gdy rodzic włączy tryb pokoju / wystartuje partię – schowaj ekran startowy */
