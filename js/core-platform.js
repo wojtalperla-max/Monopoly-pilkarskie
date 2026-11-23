@@ -32,8 +32,17 @@ function islaExit(){islaLeave();document.getElementById('isla').hidden=true;cons
 window.addEventListener('message',e=>{
   const f=islaFrame();if(!f||e.source!==f.contentWindow)return;
   const d=e.data;if(!d||!d.isla)return;
-  if(d.type==='ready'){ISL.ready=true;islaSync()}
-  else if(d.type==='lobby'){if(islaNet())islaLobby()}
+  if(d.type==='ready'){ISL.ready=true;islaPost({cmd:'profile',nick:__gameNick(),col:__gameCol()});islaSync()}
+  else if(d.type==='lobby'){
+    if(d.action==='create'||d.action==='join'){
+      if(!islaNet()){islaPost({cmd:'roomError',msg:'Pokoje online wymagają połączenia z Firebase.'});return}
+      ISL.nick=islaClean(d.nick)||__gameNick()||ISL.nick||'Gracz';
+      ISL.col=/^#[0-9a-f]{6}$/i.test(d.col||'')?d.col:(__gameCol()||ISL.col||'#2a9df4');
+    }
+    if(d.action==='create'){ISL.board=d.variant==='grande'?'isla-grande':'isla-petit';islaCreate()}
+    else if(d.action==='join'){ISL.joinCode=d.code||'';islaJoin()}
+    else if(d.action==='startRoom')islaHostStart();
+  }
   else if(d.type==='state'){ISL.state=d.s;islaSendScore();lbIsla(d.s)}
   else if(d.type==='draw'&&ISL.ref&&ISL.host===onlinePlayerId){
     ISL.localDrawPending=true;
@@ -159,31 +168,17 @@ function islaRender(){
   el.innerHTML=`<span>Pokój <b class="lgcode">${lgEsc(ISL.code)}</b></span>${chips}${ISL.round?waiting:''}${win}<button class="lgbtn" onclick="islaLobby()">Pokój</button>`;
 }
 function islaCloseLobby(){const d=document.getElementById('islalobby');if(d)d.remove()}
-function islaLobbyRefresh(){if(document.getElementById('islalobby'))islaLobby()}
+/* Ekran pokoju jest teraz rysowany w grze (gry/tukan/tukan.html) – tu tylko wysyłamy mu stan pokoju. */
+function islaRoomInfo(){
+  const me=typeof onlinePlayerId!=='undefined'?onlinePlayerId:null;
+  return{cmd:'room',code:ISL.code,variant:ISL.board==='isla-grande'?'grande':'petit',host:ISL.host===me,max:6,min:1,round:ISL.round,
+    players:ISL.players.map(p=>({name:p.name,color:p.color,host:p.id===ISL.host,me:p.id===me}))};
+}
+function islaLobbyRefresh(){if(ISL.ref)islaPost(islaRoomInfo())}
 function islaLobby(){
-  const old=document.getElementById('islalobby');
-  const act=document.activeElement,fid=old&&act&&act.id&&old.contains(act)?act.id:null,pos=fid?act.selectionStart:0;
-  if(old)old.remove();
-  const d=document.createElement('div');d.id='islalobby';
-  const msg=ISL.msg?`<div class="lgmsg">${lgEsc(ISL.msg)}</div>`:'';
-  let h;
-  if(!ISL.ref){
-    h=`<h2>Pokój online</h2><p class="lgnote">W pokoju wszyscy gracze dostają tę samą planszę i te same karty, a wyniki widać na żywo.</p>
-    <div class="lgrow"><label>Twój nick <input id="islanick" maxlength="14" value="${lgEsc(ISL.nick||'Gracz')}" oninput="ISL.nick=this.value"></label>
-    <label>Kolor <input id="islacol" type="color" value="${lgEsc(ISL.col||'#2a9df4')}" oninput="ISL.col=this.value"></label></div>
-    <div class="lgrow"><label>Wybierz planszę <select id="islaboard" onchange="ISL.board=this.value"><option value="isla-petit" ${ISL.board==='isla-petit'?'selected':''}>Isla Petit</option></select></label></div>
-    <div class="lgrow"><button class="lgbtn go" onclick="islaCreate()">Utwórz pokój</button></div>
-    <div class="lgrow"><input id="islajoin" maxlength="5" placeholder="Kod pokoju" value="${lgEsc(ISL.joinCode||'')}" oninput="ISL.joinCode=this.value" style="text-transform:uppercase"><button class="lgbtn" onclick="islaJoin()">Dołącz</button></div>${msg}
-    <div class="lgrow"><button class="lgbtn" onclick="islaCloseLobby()">Zamknij</button></div>`;
-  }else{
-    const isHost=ISL.host===onlinePlayerId,list=ISL.players.map((p,i)=>`<div class="lghist">${lgDot(p.color)}${i+1}. ${lgEsc(p.name)}${p.id===ISL.host?' <b>(host)</b>':''}${p.id===onlinePlayerId?' (Ty)':''}</div>`).join('');
-    h=`<h2>Pokój: <span class="lgcode">${lgEsc(ISL.code)}</span></h2><p class="lgnote">Plansza: <b>Isla Petit</b></p>${list}${tgBox('ISL.ref',ISL.room&&ISL.room.test)}
-    <p class="lgnote">${isHost?(ISL.round?'Możesz zacząć nową partię z nową planszą.':'Gdy wszyscy są w pokoju, rozpocznij partię.'):(ISL.round?'Partia trwa. Host może rozpocząć nową.':'Czekaj, aż host rozpocznie partię.')} (Gracze: ${ISL.players.length}/6)</p>${msg}
-    <div class="lgrow">${isHost?`<button class="lgbtn go" onclick="islaHostStart()">${ISL.round?'Nowa partia':'Rozpocznij partię'}</button>`:''}<button class="lgbtn" onclick="navigator.clipboard&&navigator.clipboard.writeText(ISL.code)">Kopiuj kod</button><button class="lgbtn" onclick="islaLeave()">Wyjdź z pokoju</button><button class="lgbtn" onclick="islaCloseLobby()">Zamknij</button></div>`;
-  }
-  d.innerHTML=`<div class="islabox">${h}</div>`;
-  document.getElementById('isla').appendChild(d);
-  if(fid){const e=document.getElementById(fid);if(e){e.focus();try{e.setSelectionRange(pos,pos)}catch(x){}}}
+  islaCloseLobby();
+  if(ISL.ref)islaPost(islaRoomInfo());
+  else if(ISL.msg){islaPost({cmd:'roomError',msg:ISL.msg});ISL.msg=''}
 }
 /* ===== KONTA (logowanie i rejestracja, Firebase Authentication) ===== */
 let ACC={user:null,nick:'',col:'',avatar:'',admin:false,view:'login',msg:'',ok:'',busy:false,f:{email:'',nick:'',gender:''},gender:'',streak:null};
