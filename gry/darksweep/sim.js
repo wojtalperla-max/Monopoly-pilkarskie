@@ -140,6 +140,7 @@
       this.players = new Map(); this.bullets = []; this.events = [];
       this.score = [0, 0]; this.phase = 'play'; this.phaseT = 0; this.winner = -1;
       this.nextId = 1; this.snapN = 0; this.botsPerTeam = opts.botsPerTeam ?? 3;
+      this.teamSize = opts.teamSize || 0;
       this.difficulty = opts.difficulty || 'normal'; this.items = []; this.itemTimer = 8;
       this.seedItems();
       this.rosterDirty = true; this.botCounter = 0;
@@ -166,10 +167,11 @@
     humans() { return [...this.players.values()].filter(p => !p.isBot); }
     // Drużyna 0 (zielona) = wszyscy ludzie (+ ewentualne zielone boty). Drużyna 1 (czerwona) = zawsze boty.
     addPlayer(name, isBot, team) {
-      const id = this.nextId++;
       if (team === undefined) team = isBot ? 1 : 0;
+      if (![0,1].includes(team) || (!isBot && (!this.canJoin(team) || this.humans().length >= C.MAX_HUMANS))) return null;
+      const id = this.nextId++;
       // czerwone boty nie mają nicków
-      const nm = (isBot && team === 1) ? '' : String(name || 'Gracz').slice(0, 12);
+      const nm = String(name || 'Gracz').slice(0, 12);
       const p = {
         id, name: nm, isBot: !!isBot, team,
         x: 0, y: 0, ang: team === 0 ? 0 : Math.PI, hp: C.MAXHP, alive: false, resp: 0, prot: 0,
@@ -187,11 +189,18 @@
       this.players.delete(id); this.rosterDirty = true;
       if (!p.isBot) this.rebalanceBots();
     }
+    canJoin(team, except) { return this.humans().filter(p => p.team === team && p.id !== except).length < (this.teamSize || C.MAX_HUMANS); }
+    changeTeam(id, team) {
+      const p = this.players.get(id);
+      if (!p || p.isBot || ![0,1].includes(team) || !this.canJoin(team,id)) return false;
+      if (p.team !== team) { p.team = team; this.spawn(p); this.rebalanceBots(); this.rosterDirty = true; }
+      return true;
+    }
     setBotsPerTeam(n) { this.botsPerTeam = n; this.rebalanceBots(); }
     rebalanceBots() {
       const humans = this.humans();
       const counts = [humans.filter(p => p.team === 0).length, humans.filter(p => p.team === 1).length];
-      const total = Math.max(this.botsPerTeam, counts[0], counts[1]);
+      const total = this.teamSize || Math.max(this.botsPerTeam, counts[0], counts[1]);
       for (const t of [0, 1]) {
         const want = Math.max(0, total - counts[t]);
         const bots = [...this.players.values()].filter(p => p.isBot && p.team === t);
@@ -206,7 +215,7 @@
       const p = this.players.get(id); if (!p) return;
       const f = v => (Number.isFinite(v) ? v : 0);
       p.input.mx = Math.max(-1, Math.min(1, f(i.mx))); p.input.my = Math.max(-1, Math.min(1, f(i.my)));
-      p.input.ang = f(i.ang); p.input.fire = !!i.fire; p.input.hide = !!i.hide; if (i.knife) p.input.knife = true; if (i.reload) p.input.reload = true; p.input.swap = !!i.swap; // Broń zmieniasz klawiszem F przy upuszczonej broni.
+      p.input.ang = f(i.ang); p.input.fire = !!i.fire; if (i.trigger) p.input.trigger = true; p.input.hide = !!i.hide; if (i.knife) p.input.knife = true; if (i.reload) p.input.reload = true; p.input.swap = !!i.swap; // Broń zmieniasz klawiszem F przy upuszczonej broni.
     }
     spawn(p) {
       const list = spawns[p.team];
@@ -296,16 +305,17 @@
         
         if (p.reload > 0) { p.reload -= dt; if (p.reload <= 0) { p.reload = 0; p.ammo = WEAPONS[p.weapon].mag; } }
         if (inp.reload) { inp.reload = false; if (p.ammo < WEAPONS[p.weapon].mag && p.reload <= 0) p.reload = WEAPONS[p.weapon].reload; }
-        if (inp.fire && p.cd <= 0 && p.reload <= 0) {
+        if ((inp.fire || inp.trigger) && p.cd <= 0 && p.reload <= 0) {
           if (p.ammo <= 0) p.reload = WEAPONS[p.weapon].reload;
           else {
             p.ammo--; p.cd = WEAPONS[p.weapon].cd; p.prot = 0; p.reveal = 0.7; p.hidden = false;
             const spread = (Math.random() - 0.5) * 2 * (p.isBot ? 0.09 : 0.04), a = p.ang + spread;
             const bx = p.x + Math.cos(p.ang) * 24, by = p.y + Math.sin(p.ang) * 24;
             this.bullets.push({ x: bx, y: by, vx: Math.cos(a) * WEAPONS[p.weapon].speed, vy: Math.sin(a) * WEAPONS[p.weapon].speed, team: p.team, owner: p.id, damage: WEAPONS[p.weapon].damage, life: C.BLIFE });
-            this.events.push(['s', r1(bx), r1(by), r1(p.ang * 100) / 100, p.team]);
+            this.events.push(['s', r1(bx), r1(by), r1(p.ang * 100) / 100, p.team, p.id]);
           }
         }
+        inp.trigger = false;
       }
       for (let i = this.bullets.length - 1; i >= 0; i--) {
         const b = this.bullets[i]; let dead = false;
@@ -378,7 +388,7 @@
     snapshot() {
       const players = [];
       for (const p of this.players.values()) players.push([p.id, r1(p.x), r1(p.y), Math.round(p.ang * 100) / 100, Math.max(0, Math.round(p.hp)), p.alive ? 1 : 0, p.ammo, p.reload > 0 ? 1 : 0, p.kills, p.deaths, r1(Math.max(0, p.resp)), p.hidden ? 1 : 0, p.weapon, p.knife ? 1 : 0]);
-      const b = this.bullets.map(q => [r1(q.x), r1(q.y), Math.round(q.vx), Math.round(q.vy), q.team]);
+      const b = this.bullets.map(q => [r1(q.x), r1(q.y), Math.round(q.vx), Math.round(q.vy), q.team, q.owner]);
       const e = this.events; this.events = [];
       return { t: 's', n: ++this.snapN, p: players, b, it: this.items.map(q => [q.type, r1(q.x), r1(q.y), q.weapon || 0]), sc: this.score.slice(), ph: this.phase, pt: r1(this.phaseT), w: this.winner, e };
     }

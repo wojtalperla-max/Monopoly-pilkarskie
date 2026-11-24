@@ -141,3 +141,17 @@ html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:non
 .ds-dot{flex:0 0 auto;width:12px;height:12px;border-radius:50%;box-shadow:0 0 0 2px #fff8}
 #lbInfo{font-size:14px;opacity:.85}
 .ds-lobby .ds-btn{margin-top:2px}
+
+.team-colors,.team-switch{display:flex;gap:10px;justify-content:center;align-items:center;margin:8px 0}.team-colors label{display:flex;align-items:center;justify-content:center;gap:8px}.team-colors input[type=color]{width:44px;height:32px;padding:2px;border-radius:8px;cursor:pointer}.team-switch button{flex:1;font-size:15px!important}.team-switch button:disabled{opacity:.5;cursor:default}
+/* Mobile: scrolling lobby, touch controls and safe screen edges. */
+html,body{touch-action:auto;overscroll-behavior:none}
+#cv{touch-action:none}
+#menu{touch-action:pan-y;overscroll-behavior:contain;padding-bottom:calc(18px + env(safe-area-inset-bottom,0px))}
+#mobileActions{display:none}
+.mobile-play #mobileActions{display:flex;position:fixed;z-index:7;left:50%;transform:translateX(-50%);bottom:calc(38px + env(safe-area-inset-bottom,0px));flex-direction:column;gap:5px;align-items:center;touch-action:none}
+.mobile-play #mobileActions button{display:block;position:static;width:78px;height:34px;min-height:34px;border-radius:10px;padding:3px;font-size:11px;opacity:.88;background:#20252d;border:1px solid #8b929d;color:white;touch-action:none}
+.mobile-play #mobileActions button.on{background:#3dff7a;color:#111}
+.mobile-play #hud{top:calc(5px + env(safe-area-inset-top,0px));left:calc(5px + env(safe-area-inset-left,0px))}
+.mobile-play #hud button{max-width:105px;font-size:10px;padding:5px;min-height:32px}
+@media(max-width:600px){.ds-wrap{margin:0 auto;padding-top:15px;gap:12px}.ds-logo b{font-size:clamp(20px,7.5vw,45px)}#menu h1.ds-logo{max-width:100%;padding:10px 12px}.ds-pane{padding:12px}.ds-pane select{max-width:46%;font-size:16px}.ds-pane input{font-size:16px}.ds-pane .row{flex-wrap:wrap}.ds-pane .row>input{min-width:100px}.team-colors{flex-wrap:wrap}.ds-btn{min-height:44px}}
+@media(orientation:landscape){.mobile-play #mobileActions{flex-direction:row;flex-wrap:wrap;justify-content:center;width:210px;bottom:32px}.mobile-play #mobileActions button{width:64px;height:36px}}
