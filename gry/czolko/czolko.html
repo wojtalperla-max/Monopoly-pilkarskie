@@ -118,6 +118,7 @@ const czWordRe=/^[\p{L}\p{N} '’.\-]{1,30}$/u;
 const czNewGame=()=>({id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),turn:0,pending:null,log:[],solved:[],done:false});
 const czMe=()=>CZ.players.findIndex(p=>p.id===(typeof onlinePlayerId!=='undefined'?onlinePlayerId:null));
 const czAuthor=(i,n)=>(i-1+n)%n;
+const czClean=s=>String(s==null?'':s).replace(/[<>&]/g,'').replace(/\s+/g,' ').trim().slice(0,14);
 function czNext(g,n,from){let k=from;for(let s=0;s<n;s++){k=(k+1)%n;if(!g.solved.includes(k))return k}return from}
 function czWordOf(j){const n=CZ.players.length;if(!n)return '';const a=CZ.players[czAuthor(j,n)];return a?(CZ.words[a.id]||''):''}
 let czToastT=null;
