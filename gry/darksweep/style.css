@@ -1,7 +1,7 @@
 :root{--bg:#0e0e0e;--fg:#e8e8e8;--green:#3dff7a;--red:#ff3b3b;--accent:#ff2d8a}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:system-ui,Segoe UI,Roboto,sans-serif;overflow:hidden;touch-action:none;-webkit-user-select:none;user-select:none}
-canvas{position:fixed;inset:0;display:block}
+#cv{position:fixed;inset:0;display:block}
 #menu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,8,8,.92);z-index:10;padding:16px;overflow:auto}
 .card{width:100%;max-width:400px;display:flex;flex-direction:column;gap:12px}
 h1{margin:0;font-size:44px;letter-spacing:2px;font-style:italic;font-weight:900;color:#fff;text-shadow:0 0 18px var(--accent)}
@@ -155,3 +155,23 @@ html,body{touch-action:auto;overscroll-behavior:none}
 .mobile-play #hud button{max-width:105px;font-size:10px;padding:5px;min-height:32px}
 @media(max-width:600px){.ds-wrap{margin:0 auto;padding-top:15px;gap:12px}.ds-logo b{font-size:clamp(20px,7.5vw,45px)}#menu h1.ds-logo{max-width:100%;padding:10px 12px}.ds-pane{padding:12px}.ds-pane select{max-width:46%;font-size:16px}.ds-pane input{font-size:16px}.ds-pane .row{flex-wrap:wrap}.ds-pane .row>input{min-width:100px}.team-colors{flex-wrap:wrap}.ds-btn{min-height:44px}}
 @media(orientation:landscape){.mobile-play #mobileActions{flex-direction:row;flex-wrap:wrap;justify-content:center;width:210px;bottom:32px}.mobile-play #mobileActions button{width:64px;height:36px}}
+
+#shop[hidden],#shopBtn[hidden]{display:none!important} #shop{position:fixed;inset:0;z-index:20;background:#000b;display:grid;place-items:center;padding:12px;box-sizing:border-box} .shop-panel{background:#20252d;border:1px solid #78818a;border-radius:14px;padding:16px;width:min(640px,96vw);max-height:90vh;overflow:auto;color:white;box-sizing:border-box} #shopList{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin:12px 0} #shopList button{white-space:normal;min-height:36px} #shopList button:disabled{opacity:.45} #shopStatus{color:#ffd166}
+#shopList .weapon-card{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:8px;padding:10px;min-height:168px;border-radius:12px;background:linear-gradient(180deg,#20262d 0%,#171c22 100%);border:1px solid rgba(255,255,255,.12);box-shadow:inset 0 1px 0 rgba(255,255,255,.05)} #shopList .weapon-card .weapon-art{display:block;width:100%;height:auto;background:radial-gradient(circle at 50% 45%,#27303a 0%,#10151b 78%);border-radius:10px;border:1px solid rgba(255,255,255,.08)} #shopList .weapon-card .weapon-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13px;font-weight:700} #shopList .weapon-card .weapon-price{color:#ffd166;font-weight:800} #shopList .weapon-card .weapon-meta{display:flex;justify-content:space-between;gap:10px;font-size:11px;color:#b8c1c8} #shopList .weapon-card .weapon-meta b{color:#fff;font-weight:700}
+
+#shopList .weapon-card .weapon-art{position:static;inset:auto;min-width:0;max-width:100%;aspect-ratio:360/140;object-fit:contain}
+#shopList button:disabled{opacity:1;border-color:#333;cursor:not-allowed} #shopList button:disabled .weapon-head,#shopList button:disabled .weapon-meta{opacity:.55}
+#shop{touch-action:pan-y} .shop-panel{touch-action:pan-y;overscroll-behavior:contain}
+
+#shopList img.weapon-art{box-sizing:border-box;position:static;width:100%;height:100px;max-height:100px;object-fit:contain;padding:9px;aspect-ratio:auto;}
+
+/* V26: original menu layout and animations, dark palette only */
+#menu{background:radial-gradient(circle at 50% 18%,#303b4b 0,#171e29 38%,#080c13 100%)}
+#menu h1.ds-logo{background:linear-gradient(180deg,#414b5c,#222b38);border-color:#bbc5d3;box-shadow:0 0 0 clamp(3px,.7vw,5px) #0b1018,0 14px 0 #111822,0 26px 40px #000a}
+.ds-logo b{text-shadow:0 3px 0 #17202d,0 6px 0 #0b1018,0 9px 14px #0008}.ds-logo b.s{color:#ffd166}
+.ds-gold{background:linear-gradient(180deg,#ffd879,#d9a745);color:#30210e;box-shadow:0 6px 0 #89601e,0 14px 22px #0006}
+.ds-white{background:linear-gradient(180deg,#64748b,#3c495d);color:#fff;box-shadow:0 6px 0 #252e3d,0 14px 22px #0006}
+.ds-pane select,.ds-pane input:not([type=color]){background:#293444;color:#f4f6fa;border-color:#617087}.ds-code{text-shadow:0 3px 0 #171e29}
+#menu #roundTargetLabel[hidden]{display:none!important}#roundTarget{width:110px;max-width:46%;letter-spacing:normal}
+
+#heavyPunch[hidden]{display:none!important}
