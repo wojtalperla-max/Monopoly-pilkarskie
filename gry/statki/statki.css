@@ -181,3 +181,295 @@ body:has(.ob[data-t="stk"]) #obBg{background:radial-gradient(circle at 50% 18%,#
 .ob .ob-pane .ob-prow input:not([type=color]){margin:6px 0!important;flex:1!important;width:auto!important}
 .ob-prow i{width:20px;height:20px;border-radius:50%;border:2px solid #fff;flex:none}
 .ob-pane .ob-chips{margin:10px 0 6px}
+
+/* ===== plansza 10×10: morze, siatka, współrzędne, okręty ===== */
+.stkboardwrap{display:flex;flex-direction:column;align-items:center}
+.stkboardwrap h3{margin:6px 0 12px;font-family:"Fredoka","Trebuchet MS",sans-serif;font-weight:700;letter-spacing:.04em;text-shadow:0 2px 0 #06223d}
+
+.stkframe{--lab:22px;display:grid;grid-template-columns:var(--lab) minmax(0,1fr);grid-template-rows:var(--lab) auto;width:min(92vw,410px);margin:0 auto 18px}
+.stkax-x,.stkax-y{display:grid;font:700 clamp(10px,2.8vw,14px)/1 "Fredoka","Trebuchet MS",sans-serif;color:#cfe8ff;text-shadow:0 1px 0 #06223d;user-select:none;pointer-events:none}
+.stkax-x{grid-column:2;grid-row:1;grid-template-columns:repeat(10,1fr);padding:0 7px;align-items:end;padding-bottom:5px}
+.stkax-y{grid-column:1;grid-row:2;grid-template-rows:repeat(10,1fr);padding:7px 0;justify-items:start;align-items:center;padding-right:4px}
+.stkax-x span,.stkax-y span{display:grid;place-items:center}
+.stkax-y span{width:100%}
+
+.stkframe .stkboard{grid-column:2;grid-row:2;position:relative;width:100%;aspect-ratio:1;gap:0;padding:7px;border-radius:14px;
+ background-color:#1b6fb5;
+ background-image:
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='24'%3E%3Cpath d='M0 12q15-10 30 0t30 0' fill='none' stroke='white' stroke-opacity='.17' stroke-width='2'/%3E%3C/svg%3E"),
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='24'%3E%3Cpath d='M0 12q15-10 30 0t30 0' fill='none' stroke='white' stroke-opacity='.10' stroke-width='3'/%3E%3C/svg%3E"),
+  linear-gradient(160deg,#58b8ee 0%,#2c86cb 45%,#14578f 100%);
+ background-size:60px 24px,96px 38px,100% 100%;
+ animation:stkSea 14s linear infinite;
+ box-shadow:0 0 0 3px #fff,0 0 0 6px #14060a,0 12px 0 #06223d,0 22px 34px #000a,inset 0 0 22px #04182e99}
+.stkframe .stkboard::before{content:"";position:absolute;inset:7px;border-radius:7px;pointer-events:none;z-index:7;
+ background:linear-gradient(135deg,#ffffff2b 0,#ffffff00 38%),radial-gradient(circle at 85% 100%,#04182e55 0,#04182e00 55%)}
+
+.stkframe .stkcell{position:relative;background:transparent;border-radius:0;animation:none;box-shadow:inset 0 0 0 1px #ffffff26;transition:background-color .15s,box-shadow .15s}
+.stkframe .stkboard .stkcell:first-child{border-top-left-radius:6px}
+.stkframe .stkboard .stkcell:nth-child(10){border-top-right-radius:6px}
+.stkframe .stkboard .stkcell:nth-child(91){border-bottom-left-radius:6px}
+.stkframe .stkboard .stkcell:nth-child(100){border-bottom-right-radius:6px}
+.stkframe .stkboard .stkcell.ship{background:transparent}
+
+/* pudło – kręgi na wodzie */
+.stkframe .stkboard .stkcell.miss{animation:none;z-index:3;background:
+ radial-gradient(circle,#fff 0 7%,transparent 8%),
+ radial-gradient(circle,transparent 0 24%,#ffffffd9 26% 32%,transparent 34%),
+ radial-gradient(circle,transparent 0 44%,#ffffff66 46% 51%,transparent 53%),
+ #ffffff1f}
+.stkframe .stkboard .stkcell.miss:after{content:none}
+/* trafienie – ogień */
+.stkframe .stkboard .stkcell.hit{animation:none;z-index:5;background:radial-gradient(circle,#fff3a8 0,#ffa127 34%,#d3361f 68%,#6b1010 100%);box-shadow:inset 0 0 0 1px #0005}
+.stkframe .stkboard .stkcell.hit:after{content:'🔥';position:absolute;inset:0;display:grid;place-items:center;font-size:clamp(11px,3.7vw,21px);line-height:1;animation:stkflick .45s ease-in-out infinite alternate;filter:drop-shadow(0 1px 2px #0008)}
+.stkframe .stkboard[data-kind="own"] .stkcell.hit{background:radial-gradient(circle,#ffe27acc 0,#ff7a2fb3 40%,#b81d12a6 100%)}
+.stkframe .stkboard[data-kind="own"] .stkcell.miss{background:
+ radial-gradient(circle,#fff 0 7%,transparent 8%),
+ radial-gradient(circle,transparent 0 24%,#ffffffd9 26% 32%,transparent 34%),
+ radial-gradient(circle,transparent 0 44%,#ffffff66 46% 51%,transparent 53%),
+ #ffffff1f}
+
+/* celowanie na planszy przeciwnika */
+.stkframe .stkboard[data-kind="enemy"] .stkcell:not(:disabled){cursor:crosshair}
+.stkframe .stkboard[data-kind="enemy"] .stkcell:not(:disabled):hover{box-shadow:inset 0 0 0 2px #ffd24a,0 0 12px #ffd24acc;z-index:6;
+ background:linear-gradient(#ffd24a,#ffd24a) center/2px 62% no-repeat,linear-gradient(#ffd24a,#ffd24a) center/62% 2px no-repeat,#ffe27a40}
+.stkframe .stkboard .stkcell.aim{animation:stkaim .5s ease-in-out infinite alternate;box-shadow:inset 0 0 0 2px #ffd24a;z-index:6}
+.stkframe .stkboard[data-kind="enemy"]:has(.stkcell:disabled:not(.hit):not(.miss)) .stkcell:disabled:not(.hit):not(.miss){cursor:default}
+
+/* ustawianie floty – podgląd */
+.stkframe .stkboard[data-kind="place"] .stkcell{cursor:pointer}
+.stkframe .stkboard[data-kind="place"] .stkcell:hover{background:#ffffff2e}
+.stkframe .stkboard .stkcell.pvok{background:#5ee6c8aa!important;box-shadow:inset 0 0 0 2px #fff,0 0 8px #5ee6c8;z-index:6}
+.stkframe .stkboard .stkcell.pvbad{background:#ff5a50aa!important;box-shadow:inset 0 0 0 2px #fff;z-index:6}
+
+/* okręty */
+.stksh{pointer-events:none;z-index:2;position:relative}
+.stksh svg{width:100%;height:100%;display:block;overflow:visible;filter:drop-shadow(0 3px 2px #03182c88)}
+.stksh .bob{animation:stkbob 3.4s ease-in-out infinite;animation-delay:var(--d)}
+.stksh .wv{animation:stkwv 2.2s linear infinite}
+.stksh .foam{transform-box:fill-box;transform-origin:center;animation:stkfoam 2.4s ease-in-out infinite}
+.stksh .fl{transform-box:fill-box;transform-origin:0 50%;animation:stkflag .7s ease-in-out infinite alternate}
+.stksh .rd{transform-box:fill-box;transform-origin:center;animation:stkrad 1.6s ease-in-out infinite alternate}
+.stksh .ph{fill:#ffe9a0}
+.stksunk{z-index:4}
+
+@keyframes stkSea{from{background-position:0 0,0 0,0 0}to{background-position:60px 0,-96px 0,0 0}}
+@keyframes stkaim{from{background-color:#ffe27a33}to{background-color:#ffe27a99}}
+@keyframes stkflick{from{transform:scale(.88) rotate(-6deg)}to{transform:scale(1.12) rotate(6deg)}}
+@keyframes stkbob{0%,100%{transform:translateY(1px)}50%{transform:translateY(-2px)}}
+@keyframes stkwv{to{transform:translateX(-50px)}}
+@keyframes stkfoam{0%,100%{transform:scaleX(.7);opacity:.35}50%{transform:scaleX(1.25);opacity:.8}}
+@keyframes stkflag{from{transform:skewY(-9deg) scaleX(1)}to{transform:skewY(9deg) scaleX(.82)}}
+@keyframes stkrad{to{transform:scaleX(-1)}}
+@media(prefers-reduced-motion:reduce){.stkframe .stkboard,.stkframe .stkcell,.stksh *,.stkcell:after{animation:none!important}}
+@media(max-width:600px){.stkframe{--lab:18px;width:min(94vw,360px)}.stkframe .stkboard{padding:5px}.stkax-x{padding:0 5px}.stkax-y{padding:5px 0}.stkframe .stkboard::before{inset:5px}}
+
+/* ===== pola zawsze idealnymi kwadratami =====
+   Plansza jest kwadratem (aspect-ratio:1), a oba wymiary siatki to dokładnie
+   10 równych ścieżek – wiersze nie mogą już rosnąć od zawartości (SVG statków). */
+.stkframe .stkboard{
+  grid-template-columns:repeat(10,minmax(0,1fr));
+  grid-template-rows:repeat(10,minmax(0,1fr));
+  grid-auto-rows:minmax(0,1fr);
+  aspect-ratio:1/1;
+  height:auto;
+}
+.stkframe .stkcell{aspect-ratio:1/1;width:100%;height:100%;min-width:0;min-height:0;overflow:visible}
+/* nakładki (statki, zatopione) nie wpływają na rozmiar ścieżek siatki */
+.stksh,.stksunk{min-width:0;min-height:0;position:relative;overflow:visible}
+.stksh svg,.stksunk svg{position:absolute;left:0;top:0;width:100%;height:100%}
+/* osie dopasowane do tych samych 10 równych ścieżek */
+.stkax-x{grid-template-columns:repeat(10,minmax(0,1fr))}
+.stkax-y{grid-template-rows:repeat(10,minmax(0,1fr))}
+
+/* ==========================================================================
+   Interfejs wokół planszy: tło, panele, nagłówki, przyciski, legenda
+   (spójny z lobby – Fredoka, szkło, złote przyciski 3D)
+   ========================================================================== */
+#stk{
+  font-family:"Fredoka","Trebuchet MS",system-ui,sans-serif;
+  background:radial-gradient(circle at 50% 0%,#3aa0d8 0,#0f4a7c 34%,#04182e 100%) fixed;
+  position:fixed;
+}
+#stk::before{content:"";position:fixed;inset:-50%;pointer-events:none;z-index:0;
+  background:conic-gradient(from 0deg,#fff0 0 8%,#ffffff12 10%,#fff0 12% 33%,#ffffff10 35%,#fff0 37% 58%,#ffffff12 60%,#fff0 62% 83%,#ffffff10 85%,#fff0 87%);
+  animation:obSpin 50s linear infinite}
+#stk *{font-family:inherit}
+#stkcontent{position:relative;z-index:1;width:min(100%,980px);padding:clamp(12px,3vw,24px);padding-top:calc(clamp(12px,3vw,24px) + 8px)}
+
+/* panele */
+.stkbox{
+  position:relative;
+  background:linear-gradient(180deg,#ffffff1c,#ffffff0a);
+  border:2px solid #ffffff33;border-radius:22px;
+  padding:clamp(14px,3vw,22px);margin:14px 0;
+  text-align:center;color:#fff;
+  box-shadow:0 10px 30px #0006,inset 0 1px 0 #ffffff33;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+}
+.stkbox p{margin:6px auto 10px;font-size:clamp(15px,3.6vw,18px);color:#e6f2ff;max-width:60ch}
+.stkbox b{color:#ffd23f}
+.stkbox h2,.stkbox h3{margin:0 0 4px;font-weight:700;letter-spacing:.03em;text-shadow:0 2px 0 #06223d,0 4px 10px #0006}
+.stkbox h2{font-size:clamp(22px,5.4vw,32px);
+  background:linear-gradient(180deg,#fff,#ffd23f);-webkit-background-clip:text;background-clip:text;color:transparent;
+  text-shadow:none;filter:drop-shadow(0 3px 0 #06223d)}
+.stkbox h3{font-size:clamp(18px,4.4vw,22px);color:#fff}
+.stkmuted{color:#cfe3f7;font-size:clamp(13px,3.2vw,16px);font-weight:500}
+
+/* rzędy przycisków */
+.stkrow{display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;margin:12px 0}
+.stkrow>.stkmuted{background:#00000040;border-radius:999px;padding:6px 14px;font-weight:600}
+
+/* kod pokoju */
+.stkcode{display:inline-block;font-size:clamp(30px,9vw,46px);font-weight:700;letter-spacing:.2em;
+  color:#ffd23f;background:#00000066;border:2px dashed #ffffff4d;border-radius:16px;
+  padding:4px 16px 4px 22px;margin-left:6px;user-select:all;text-shadow:0 3px 0 #a26b00}
+
+/* przyciski */
+.stkbtn{
+  position:relative;overflow:hidden;
+  font:700 clamp(15px,3.8vw,18px)/1 "Fredoka","Trebuchet MS",sans-serif;
+  padding:12px 20px;margin:0;border:2px solid #ffffff66;border-radius:999px;
+  color:#fff;background:linear-gradient(180deg,#ffffff33,#ffffff14);
+  box-shadow:0 4px 0 #04182e99,0 10px 16px #0004;
+  cursor:pointer;
+  transition:transform .18s cubic-bezier(.2,1.5,.4,1),box-shadow .18s,background .18s}
+.stkbtn::after{content:"";position:absolute;top:0;bottom:0;width:40%;left:-60%;
+  background:linear-gradient(100deg,#fff0,#fff6,#fff0);transform:skewX(-20deg);transition:left .5s}
+.stkbtn:not(:disabled):hover{transform:translateY(-3px) scale(1.04);background:linear-gradient(180deg,#ffffff4d,#ffffff22)}
+.stkbtn:not(:disabled):hover::after{left:130%}
+.stkbtn:not(:disabled):active{transform:translateY(2px) scale(.97);box-shadow:0 1px 0 #04182e99}
+.stkbtn:focus-visible{outline:3px solid #ffd23f;outline-offset:2px}
+.stkbtn:disabled{opacity:.4;cursor:not-allowed;filter:saturate(.5)}
+
+/* przyciski główne (akcja) – złote */
+.stkbtn[onclick*="stkReady"],.stkbtn[onclick*="stkStart"],.stkbtn[onclick*="stkBotBegin"],.stkbtn[onclick*="stkBotStart"]{
+  background:linear-gradient(180deg,#ffd84a,#f2a900);color:#3b2400;border-color:#fff3b0;
+  font-size:clamp(17px,4.4vw,22px);padding:14px 28px;
+  box-shadow:0 5px 0 #a26b00,0 12px 20px #0006}
+.stkbtn[onclick*="stkReady"]:not(:disabled):hover,.stkbtn[onclick*="stkStart"]:not(:disabled):hover,
+.stkbtn[onclick*="stkBotBegin"]:not(:disabled):hover,.stkbtn[onclick*="stkBotStart"]:not(:disabled):hover{background:linear-gradient(180deg,#ffe477,#ffb914)}
+.stkbtn[onclick*="stkReady"]:not(:disabled):active,.stkbtn[onclick*="stkStart"]:not(:disabled):active,
+.stkbtn[onclick*="stkBotBegin"]:not(:disabled):active,.stkbtn[onclick*="stkBotStart"]:not(:disabled):active{box-shadow:0 1px 0 #a26b00}
+.stkbtn[onclick*="stkReady"]:not(:disabled),.stkbtn[onclick*="stkStart"]:not(:disabled),.stkbtn[onclick*="stkBotBegin"]:not(:disabled){animation:obPulse 2.4s ease-in-out infinite}
+
+/* przyciski wyjścia – czerwone */
+.stkbtn[onclick*="stkLeave"],.stkbtn[onclick*="stkBotLeave"]{
+  background:linear-gradient(180deg,#ff7a7a99,#d9393966);border-color:#ffb3b3aa}
+.stkbtn[onclick*="stkLeave"]:not(:disabled):hover,.stkbtn[onclick*="stkBotLeave"]:not(:disabled):hover{background:linear-gradient(180deg,#ff8f8fcc,#e04545aa)}
+
+/* plansze obok siebie, wyśrodkowane */
+.stkboards{gap:clamp(14px,4vw,34px);margin-top:14px}
+.stkboardwrap h3{display:inline-block;margin:6px 0 14px;padding:6px 18px;font-size:clamp(16px,4vw,20px);
+  background:#00000059;border:2px solid #ffffff33;border-radius:999px}
+.stkboardwrap:has([data-kind="enemy"]) h3{border-color:#ffd23f99;color:#ffe27a}
+.stkframe{margin-bottom:6px}
+
+/* legenda – kolory zgodne z nowym wyglądem planszy */
+.stklegend{justify-content:center;gap:10px;margin-top:16px;font-size:clamp(13px,3.2vw,15px);font-weight:600}
+.stklegend span{display:inline-flex;align-items:center;gap:7px;background:#00000050;border:1px solid #ffffff2e;border-radius:999px;padding:6px 14px}
+.stkdot{width:14px;height:14px;border-radius:4px;margin:0;border:1px solid #ffffff99}
+.stklegend span:nth-child(1) .stkdot{background:linear-gradient(135deg,#9db4cc,#4a5a70)!important}
+.stklegend span:nth-child(2) .stkdot{background:radial-gradient(circle,#fff3a8,#ffa127 45%,#d3361f)!important;border-radius:50%}
+.stklegend span:nth-child(3) .stkdot{background:radial-gradient(circle,#fff 0 22%,transparent 24%),#3a8fd0!important;border-radius:50%}
+
+/* podgląd obrotu / komunikaty błędów */
+.stkbox[style*="ffd1ca"]{background:linear-gradient(180deg,#ff6b6b33,#ff6b6b14);border-color:#ff9a9a99;font-weight:600}
+
+@media(max-width:600px){
+  .stkbox{border-radius:18px;margin:10px 0}
+  .stkrow{gap:8px}
+  .stkbtn{padding:11px 16px}
+  .stkcode{letter-spacing:.14em;padding:3px 12px 3px 16px}
+}
+@media(prefers-reduced-motion:reduce){#stk::before,.stkbtn{animation:none!important;transition:none!important}}
+
+/* ===== przerysowanie planszy bez „migania" =====
+   Gra odświeża cały ekran po każdym ruchu. Zapętlone animacje (fale, kołysanie
+   statków, ogień, pulsowanie) dostają ujemne opóźnienie równe czasowi, który
+   upłynął (--stkT ustawia JS), więc po przerysowaniu kontynuują, zamiast
+   zaczynać od nowa. Animacje jednorazowe (wybuch, plusk) działają jak dawniej. */
+#stk .stkframe .stkboard{animation-delay:calc(var(--stkT,0s) * -1)}
+#stk .stksh .bob{animation-delay:calc(var(--d,0s) - var(--stkT,0s))}
+#stk .stksh .wv,#stk .stksh .foam,#stk .stksh .fl,#stk .stksh .rd,
+#stk .stksunk .fl,#stk .stksunk .sm,
+#stk .stkframe .stkboard .stkcell.hit:after,
+#stk .stkframe .stkboard .stkcell.aim,
+#stk .stkbtn:not(:disabled)[onclick*="stkReady"],#stk .stkbtn:not(:disabled)[onclick*="stkStart"],#stk .stkbtn:not(:disabled)[onclick*="stkBotBegin"]{animation-delay:calc(var(--stkT,0s) * -1)}
+
+/* komunikaty (tryb online) jako unoszący się dymek – nie przesuwa planszy */
+.stktoast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:20;
+  max-width:min(92vw,520px);padding:10px 18px;border-radius:999px;text-align:center;font-weight:600;font-size:clamp(14px,3.6vw,16px);
+  color:#fff;background:#b3261ecc;border:2px solid #ffb3b3aa;box-shadow:0 8px 20px #0006;pointer-events:none;
+  animation:stkToast 3.2s ease-out forwards}
+@keyframes stkToast{0%{opacity:0;transform:translate(-50%,-10px)}8%,80%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,0)}}
+
+/* ===== zatopiony statek: grafika widoczna nad polami ===== */
+#stk .stkboard .stksunk{z-index:6;pointer-events:none}
+#stk .stkboard .stksunk svg{filter:drop-shadow(0 3px 4px #000a)}
+/* pola zatopionego statku: spokojne, ciemne morze zamiast ognia, żeby grafika była czytelna */
+#stk .stkframe .stkboard .stkcell.sunkc.hit,
+#stk .stkframe .stkboard[data-kind="own"] .stkcell.sunkc.hit{background:radial-gradient(circle,#0b3a63cc,#04182ecc);box-shadow:inset 0 0 0 1px #0007}
+#stk .stkframe .stkboard .stkcell.sunkc.hit:after{content:none}
+
+/* ==========================================================================
+   Ustawianie floty: plansza po lewej, PORT ze statkami po prawej.
+   Statki z portu przeciąga się na planszę (patrz stkTrayDown / stkDrag*).
+   ========================================================================== */
+.stkplace{display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:clamp(14px,3vw,28px);margin:12px 0 4px}
+.stkplace .stkboardwrap{flex:0 1 432px;min-width:0}
+.stkplace .stkframe{margin-bottom:0}
+
+/* port */
+.stktray{--tc:38px;flex:0 0 auto;align-self:flex-start;width:calc(4*var(--tc) + 56px);max-width:100%;
+  padding:12px 14px 14px;text-align:center;
+  background:linear-gradient(180deg,#ffffff24,#ffffff0d);
+  border:2px solid #ffffff40;border-radius:20px;
+  box-shadow:0 10px 24px #0006,inset 0 1px 0 #ffffff33;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  transition:border-color .15s,background .15s,box-shadow .15s}
+.stktray h4{margin:0 0 2px;font-size:clamp(17px,4vw,20px);font-weight:700;letter-spacing:.04em;color:#ffd23f;text-shadow:0 2px 0 #06223d}
+.stktray>.stkmuted{margin:0 0 10px;font-size:13px;line-height:1.25}
+.stktray.drop{border-color:#5ee6c8;background:linear-gradient(180deg,#5ee6c855,#5ee6c81f);box-shadow:0 0 0 3px #5ee6c866,0 10px 24px #0006}
+.stktitems{display:flex;flex-direction:column;align-items:center;gap:12px}
+
+.stktitem{position:relative;display:flex;align-items:center;gap:10px;padding:8px 10px 8px 8px;border-radius:14px;
+  background:#04182e66;border:2px solid #ffffff2e;cursor:grab;user-select:none;-webkit-user-select:none;
+  touch-action:none;-webkit-touch-callout:none;
+  transition:transform .15s cubic-bezier(.2,1.5,.4,1),border-color .15s,background .15s}
+.stktitem:not(.done):hover{transform:translateY(-2px);border-color:#ffffff88;background:#04182e99}
+.stktitem:not(.done):active{cursor:grabbing}
+.stktitem.sel{border-color:#ffd23f;box-shadow:0 0 0 2px #ffd23f66}
+.stktitem.done{opacity:.35;cursor:default;filter:saturate(.4)}
+.stktitem:focus-visible{outline:3px solid #ffd23f;outline-offset:2px}
+
+/* grafika statku w porcie: 1 pole = --tc, statek ma n pól długości */
+.stktship{flex:none;width:calc(var(--n)*var(--tc));height:var(--tc);overflow:visible}
+.stktcnt{min-width:30px;font-weight:700;font-size:15px;color:#fff;background:#00000066;border-radius:999px;padding:3px 8px}
+.stktitem.done .stktcnt{color:#5ee6c8}
+
+/* przeciągany statek (duch pod palcem/kursorem) */
+.stkghost{position:fixed;left:0;top:0;z-index:20000;pointer-events:none;will-change:transform;
+  filter:drop-shadow(0 8px 8px #0008);opacity:.96}
+.stkghost svg{position:absolute;inset:0;width:100%;height:100%;display:block;overflow:visible}
+.stkghost.bad{filter:drop-shadow(0 0 6px #ff5a50) drop-shadow(0 8px 8px #0008);opacity:.8}
+body.stkdragging{cursor:grabbing!important;user-select:none;-webkit-user-select:none;touch-action:none;overscroll-behavior:none}
+body.stkdragging *{cursor:grabbing!important}
+body.stkdragging #stk{overflow:hidden}
+
+/* statki już stojące na planszy można chwycić i przeciągnąć */
+.stkframe .stkboard[data-kind="place"] .stkcell.ship{cursor:grab;touch-action:none}
+
+/* wąskie ekrany: port pod planszą, statki w rzędzie */
+@media(max-width:760px){
+  .stkplace{flex-direction:column;align-items:center}
+  .stktray{--tc:30px;width:min(100%,432px)}
+  .stktitems{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:8px}
+}
+@media(prefers-reduced-motion:reduce){.stktitem{transition:none}}
+
+/* ===== rakieta lecąca między planszami ===== */
+/* musi być nad #stk (z-index 19010), inaczej jest niewidoczna */
+.stkmissile{z-index:30000!important;filter:drop-shadow(0 0 6px #ffb347) drop-shadow(0 3px 4px #0008)}
+/* wybuch / plusk na własnej planszy czeka, aż rakieta przeciwnika doleci */
+.stkcell.fxin.fxhit:before,.stkcell.fxin.fxmiss:before{animation-delay:.7s;animation-fill-mode:both}

@@ -101,7 +101,7 @@ const lgEsc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt
 </script>
 <script>
 /* ================= STATKI ONLINE ================= */
-const STK_FLEET=[3,3,2,2,2,1,1,1];
+const STK_FLEET=[4,3,3,2,2,2,1,1,1],STK_N=STK_FLEET.length,STK_CELLS=STK_FLEET.reduce((a,b)=>a+b,0);
 let STK={ref:null,code:'',host:'',uid:'',listener:null,reqListener:null,resListener:null,room:null,players:[],status:'start',msg:'',joinCode:'',pane:'',nick:'Gracz',color:'#2a9df4',ships:[],orientation:'H',ready:false,privateRef:null,pending:false,processed:new Set(),requestsRef:null,responsesRef:null,shots:{},turn:'',winner:null};
 function stkMe(){return STK.uid||onlinePlayerId}
 function stkProfile(){const u=(typeof ACC!=='undefined'&&ACC.user)?ACC.user:null;
@@ -118,22 +118,33 @@ function stkHub(){
   try{const g=parent.document.querySelector('#statki .gmenu')||parent.document.querySelector('.gmenu');if(g){g.click();return}}catch(e){}
   try{parent.postMessage({type:'gmenu-back'},'*')}catch(e){}
 }
-function stkRender(){const el=document.getElementById('stkcontent');if(!el)return;let h='';if(STK.msg)h+=`<div class="stkbox" style="color:#ffd1ca">${lgEsc(STK.msg)}</div>`;
+const STK_T0=performance.now();
+/* Przerysowanie bez „migania": zachowuje przewinięcie i fazę animacji (morze, statki, ogień) */
+function stkPaint(el,h){
+ if(STK.drag){STK.dirty=true;return}
+ const sc=document.getElementById('stk'),top=sc?sc.scrollTop:0;
+ if(sc)sc.style.setProperty('--stkT',((performance.now()-STK_T0)/1000).toFixed(3)+'s');
+ el.innerHTML=h;
+ if(sc&&sc.scrollTop!==top)sc.scrollTop=top;
+}
+function stkRender(){const el=document.getElementById('stkcontent');if(!el)return;if(STK.bot)return stkBotRender(el);let h='';if(STK.msg)h+=`<div class="stktoast" role="status">${lgEsc(STK.msg)}</div>`;
  if(!STK.ref){const net=podNet(),pn=STK.pane||'';
   const nick=`<label for="stknick">Twój nick</label><input id="stknick" maxlength="18" autocomplete="off" value="${lgEsc(STK.nick||'Gracz')}" oninput="STK.nick=this.value;STK.nickT=1">
     <div class="ob-opt"><span>Kolor gracza</span><input id="stkcol" type="color" value="${lgEsc(STK.color||'#2a9df4')}" oninput="STK.color=this.value;STK.colT=1"></div>`;
+  const lv=STK.botLvl==null?1:STK.botLvl;
+  const bot=pn==='bot'?`<div class="ob-pane"><label>Poziom bota</label><div class="ob-chips">${['Łatwy','Normalny','Trudny'].map((t,i)=>obChip(t,lv===i,`STK.botLvl=${i};stkRender()`)).join('')}</div><p class="ob-note">${['Bot strzela losowo.','Bot dobija trafione statki.','Bot liczy prawdopodobieństwo – trudny przeciwnik.'][lv]}</p>${obBtn('Rozpocznij grę','⚓','stkBotStart()','gold')}</div>`:'';
   const create=pn==='create'?`<div class="ob-pane">${nick}${obBtn('Stwórz pokój','🎲','stkCreate()','gold',!net)}</div>`:'';
   const join=pn==='join'?`<div class="ob-pane">${nick}<label for="stkjoincode">Kod pokoju od znajomego</label><input id="stkjoincode" class="cd" maxlength="5" placeholder="A8K2Q" autocomplete="off" value="${lgEsc(STK.joinCode)}" oninput="STK.joinCode=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')stkJoin()">${obBtn('Dołącz','🚪','stkJoin()','gold',!net)}</div>`:'';
   el.innerHTML=obShell({key:'stk-start',host:'#stk',theme:'stk',words:['STATKI'],tiles:['⚓','🚢','💥','🌊'],sub:'Bitwa morska dla dwóch graczy.',msg:STK.msg?`<div class="ob-err">${lgEsc(STK.msg)}</div>`:'',
   back:{label:'← Menu główne',onclick:'stkHub()'},
-  body:`${obBtn('Utwórz pokój','🏠',"stkPane('create')",'gold')}${obBtn('Dołącz do znajomego','🚪',"stkPane('join')",'white')}
+  body:`${obBtn('Graj z botem (offline)','🤖',"stkPane('bot')",'gold')}${bot}${obBtn('Utwórz pokój','🏠',"stkPane('create')",'white')}${obBtn('Dołącz do znajomego','🚪',"stkPane('join')",'white')}
   ${create}${join}
-  ${net?'':'<p class="ob-net">Statki wymagają pokoju online. Działają po wgraniu gry na własny hosting z Firebase.</p>'}
-  ${obRules('<p>Gra dla dokładnie 2 osób. Każdy ustawia flotę na swojej planszy 10×10. Statki nie mogą na siebie nachodzić ani stykać się bokami lub rogami.</p><p>Plansza 10×10 · flota: 1×5, 2×4, 3×3, 4×2 i 4×1</p>')}`});return}
+  ${net?'':'<p class="ob-net">Gra online wymaga połączenia z platformą (Firebase). Gra z botem działa w pełni offline.</p>'}
+  ${obRules('<p>Gra online dla 2 osób lub offline z botem. Każdy ustawia flotę na swojej planszy 10×10. Statki nie mogą na siebie nachodzić ani stykać się bokami lub rogami.</p><p>Plansza 10×10 · flota: 1×4, 2×3, 3×2 i 3×1 (9 statków). Statki przeciągasz z portu na planszę.</p>')}`});return}
  const list=STK.players.map(p=>`<span class="stkmuted">${lgEsc(p.name)}${p.id===STK.host?' (host)':''}${p.id===stkMe()?' (Ty)':''} ${p.ready?'✓ gotowy':'· ustawia flotę'}</span>`).join(' · ');
  h+=`<div class="stkbox"><div>Pokój: <span class="stkcode">${lgEsc(STK.code)}</span></div><div class="stkrow">${list}</div><div class="stkrow"><span class="stkmuted">Gracze: ${STK.players.length}/2</span><button class="stkbtn" onclick="navigator.clipboard?.writeText(STK.code).then(()=>{STK.msg='Kod skopiowany';stkRender()}).catch(()=>{STK.msg='Kod pokoju: '+STK.code;stkRender()})">Kopiuj kod</button><button class="stkbtn" onclick="stkLeave()">Opuść pokój</button></div></div>`;
  if(STK.status==='lobby'){
-   if(!STK.ready){const next=STK.ships.length,remaining=STK_FLEET[next];h+=`<div class="stkbox"><h3>Ustaw swoją flotę</h3><p>${next<8?`Teraz ustaw statek długości <b>${remaining}</b> (${next+1}/8).`:'Flota ustawiona — możesz zatwierdzić ustawienie.'}</p><div class="stkrow"><button class="stkbtn" onclick="stkRotate()">Obróć: ${STK.orientation==='H'?'poziomo':'pionowo'}</button><button class="stkbtn" onclick="stkUndo()" ${STK.ships.length?'':'disabled'}>Cofnij statek</button><button class="stkbtn" onclick="stkRandom()">Losuj flotę</button><span class="stkmuted">Postawione: ${STK.ships.length}/8</span></div>${stkGridHTML('place')}<div class="stkrow"><button class="stkbtn" onclick="stkReady()" ${STK.ships.length===8?'':'disabled'}>Zatwierdź flotę</button></div></div>`}
+   if(!STK.ready){h+=stkPlaceBox(`<button class="stkbtn" onclick="stkReady()" ${STK.ships.length===STK_N?'':'disabled'}>Zatwierdź flotę</button>`)}
    else h+=`<div class="stkbox"><h3>Twoja flota jest gotowa ✓</h3><p>Czekaj, aż drugi gracz również zatwierdzi ustawienie.</p>${stkGridHTML('own')}</div>`;
    if(STK.host===stkMe())h+=`<div class="stkbox"><button class="stkbtn" onclick="stkStart()" ${STK.players.length===2&&STK.players.every(p=>p.ready)?'':'disabled'}>Rozpocznij bitwę</button><div class="stkmuted">Rozpocząć można, gdy obaj gracze zatwierdzą flotę.</div></div>`;
  }else if(STK.status==='play'){
@@ -141,7 +152,7 @@ function stkRender(){const el=document.getElementById('stkcontent');if(!el)retur
  }else if(STK.status==='end'){
    const won=STK.winner===stkMe();h+=`<div class="stkbox"><h2>${won?'🏆 Zwycięstwo!':'Koniec gry'}</h2><p>${won?'Zatopiłeś całą flotę przeciwnika!':'Przeciwnik zatopił całą Twoją flotę.'}</p><button class="stkbtn" onclick="stkLeave()">Wróć</button></div>`;
  }
- el.innerHTML=h;
+ stkPaint(el,h);
 }
 function stkSunkSVG(len,ori){
  const W=len*100,V=ori==='V',w=V?100:W,h=V?W:100,F=n=>Math.round(n*10)/10;
@@ -174,14 +185,16 @@ function stkSunkOverlay(shots,local){
  Object.values(shots||{}).forEach(x=>x&&add(x.sk));(local||[]).forEach(add);
  return out.join('');
 }
-function stkFly(k){
+/* dir 'out': z mojej planszy w pole planszy przeciwnika; 'in': z planszy przeciwnika w pole mojej */
+function stkFly(k,dir){
  try{
-  const tgt=document.querySelector('.stkboard[data-kind="enemy"] [data-k="'+k+'"]');if(!tgt||!tgt.animate)return;
+  const inc=dir==='in',tk=inc?'own':'enemy',sk=inc?'enemy':'own';
+  const tgt=document.querySelector('.stkboard[data-kind="'+tk+'"] [data-k="'+k+'"]');if(!tgt||!tgt.animate)return;
   const r=tgt.getBoundingClientRect(),ex=r.left+r.width/2,ey=r.top+r.height/2;
-  const own=document.querySelector('.stkboard[data-kind="own"]');
+  const own=document.querySelector('.stkboard[data-kind="'+sk+'"]');
   let sx,sy;
-  if(own){const o=own.getBoundingClientRect();sx=o.left+o.width/2;sy=o.top+o.height/2}else{sx=window.innerWidth/2;sy=window.innerHeight+40}
-  if(Math.hypot(ex-sx,ey-sy)<140){sx=ex;sy=window.innerHeight+40}
+  if(own){const o=own.getBoundingClientRect();sx=o.left+o.width/2;sy=o.top+o.height/2}else{sx=window.innerWidth/2;sy=inc?-40:window.innerHeight+40}
+  if(Math.hypot(ex-sx,ey-sy)<140){sx=ex;sy=inc?-40:window.innerHeight+40}
   const mx=(sx+ex)/2,my=Math.min(sy,ey)-Math.max(90,Math.abs(ex-sx)*.25);
   const m=document.createElement('div');m.className='stkmissile';
   m.innerHTML='<svg viewBox="0 0 26 46" width="26" height="46"><path d="M9 26H17L13 46Z" fill="#ffa21f"/><path d="M13 0Q20 10 19 26H7Q6 10 13 0Z" fill="#dfe6ee" stroke="#33475f" stroke-width="1.5"/><path d="M7 22L0 36L8 32ZM19 22L26 36L18 32Z" fill="#e45d57"/><circle cx="13" cy="14" r="3" fill="#2a9df4"/></svg>';
@@ -197,38 +210,371 @@ function stkFly(k){
   setTimeout(()=>{try{m.remove()}catch(e){}},1500);
  }catch(e){console.error('Pocisk:',e)}
 }
-function stkGridHTML(kind){const cells=[];const ownHits=STK.shots?.[Object.keys(STK.room?.players||{}).find(id=>id!==stkMe())]||{};const myShots=STK.shots?.[stkMe()]||{};const occupied=new Set(STK.ships.flatMap(s=>s.cells.map(c=>c.x+'_'+c.y)));
- for(let y=0;y<10;y++)for(let x=0;x<10;x++){const k=x+'_'+y;let cl='stkcell',disabled=false,click='';if(kind==='place'){if(occupied.has(k))cl+=' ship';click=`onclick="stkPlace(${x},${y})"`;}
- else if(kind==='own'){if(occupied.has(k))cl+=' ship';const sh=ownHits[k];if(sh)cl+=' '+(sh.result==='hit'?'hit':'miss');if(STK.fxOwn&&STK.fxOwn.k===k&&Date.now()<STK.fxOwn.until)cl+=' fx'+STK.fxOwn.result;disabled=true;}
- else{const sh=myShots[k];if(sh)cl+=' '+(sh.result==='hit'?'hit':'miss');if(!sh&&STK.pending&&STK.aim===k)cl+=' aim';if(sh&&STK.fx&&STK.fx.k===k&&Date.now()<STK.fx.until)cl+=' fx'+STK.fx.result;disabled=!!sh||STK.turn!==stkMe()||STK.pending||STK.status!=='play';click=`onclick="stkShoot(${x},${y})"`;}
- cells.push(`<button class="${cl}" style="grid-area:${y+1}/${x+1}" data-k="${k}" ${disabled?'disabled':''} ${click} aria-label="${String.fromCharCode(65+x)}${y+1}"></button>`)}
- const ov=kind==='own'?stkSunkOverlay(ownHits):kind==='enemy'?stkSunkOverlay(myShots,STK.skLocal):'';
- return `<div class="stkboard" data-kind="${kind}" aria-label="Plansza 10 na 10">${cells.join('')}${ov}</div>`;
+/* ===== grafiki okrętów na planszy (SVG, animowane) ===== */
+const STK_PAL=[{h:'#4a5a70',d:'#8a9bb0',s:'#62748b',f:'#6c5f55',a:'#e45d57'},{h:'#3f5f58',d:'#8fb5a6',s:'#5a8076',f:'#6c5f55',a:'#ffd23f'},{h:'#6a4a5e',d:'#c79ab5',s:'#8a6279',f:'#4a3a46',a:'#5ee6c8'},{h:'#a8452f',d:'#f0a37f',s:'#d9d2bf',f:'#fff6dd',a:'#18222e'},{h:'#1f6fb0',d:'#7cc4ff',s:'#fff6dd',f:'#e45d57',a:'#ffd23f'}];
+let stkSid=0;
+function stkShipSVG(n,ori,pi){
+ const c=STK_PAL[pi%5],id='k'+(++stkSid),W=n*100,S='stroke="#18222e" stroke-width="3" stroke-linejoin="round"',S2='stroke="#18222e" stroke-width="2"',bx=n===1?14:n===2?40:n===3?88:128;
+ let g=`<ellipse class="foam" cx="${W-6}" cy="101" rx="22" ry="5" fill="#fff"/><path d="M6 70H${W-44}Q${W-10} 72 ${W-4} 84L${W-24} 106H22Q10 100 6 70Z" fill="${c.h}" ${S}/><rect x="12" y="66" width="${W-50}" height="6" rx="2" fill="${c.d}" ${S2}/><path d="M12 82H${W-12}" stroke="${c.a}" stroke-width="5"/>`;
+ for(let x=30;x<W-46;x+=24)g+=`<circle class="ph" cx="${x}" cy="92" r="4.5" ${S2}/>`;
+ let top=n===1?36:n===2?28:24;
+ if(n>=2){
+  g+=`<rect x="${bx}" y="40" width="60" height="26" rx="4" fill="${c.s}" ${S}/>`;
+  for(let i=0;i<3;i++)g+=`<rect class="ph" x="${bx+8+i*16}" y="47" width="10" height="9" rx="2"/>`;
+  if(n>=3)g+=`<rect x="${bx+8}" y="22" width="44" height="18" rx="4" fill="${c.s}" ${S}/><rect class="ph" x="${bx+16}" y="27" width="28" height="8" rx="2"/><path d="M${bx+30} 22V8" stroke="#2a3644" stroke-width="3"/><g transform="translate(${bx+30} 6)"><path class="rd" d="M-13 0H13" stroke="#18222e" stroke-width="4" stroke-linecap="round"/></g>`;
+  (n===2?[bx+66]:[bx+66,bx+96]).forEach(x=>g+=`<rect x="${x}" y="28" width="20" height="38" rx="3" fill="${c.f}" ${S}/><rect x="${x}" y="38" width="20" height="7" fill="${c.a}"/>`);
+  const gx=n===2?W-70:W-82;
+  g+=`<rect x="${gx}" y="55" width="22" height="11" rx="4" fill="${c.d}" ${S}/><rect x="${gx+18}" y="58" width="${n===2?24:28}" height="4.5" fill="#2a3644"/>`;
+  if(n===4)g+=`<rect x="84" y="50" width="34" height="16" rx="3" fill="${c.s}" ${S}/><rect class="ph" x="91" y="55" width="10" height="7" rx="2"/><rect x="254" y="55" width="22" height="11" rx="4" fill="${c.d}" ${S}/><rect x="272" y="58" width="26" height="4.5" fill="#2a3644"/>`;
+  if(n>=3)g+=`<rect x="28" y="55" width="22" height="11" rx="4" fill="${c.d}" ${S}/><rect x="46" y="58" width="28" height="4.5" fill="#2a3644"/>`;
+ }else{
+  g+=`<rect x="${bx}" y="44" width="38" height="22" rx="4" fill="${c.s}" ${S}/><rect class="ph" x="${bx+6}" y="50" width="12" height="9" rx="2"/><circle cx="${bx+29}" cy="55" r="5" fill="#fff" stroke="#e45d57" stroke-width="3"/><path d="M${bx+19} 44V20" stroke="#2a3644" stroke-width="3"/><rect x="${W-46}" y="58" width="12" height="8" rx="3" fill="${c.d}" ${S2}/><rect x="${W-36}" y="60" width="18" height="3.5" fill="#2a3644"/>`;
+ }
+ g+=`<path d="M14 66V${top}" stroke="#2a3644" stroke-width="3" stroke-linecap="round"/><g class="fl" transform="translate(16 ${top})"><rect width="22" height="6" fill="#fff" stroke="#18222e" stroke-width="1.5"/><rect y="6" width="22" height="6" fill="#e45d57" stroke="#18222e" stroke-width="1.5"/></g>`;
+ let w='M-50 99';for(let i=0;i<Math.ceil((W+110)/50);i++)w+='q12.5 -6 25 0t25 0';
+ g+=`<clipPath id="${id}"><rect x="-6" y="94" width="${W+12}" height="30"/></clipPath><g clip-path="url(#${id})"><g class="wv"><path d="${w}V160H-50Z" fill="rgba(25,110,196,.8)"/><path d="${w}" fill="none" stroke="#bfe6ff" stroke-width="2" opacity=".8"/></g></g>`;
+ g=`<g class="bob">${g}</g>`;
+ return ori==='V'?`<svg viewBox="0 0 100 ${W}" preserveAspectRatio="none" aria-hidden="true"><g transform="translate(108 0) rotate(90)">${g}</g></svg>`:`<svg viewBox="0 8 ${W} 100" preserveAspectRatio="none" aria-hidden="true">${g}</svg>`;
 }
-function stkCanPlace(x,y,len,ori){if((ori==='H'&&x+len>10)||(ori==='V'&&y+len>10))return false;const used=new Set(STK.ships.flatMap(s=>s.cells.map(c=>c.x+'_'+c.y)));for(let i=0;i<len;i++){const cx=x+(ori==='H'?i:0),cy=y+(ori==='V'?i:0);for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){const nx=cx+dx,ny=cy+dy;if(nx>=0&&nx<10&&ny>=0&&ny<10&&used.has(nx+'_'+ny))return false}}return true}
-function stkPlace(x,y){if(STK.status!=='lobby'||STK.ready||STK.ships.length>=8)return;const len=STK_FLEET[STK.ships.length];if(!stkCanPlace(x,y,len,STK.orientation)){STK.msg='Statek nie mieści się lub dotyka innego statku. Wybierz inne pole.';stkRender();return}const cells=Array.from({length:len},(_,i)=>({x:x+(STK.orientation==='H'?i:0),y:y+(STK.orientation==='V'?i:0)}));STK.ships.push({len,cells});STK.msg='';stkRender()}
+function stkShipsOverlay(ships,hits){
+ return (ships||[]).map((s,i)=>{
+  const cs=s.cells;if(!cs||!cs.length)return '';
+  if(hits&&cs.every(c=>hits[c.x+'_'+c.y]&&hits[c.x+'_'+c.y].result==='hit'))return '';
+  const n=cs.length,ori=n>1&&cs[0].x===cs[1].x?'V':'H',c0=cs[0];
+  return `<div class="stksh" data-i="${i}" style="grid-area:${c0.y+1}/${c0.x+1}/${ori==='V'?c0.y+1+n:c0.y+2}/${ori==='H'?c0.x+1+n:c0.x+2};--d:-${(i*.9).toFixed(1)}s">${stkShipSVG(n,ori,STK_PALBY[n]!=null?STK_PALBY[n]:i)}</div>`;
+ }).join('');
+}
+function stkGridHTML(kind){const cells=[];const ownHits=STK.shots?.[Object.keys(STK.room?.players||{}).find(id=>id!==stkMe())]||{};const myShots=STK.shots?.[stkMe()]||{};const occupied=new Set(STK.ships.flatMap(s=>s.cells.map(c=>c.x+'_'+c.y)));
+ const sunkSet=new Set(),addSk=sk=>{if(sk)String(sk).split(',').forEach(t=>sunkSet.add(t))};
+ if(kind==='own')Object.values(ownHits).forEach(r=>r&&addSk(r.sk));else if(kind==='enemy'){Object.values(myShots).forEach(r=>r&&addSk(r.sk));(STK.skLocal||[]).forEach(addSk)}
+ for(let y=0;y<10;y++)for(let x=0;x<10;x++){const k=x+'_'+y;let cl='stkcell',disabled=false,click='';if(kind==='place'){if(occupied.has(k))cl+=' ship';click=`onclick="stkCellClick(${x},${y})" onmouseenter="stkPrev(${x},${y})"${occupied.has(k)?` onpointerdown="stkBoardDown(event,${x},${y})"`:''}`;}
+ else if(kind==='own'){if(occupied.has(k))cl+=' ship';const sh=ownHits[k];if(sh)cl+=' '+(sh.result==='hit'?'hit':'miss');if(STK.fxOwn&&STK.fxOwn.k===k&&Date.now()<STK.fxOwn.until)cl+=' fx'+STK.fxOwn.result+(STK.fxOwn.late?' fxin':'');disabled=true;}
+ else{const sh=myShots[k];if(sh)cl+=' '+(sh.result==='hit'?'hit':'miss');if(!sh&&STK.pending&&STK.aim===k)cl+=' aim';if(sh&&STK.fx&&STK.fx.k===k&&Date.now()<STK.fx.until)cl+=' fx'+STK.fx.result;disabled=!!sh||STK.turn!==stkMe()||STK.pending||STK.status!=='play';click=`onclick="stkShoot(${x},${y})"`;}
+ cells.push(`<button class="${cl}${sunkSet.has(k)?' sunkc':''}" style="grid-area:${y+1}/${x+1}" data-k="${k}" ${disabled?'disabled':''} ${click} aria-label="${String.fromCharCode(65+x)}${y+1}"></button>`)}
+ const ov=kind==='own'?stkSunkOverlay(ownHits):kind==='enemy'?stkSunkOverlay(myShots,STK.skLocal):'';
+ const shipsOv=(kind==='own'||kind==='place')?stkShipsOverlay(STK.ships,kind==='own'?ownHits:null):'';
+ const ax='ABCDEFGHIJ'.split('').map(c=>`<span>${c}</span>`).join(''),ay=Array.from({length:10},(_,i)=>`<span>${i+1}</span>`).join('');
+ return `<div class="stkframe"><div class="stkax-x" aria-hidden="true">${ax}</div><div class="stkax-y" aria-hidden="true">${ay}</div><div class="stkboard" data-kind="${kind}" aria-label="Plansza 10 na 10" ${kind==='place'?'onmouseleave="stkPrevClear()"':''}>${cells.join('')}${shipsOv}${ov}</div></div>`;
+}
+function stkPrevClear(){document.querySelectorAll('.stkboard[data-kind="place"] .pvok,.stkboard[data-kind="place"] .pvbad').forEach(e=>e.classList.remove('pvok','pvbad'))}
+function stkPrev(x,y){if(STK.drag)return;stkPrevClear();const len=stkSelLen();if(STK.status!=='lobby'||STK.ready||!len)return;const ori=STK.orientation,good=stkCanPlace(x,y,len,ori);for(let i=0;i<len;i++){const cx=x+(ori==='H'?i:0),cy=y+(ori==='V'?i:0);if(cx>9||cy>9)break;const c=document.querySelector('.stkboard[data-kind="place"] [data-k="'+cx+'_'+cy+'"]');if(c)c.classList.add(good?'pvok':'pvbad')}}
+function stkCanPlace(x,y,len,ori,ign){if(x<0||y<0||(ori==='H'&&x+len>10)||(ori==='V'&&y+len>10))return false;const used=new Set(STK.ships.filter(s=>s!==ign).flatMap(s=>s.cells.map(c=>c.x+'_'+c.y)));for(let i=0;i<len;i++){const cx=x+(ori==='H'?i:0),cy=y+(ori==='V'?i:0);for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++){const nx=cx+dx,ny=cy+dy;if(nx>=0&&nx<10&&ny>=0&&ny<10&&used.has(nx+'_'+ny))return false}}return true}
+function stkPlace(x,y){const len=stkSelLen();if(STK.status!=='lobby'||STK.ready||!len)return;if(!stkCanPlace(x,y,len,STK.orientation)){STK.msg='Statek nie mieści się lub dotyka innego statku. Wybierz inne pole.';stkRender();return}const cells=Array.from({length:len},(_,i)=>({x:x+(STK.orientation==='H'?i:0),y:y+(STK.orientation==='V'?i:0)}));STK.ships.push({len,cells});STK.msg='';stkRender()}
 function stkRotate(){STK.orientation=STK.orientation==='H'?'V':'H';stkRender()}
 function stkUndo(){if(STK.ready)return;STK.ships.pop();STK.msg='';stkRender()}
 function stkRandom(){if(STK.ready)return;let success=null;for(let restart=0;restart<250&&!success;restart++){let placed=[],ok=true;for(const len of STK_FLEET){let found=false;for(let tries=0;tries<450&&!found;tries++){STK.ships=placed;const x=Math.floor(Math.random()*10),y=Math.floor(Math.random()*10),o=Math.random()<.5?'H':'V';if(stkCanPlace(x,y,len,o)){const cells=Array.from({length:len},(_,i)=>({x:x+(o==='H'?i:0),y:y+(o==='V'?i:0)}));placed.push({len,cells});found=true}}if(!found){ok=false;break}}if(ok)success=placed}STK.ships=success||[];STK.msg=success?'Wylosowano ustawienie floty.':'Nie udało się wylosować floty. Ustaw ją ręcznie.';stkRender()}
 async function stkCreate(){try{stkProfile();const uid=await onlineEnsureAuth();STK.uid=uid;const code=onlineCode(),ref=fbDB.ref('statkiRooms/'+code);const room={host:uid,status:'lobby',createdAt:firebase.database.ServerValue.TIMESTAMP,players:{[uid]:{id:uid,name:STK.nick,color:STK.color,ready:false}}};await ref.set(room);stkAttach(ref,code)}catch(e){STK.msg='Nie udało się utworzyć pokoju: '+e.message;stkRender()}}
 async function stkJoin(){try{stkProfile();const uid=await onlineEnsureAuth();STK.uid=uid;const code=String(STK.joinCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);if(code.length!==5)throw new Error('Wpisz pięcioznakowy kod.');const ref=fbDB.ref('statkiRooms/'+code),room=(await ref.once('value')).val();if(!room)throw new Error('Nie znaleziono takiego pokoju.');if(room.status!=='lobby'&&!room.players?.[uid])throw new Error('Gra już się rozpoczęła.');if(!room.players?.[uid]){const tx=await ref.child('players').transaction(players=>{players=players||{};if(players[uid])return players;if(Object.keys(players).length>=2||room.status!=='lobby')return;players[uid]={id:uid,name:STK.nick,color:STK.color,ready:false};return players});if(!tx.committed)throw new Error('Pokój jest pełny lub gra już się rozpoczęła.')}stkAttach(ref,code)}catch(e){STK.msg='Nie udało się dołączyć: '+e.message;stkRender()}}
 function stkAttach(ref,code){stkDetach();STK.skLocal=[];STK.seenOpp=null;STK.ref=ref;STK.code=code;STK.status='lobby';STK.ships=[];STK.ready=false;STK.msg='';STK.privateRef=fbDB.ref('statkiBoards/'+code+'/'+stkMe());STK.listener=ref.on('value',s=>stkOnRoom(s.val()),e=>{STK.msg='Błąd połączenia: '+e.message;stkRender()});STK.privateRef.once('value').then(s=>{const b=s.val();if(b&&Array.isArray(b.ships)){STK.ships=b.ships;STK.ready=true}STK.requestsRef=ref.child('requests');STK.reqListener=STK.requestsRef.on('child_added',q=>stkHandleRequest(q.key,q.val()));STK.responsesRef=ref.child('responses');STK.resListener=STK.responsesRef.on('child_added',q=>stkHandleResponse(q.key,q.val()));stkRender()}).catch(e=>{STK.msg='Nie udało się wczytać Twojej floty: '+e.message;stkRender()})}
-function stkOnRoom(room){if(!room){STK.msg='Pokój został usunięty.';stkDetach();STK.status='start';stkRender();return}STK.room=room;STK.host=room.host;STK.status=room.status;STK.players=Object.values(room.players||{});STK.turn=room.turn||'';STK.winner=room.winner||null;if(room.status==='end'&&typeof ACC!=='undefined'&&ACC.user){const me=ACC.user.uid,players=Object.values(room.players||{}).map(p=>({uid:p.id,name:p.name}));if(players.some(p=>p.uid===me))statsRecord('statki_'+STK.code,'statki',room.winner===me?'w':'l',players,false)}{const opp=Object.keys(room.players||{}).find(id=>id!==stkMe()),ns=(room.shots||{})[opp]||{},ks=Object.keys(ns);if(STK.seenOpp&&STK.seenOpp.code===STK.code)ks.forEach(k=>{if(!STK.seenOpp.set.has(k))STK.fxOwn={k,result:ns[k].result,until:Date.now()+900}});STK.seenOpp={code:STK.code,set:new Set(ks)}}STK.shots=room.shots||{};if(STK.status==='lobby'&&STK.players.length===2&&STK.players.every(p=>p.ready)&&STK.host===stkMe()){}stkRender()}
-async function stkReady(){if(STK.ships.length!==8||STK_FLEET.reduce((a,b)=>a+b,0)!==STK.ships.reduce((a,s)=>a+s.len,0))return;try{await STK.privateRef.set({ships:STK.ships,ready:true});await STK.ref.child('players/'+stkMe()+'/ready').set(true);STK.ready=true;STK.msg='Flota zatwierdzona. Czekaj na przeciwnika.';stkRender()}catch(e){STK.msg='Nie udało się zapisać floty: '+e.message;stkRender()}}
+function stkOnRoom(room){if(!room){STK.msg='Pokój został usunięty.';stkDetach();STK.status='start';stkRender();return}STK.room=room;STK.host=room.host;STK.status=room.status;STK.players=Object.values(room.players||{});STK.turn=room.turn||'';STK.winner=room.winner||null;if(room.status==='end'&&typeof ACC!=='undefined'&&ACC.user){const me=ACC.user.uid,players=Object.values(room.players||{}).map(p=>({uid:p.id,name:p.name}));if(players.some(p=>p.uid===me))statsRecord('statki_'+STK.code,'statki',room.winner===me?'w':'l',players,false)}STK.inFly=[];{const opp=Object.keys(room.players||{}).find(id=>id!==stkMe()),ns=(room.shots||{})[opp]||{},ks=Object.keys(ns);if(STK.seenOpp&&STK.seenOpp.code===STK.code)ks.forEach(k=>{if(!STK.seenOpp.set.has(k)){STK.fxOwn={k,result:ns[k].result,until:Date.now()+1700,late:true};STK.inFly.push(k)}});STK.seenOpp={code:STK.code,set:new Set(ks)}}STK.shots=room.shots||{};if(STK.status==='lobby'&&STK.players.length===2&&STK.players.every(p=>p.ready)&&STK.host===stkMe()){}stkRender();(STK.inFly||[]).forEach(k=>stkFly(k,'in'));STK.inFly=[]}
+async function stkReady(){if(STK.ships.length!==STK_N||STK_FLEET.reduce((a,b)=>a+b,0)!==STK.ships.reduce((a,s)=>a+s.len,0))return;try{await STK.privateRef.set({ships:STK.ships,ready:true});await STK.ref.child('players/'+stkMe()+'/ready').set(true);STK.ready=true;STK.msg='Flota zatwierdzona. Czekaj na przeciwnika.';stkRender()}catch(e){STK.msg='Nie udało się zapisać floty: '+e.message;stkRender()}}
 async function stkStart(){if(STK.host!==stkMe()||STK.players.length!==2||!STK.players.every(p=>p.ready)||STK.status!=='lobby')return;try{await STK.ref.update({status:'play',turn:STK.host,shots:{},requests:null,responses:null})}catch(e){STK.msg='Nie udało się rozpocząć: '+e.message;stkRender()}}
-async function stkShoot(x,y){if(STK.status!=='play'||STK.turn!==stkMe()||STK.pending)return;const k=x+'_'+y;if(STK.shots?.[stkMe()]?.[k])return;STK.pending=true;STK.aim=k;STK.flyEnd=Date.now()+720;stkRender();stkFly(k);try{const target=STK.players.find(p=>p.id!==stkMe());if(!target)throw new Error('Brak przeciwnika.');const req=STK.ref.child('requests').push();await req.set({by:stkMe(),target:target.id,x,y,at:firebase.database.ServerValue.TIMESTAMP});STK.msg='Strzał oddany — oczekiwanie na wynik…';}catch(e){STK.msg='Nie udało się oddać strzału: '+e.message;STK.pending=false;stkRender()}}
+async function stkShoot(x,y){if(STK.bot)return stkBotShoot(x,y);if(STK.status!=='play'||STK.turn!==stkMe()||STK.pending)return;const k=x+'_'+y;if(STK.shots?.[stkMe()]?.[k])return;STK.pending=true;STK.aim=k;STK.flyEnd=Date.now()+720;stkRender();stkFly(k);try{const target=STK.players.find(p=>p.id!==stkMe());if(!target)throw new Error('Brak przeciwnika.');const req=STK.ref.child('requests').push();await req.set({by:stkMe(),target:target.id,x,y,at:firebase.database.ServerValue.TIMESTAMP});STK.msg='Strzał oddany — oczekiwanie na wynik…';}catch(e){STK.msg='Nie udało się oddać strzału: '+e.message;STK.pending=false;stkRender()}}
 async function stkHandleRequest(id,r){if(!r||r.target!==stkMe()||STK.status!=='play'||!STK.ships.length)return;try{const key=r.x+'_'+r.y,ship=STK.ships.find(s=>s.cells.some(c=>c.x===r.x&&c.y===r.y)),hit=!!ship;let sk='';if(ship){const prev=(await STK.ref.child('shots/'+r.by).once('value')).val()||{};if(ship.cells.every(c=>(c.x===r.x&&c.y===r.y)||(prev[c.x+'_'+c.y]&&prev[c.x+'_'+c.y].result==='hit')))sk=ship.cells.map(c=>c.x+'_'+c.y).join(',')}await STK.ref.child('responses/'+id).transaction(old=>old||Object.assign({by:r.by,target:r.target,x:r.x,y:r.y,result:hit?'hit':'miss',at:firebase.database.ServerValue.TIMESTAMP},sk?{sk}:{}))}catch(e){console.error('Statki response',e)}}
-async function stkHandleResponse(id,r){if(!r||r.by!==stkMe()||STK.processed.has(id))return;STK.processed.add(id);const key=r.x+'_'+r.y;try{const wait=(STK.flyEnd||0)-Date.now();if(wait>0)await new Promise(z=>setTimeout(z,wait));STK.fx={k:key,result:r.result,until:Date.now()+900};const existing=(await STK.ref.child('shots/'+stkMe()+'/'+key).once('value')).val();if(existing)return;{const rec={x:r.x,y:r.y,result:r.result},sref=STK.ref.child('shots/'+stkMe()+'/'+key);if(r.sk){rec.sk=r.sk;(STK.skLocal=STK.skLocal||[]).push(r.sk)}try{await sref.set(rec)}catch(er){if(!r.sk)throw er;delete rec.sk;await sref.set(rec)}}const fresh=(await STK.ref.child('shots/'+stkMe()).once('value')).val()||{};const total=Object.values(fresh).filter(x=>x.result==='hit').length;if(total>=15){await STK.ref.update({status:'end',winner:stkMe(),lastResult:r.result});STK.pending=false;STK.msg='Trafiony ostatni statek!';stkRender();return}const target=STK.players.find(p=>p.id!==stkMe());await STK.ref.update({turn:r.result==='hit'?stkMe():target.id,lastResult:r.result,lastBy:stkMe()});STK.pending=false;STK.msg=r.result==='hit'?(r.sk?'Zatopiony! Strzelasz ponownie.':'Trafiony! Strzelasz ponownie.'):'Pudło. Teraz strzela przeciwnik.';stkRender()}catch(e){STK.pending=false;STK.msg='Błąd zapisu wyniku: '+e.message;stkRender()}}
+async function stkHandleResponse(id,r){if(!r||r.by!==stkMe()||STK.processed.has(id))return;STK.processed.add(id);const key=r.x+'_'+r.y;try{const wait=(STK.flyEnd||0)-Date.now();if(wait>0)await new Promise(z=>setTimeout(z,wait));STK.fx={k:key,result:r.result,until:Date.now()+900};const existing=(await STK.ref.child('shots/'+stkMe()+'/'+key).once('value')).val();if(existing)return;{const rec={x:r.x,y:r.y,result:r.result},sref=STK.ref.child('shots/'+stkMe()+'/'+key);if(r.sk){rec.sk=r.sk;(STK.skLocal=STK.skLocal||[]).push(r.sk)}try{await sref.set(rec)}catch(er){if(!r.sk)throw er;delete rec.sk;await sref.set(rec)}}const fresh=(await STK.ref.child('shots/'+stkMe()).once('value')).val()||{};const total=Object.values(fresh).filter(x=>x.result==='hit').length;if(total>=STK_CELLS){await STK.ref.update({status:'end',winner:stkMe(),lastResult:r.result});STK.pending=false;STK.msg='Trafiony ostatni statek!';stkRender();return}const target=STK.players.find(p=>p.id!==stkMe());await STK.ref.update({turn:r.result==='hit'?stkMe():target.id,lastResult:r.result,lastBy:stkMe()});STK.pending=false;STK.msg=r.result==='hit'?(r.sk?'Zatopiony! Strzelasz ponownie.':'Trafiony! Strzelasz ponownie.'):'Pudło. Teraz strzela przeciwnik.';stkRender()}catch(e){STK.pending=false;STK.msg='Błąd zapisu wyniku: '+e.message;stkRender()}}
 
 
+
+
+/* ================= STATKI: GRA Z BOTEM (OFFLINE) ================= */
+function stkCount(sh){return Object.values(sh||{}).filter(x=>x&&x.result==='hit').length}
+function stkGenFleet(){
+ for(let r=0;r<300;r++){
+  const placed=[],used=new Set();let ok=true;
+  for(const len of STK_FLEET){
+   let found=false;
+   for(let t=0;t<500&&!found;t++){
+    const x=Math.floor(Math.random()*10),y=Math.floor(Math.random()*10),o=Math.random()<.5?'H':'V';
+    if((o==='H'&&x+len>10)||(o==='V'&&y+len>10))continue;
+    const cells=Array.from({length:len},(_,i)=>({x:x+(o==='H'?i:0),y:y+(o==='V'?i:0)}));
+    if(cells.some(c=>{for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)if(used.has((c.x+dx)+'_'+(c.y+dy)))return true;return false}))continue;
+    cells.forEach(c=>used.add(c.x+'_'+c.y));placed.push({len,cells});found=true;
+   }
+   if(!found){ok=false;break}
+  }
+  if(ok)return placed;
+ }
+ return [];
+}
+function stkResolve(ships,prev,x,y){
+ const ship=ships.find(s=>s.cells.some(c=>c.x===x&&c.y===y)),rec={x,y,result:ship?'hit':'miss'};
+ if(ship&&ship.cells.every(c=>(c.x===x&&c.y===y)||(prev[c.x+'_'+c.y]&&prev[c.x+'_'+c.y].result==='hit')))rec.sk=ship.cells.map(c=>c.x+'_'+c.y).join(',');
+ return rec;
+}
+function stkBotStart(){
+ const lvl=STK.botLvl==null?1:STK.botLvl;
+ if(STK.bot&&STK.bot.t)clearTimeout(STK.bot.t);
+ try{stkDetach()}catch(e){}
+ stkProfile();
+ STK.bot={lvl,ships:[],t:null};
+ STK.uid='me';STK.host='me';STK.code='';STK.pane='';
+ STK.room={players:{me:{id:'me'},bot:{id:'bot'}}};
+ STK.players=[{id:'me',name:STK.nick,ready:false},{id:'bot',name:'Bot',ready:true}];
+ STK.status='lobby';STK.ships=[];STK.ready=false;STK.shots={me:{},bot:{}};STK.skLocal=[];
+ STK.turn='';STK.winner=null;STK.pending=false;STK.fx=null;STK.fxOwn=null;STK.aim=null;STK.msg='';
+ stkRender();
+}
+function stkBotLeave(silent){
+ if(STK.bot&&STK.bot.t)clearTimeout(STK.bot.t);
+ Object.assign(STK,{bot:null,uid:'',host:'',room:null,players:[],status:'start',msg:'',ships:[],ready:false,shots:{},turn:'',winner:null,pending:false,skLocal:[],fx:null,fxOwn:null,aim:null,pane:''});
+ if(!silent)stkRender();
+}
+function stkBotBegin(){
+ const B=STK.bot;if(!B||STK.ships.length!==STK_N)return;
+ B.ships=stkGenFleet();
+ STK.status='play';STK.turn=Math.random()<.5?'me':'bot';STK.shots={me:{},bot:{}};STK.skLocal=[];STK.pending=false;
+ STK.msg=STK.turn==='me'?'Losowanie: zaczynasz Ty!':'Losowanie: zaczyna bot.';
+ stkRender();
+ if(STK.turn==='bot')B.t=setTimeout(stkBotMove,1000);
+}
+function stkBotShoot(x,y){
+ const B=STK.bot;if(!B||STK.status!=='play'||STK.turn!=='me'||STK.pending)return;
+ const k=x+'_'+y;if(STK.shots.me[k])return;
+ STK.pending=true;STK.aim=k;STK.flyEnd=Date.now()+720;STK.msg='';stkRender();stkFly(k);
+ B.t=setTimeout(()=>{
+  if(STK.bot!==B)return;
+  const rec=stkResolve(B.ships,STK.shots.me,x,y);
+  STK.shots.me[k]=rec;if(rec.sk)STK.skLocal.push(rec.sk);
+  STK.fx={k,result:rec.result,until:Date.now()+900};STK.pending=false;
+  if(stkCount(STK.shots.me)>=STK_CELLS){STK.status='end';STK.winner='me';STK.msg='';stkRender();return}
+  STK.turn=rec.result==='hit'?'me':'bot';
+  STK.msg=rec.result==='hit'?(rec.sk?'Zatopiony! Strzelasz ponownie.':'Trafiony! Strzelasz ponownie.'):'Pudło. Teraz strzela bot.';
+  stkRender();
+  if(STK.turn==='bot')B.t=setTimeout(stkBotMove,1000);
+ },720);
+}
+function stkBotPick(){
+ const lvl=STK.bot.lvl,mine=STK.shots.bot,ships=STK.ships,K=(x,y)=>x+'_'+y;
+ const ok=(x,y)=>x>=0&&x<10&&y>=0&&y<10;
+ const sunk=ships.filter(s=>s.cells.every(c=>mine[K(c.x,c.y)]));
+ const sunkCells=new Set(),blocked=new Set();
+ sunk.forEach(s=>s.cells.forEach(c=>{sunkCells.add(K(c.x,c.y));for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)if(ok(c.x+dx,c.y+dy))blocked.add(K(c.x+dx,c.y+dy))}));
+ const free=[];for(let y=0;y<10;y++)for(let x=0;x<10;x++){const k=K(x,y);if(!mine[k]&&!blocked.has(k))free.push({x,y})}
+ const any=a=>a[Math.floor(Math.random()*a.length)];
+ if(!free.length){const all=[];for(let y=0;y<10;y++)for(let x=0;x<10;x++)if(!mine[K(x,y)])all.push({x,y});return any(all)}
+ if(lvl===0)return any(free);
+ const hits=[];Object.values(mine).forEach(r=>{if(r.result==='hit'&&!sunkCells.has(K(r.x,r.y)))hits.push({x:r.x,y:r.y})});
+ if(lvl===1){
+  if(hits.length){
+   let cand=[];
+   const sameRow=hits.length>1&&hits.every(h=>h.y===hits[0].y),sameCol=hits.length>1&&hits.every(h=>h.x===hits[0].x);
+   hits.forEach(h=>{
+    const dirs=sameRow?[[1,0],[-1,0]]:sameCol?[[0,1],[0,-1]]:[[1,0],[-1,0],[0,1],[0,-1]];
+    dirs.forEach(([dx,dy])=>{const x=h.x+dx,y=h.y+dy;if(ok(x,y)&&!mine[K(x,y)]&&!blocked.has(K(x,y)))cand.push({x,y})});
+   });
+   if(cand.length)return any(cand);
+  }
+  const par=free.filter(c=>(c.x+c.y)%2===0);return any(par.length?par:free);
+ }
+ /* trudny: gęstość prawdopodobieństwa */
+ const lens=ships.filter(s=>!sunk.includes(s)).map(s=>s.len),score={};
+ const hitSet=new Set(hits.map(h=>K(h.x,h.y)));
+ lens.forEach(len=>['H','V'].forEach(o=>{
+  for(let y=0;y<10;y++)for(let x=0;x<10;x++){
+   const cells=[];let valid=true,cov=0;
+   for(let i=0;i<len;i++){
+    const cx=x+(o==='H'?i:0),cy=y+(o==='V'?i:0),k=K(cx,cy);
+    if(!ok(cx,cy)||blocked.has(k)||(mine[k]&&mine[k].result==='miss')){valid=false;break}
+    if(hitSet.has(k)){if(len===1){valid=false;break}cov++}
+    cells.push(k);
+   }
+   if(!valid)continue;
+   const w=cov?Math.pow(25,cov):1;
+   cells.forEach(k=>{if(!mine[k])score[k]=(score[k]||0)+w});
+  }
+ }));
+ let best=-1,pool=[];
+ free.forEach(c=>{const v=score[K(c.x,c.y)]||0;if(v>best){best=v;pool=[c]}else if(v===best)pool.push(c)});
+ return any(pool);
+}
+function stkBotMove(){
+ const B=STK.bot;if(!B||STK.status!=='play'||STK.turn!=='bot')return;
+ const p=stkBotPick();
+ stkFly(p.x+'_'+p.y,'in');
+ B.t=setTimeout(()=>{if(STK.bot===B&&STK.status==='play'&&STK.turn==='bot')stkBotApply(B,p)},720);
+}
+function stkBotApply(B,p){
+ const k=p.x+'_'+p.y,rec=stkResolve(STK.ships,STK.shots.bot,p.x,p.y);
+ STK.shots.bot[k]=rec;
+ STK.fxOwn={k,result:rec.result,until:Date.now()+900};
+ if(stkCount(STK.shots.bot)>=STK_CELLS){STK.status='end';STK.winner='bot';STK.msg='';stkRender();return}
+ STK.turn=rec.result==='hit'?'bot':'me';
+ const cell=String.fromCharCode(65+p.x)+(p.y+1);
+ STK.msg=rec.result==='hit'?(rec.sk?`Bot zatopił Twój statek (${cell}) i strzela ponownie.`:`Bot trafił w ${cell} i strzela ponownie.`):`Bot pudłuje (${cell}). Twoja kolej!`;
+ stkRender();
+ if(STK.turn==='bot')B.t=setTimeout(stkBotMove,1000);
+}
+function stkBotRender(el){
+ const lv=['Łatwy','Normalny','Trudny'][STK.bot.lvl];let h='';
+ h+=`<div class="stkbox"><div class="stkrow"><b>🤖 Gra z botem · ${lv}</b><span class="stkmuted">offline</span><button class="stkbtn" onclick="stkBotLeave()">Wyjdź</button></div></div>`;
+ const boards=`<div class="stkboards"><div class="stkboardwrap"><h3>Twoja flota</h3>${stkGridHTML('own')}</div><div class="stkboardwrap"><h3>Plansza bota</h3>${stkGridHTML('enemy')}</div></div><div class="stklegend"><span><i class="stkdot" style="background:#607d9b"></i>Twój statek</span><span><i class="stkdot" style="background:#e45d57"></i>Trafienie</span><span><i class="stkdot" style="background:#eaf3fa"></i>Pudło</span></div>`;
+ if(STK.status==='lobby'){
+  h+=stkPlaceBox(`<button class="stkbtn" onclick="stkBotBegin()" ${STK.ships.length===STK_N?'':'disabled'}>Rozpocznij bitwę</button>`);
+ }else if(STK.status==='play'){
+  const my=STK.turn==='me';
+  h+=`<div class="stkbox"><h2>${my?'Twoja tura — wybierz pole do ostrzału':'Ruch bota…'}</h2><p class="stkmuted">${my?'Kliknij pole na planszy bota. Trafienie daje kolejny strzał.':'Bot celuje. Poczekaj na wynik.'}</p>${boards}</div>`;
+ }else{
+  const won=STK.winner==='me';
+  h+=`<div class="stkbox"><h2>${won?'🏆 Zwycięstwo!':'Porażka'}</h2><p>${won?'Zatopiłeś całą flotę bota!':'Bot zatopił całą Twoją flotę.'}</p><div class="stkrow"><button class="stkbtn" onclick="stkBotStart()">Zagraj ponownie</button><button class="stkbtn" onclick="stkBotLeave()">Wyjdź</button></div>${boards}</div>`;
+ }
+ stkPaint(el,h);
+}
+
+/* ================= STATKI: PORT (MENU) I PRZECIĄGANIE OKRĘTÓW ================= */
+const STK_PALBY={1:3,2:1,3:0,4:4};
+function stkCanEdit(){return STK.status==='lobby'&&!STK.ready}
+function stkRemaining(){const r={};STK_FLEET.forEach(l=>{r[l]=(r[l]||0)+1});STK.ships.forEach(s=>{if(r[s.len]>0)r[s.len]--});return r}
+function stkSelLen(){const r=stkRemaining();if(STK.sel&&r[STK.sel]>0)return STK.sel;let b=0;for(const l in r)if(r[l]>0&&+l>b)b=+l;return b}
+function stkOri(s){const c=s.cells;return c.length>1&&c[0].x===c[1].x?'V':'H'}
+function stkSelect(l){STK.sel=l;stkRender()}
+function stkTrayHTML(){
+ const r=stkRemaining(),sel=stkSelLen(),lens=[...new Set(STK_FLEET)].sort((a,b)=>b-a);
+ const items=lens.map(l=>{const n=r[l],on=n>0;
+  return `<div class="stktitem${on?'':' done'}${on&&sel===l?' sel':''}" ${on?`tabindex="0" onpointerdown="stkTrayDown(event,${l})" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();stkSelect(${l})}"`:''} role="button" aria-label="Statek ${l}-polowy, zostało ${n}"><div class="stktship stksh" style="--n:${l};--d:-${(l*.7).toFixed(1)}s">${stkShipSVG(l,'H',STK_PALBY[l])}</div><span class="stktcnt">${on?'×'+n:'✓'}</span></div>`}).join('');
+ return `<div class="stktray" id="stktray"><h4>⚓ Port</h4><p class="stkmuted">${stkSelLen()?'Przeciągnij statek na planszę':'Wszystkie statki są na planszy'}</p><div class="stktitems">${items}</div></div>`;
+}
+function stkPlaceBox(btn){
+ const n=STK.ships.length;
+ return `<div class="stkbox"><h3>Ustaw swoją flotę</h3><p>${stkSelLen()?'Przeciągnij statki z portu na planszę (albo wybierz statek i kliknij pole). Kliknij ustawiony statek, aby go obrócić.':'Cała flota stoi na planszy — zatwierdź ją albo przestaw statki przeciągając je.'}</p><div class="stkplace"><div class="stkboardwrap">${stkGridHTML('place')}</div>${stkTrayHTML()}</div><div class="stkrow"><button class="stkbtn" onclick="stkRotate()">Obróć: ${STK.orientation==='H'?'poziomo':'pionowo'}</button><button class="stkbtn" onclick="stkUndo()" ${n?'':'disabled'}>Cofnij statek</button><button class="stkbtn" onclick="stkRandom()">Losuj flotę</button><span class="stkmuted">Postawione: ${n}/${STK_N}</span></div><div class="stkrow">${btn}</div></div>`;
+}
+function stkCellClick(x,y){
+ if(Date.now()-(STK.noClick||0)<450)return;
+ if(STK.ships.some(s=>s.cells.some(c=>c.x===x&&c.y===y)))return; /* klik w statek (obrót) obsługuje wskaźnik */
+ stkPlace(x,y);
+}
+function stkGeom(){
+ const b=document.querySelector('.stkboard[data-kind="place"]');if(!b)return null;
+ const r=b.getBoundingClientRect(),cs=getComputedStyle(b),pl=parseFloat(cs.paddingLeft)||0,pt=parseFloat(cs.paddingTop)||0,pr=parseFloat(cs.paddingRight)||0;
+ return {left:r.left+pl,top:r.top+pt,c:(r.width-pl-pr)/10};
+}
+function stkTrayDown(e,len){
+ if(!stkCanEdit()||STK.drag||(e.button||0)>0)return;
+ stkDragArm(e,{len,ship:null});
+}
+function stkBoardDown(e,x,y){
+ if(!stkCanEdit()||STK.drag||(e.button||0)>0)return;
+ const i=STK.ships.findIndex(s=>s.cells.some(c=>c.x===x&&c.y===y));if(i<0)return;
+ stkDragArm(e,{len:STK.ships[i].len,ship:STK.ships[i],idx:i});
+}
+function stkDragArm(e,o){
+ stkDragDetach();
+ STK.drag={o,id:e.pointerId,x0:e.clientX,y0:e.clientY,px:e.clientX,py:e.clientY,touch:e.pointerType!=='mouse',started:false,el:null};
+ window.addEventListener('pointermove',stkDragMove);
+ window.addEventListener('pointerup',stkDragUp);
+ window.addEventListener('pointercancel',stkDragUp);
+ window.addEventListener('keydown',stkDragKey);
+ window.addEventListener('contextmenu',stkDragCtx);
+ window.addEventListener('pointerdown',stkDragExtra);
+}
+function stkDragDetach(){
+ window.removeEventListener('pointermove',stkDragMove);
+ window.removeEventListener('pointerup',stkDragUp);
+ window.removeEventListener('pointercancel',stkDragUp);
+ window.removeEventListener('keydown',stkDragKey);
+ window.removeEventListener('contextmenu',stkDragCtx);
+ window.removeEventListener('pointerdown',stkDragExtra);
+}
+function stkDragBegin(D){
+ const g=stkGeom();if(!g)return false;
+ const o=D.o,sh=o.ship;
+ D.len=o.len;D.ori=sh?stkOri(sh):STK.orientation;D.c=g.c;
+ const w=D.ori==='H'?D.len*g.c:g.c,h=D.ori==='H'?g.c:D.len*g.c;
+ if(sh){
+  const c0=sh.cells[0];
+  D.ox=Math.min(w,Math.max(0,D.x0-(g.left+c0.x*g.c)));D.oy=Math.min(h,Math.max(0,D.y0-(g.top+c0.y*g.c)));
+  const ov=document.querySelector('.stkboard[data-kind="place"] .stksh[data-i="'+o.idx+'"]');if(ov)ov.style.visibility='hidden';
+ }else{D.ox=w/2;D.oy=h/2}
+ D.lift=D.touch?Math.round(g.c*1.4):0; /* na dotyku statek unosi się nad palcem */
+ stkGhost(D);D.started=true;document.body.classList.add('stkdragging');
+ return true;
+}
+function stkGhost(D){
+ if(D.el)D.el.remove();
+ const c=D.c,w=D.ori==='H'?D.len*c:c,h=D.ori==='H'?c:D.len*c,el=document.createElement('div');
+ el.className='stkghost';el.style.width=w+'px';el.style.height=h+'px';
+ el.innerHTML=stkShipSVG(D.len,D.ori,STK_PALBY[D.len]);
+ document.body.appendChild(el);D.el=el;D.w=w;D.h=h;
+}
+function stkDragPos(D){
+ const g=stkGeom();if(!g||!D.el)return;
+ let gx=D.px-D.ox,gy=D.py-D.oy-D.lift;
+ const mx=gx+D.w/2,my=gy+D.h/2,B=g.c*10,m=g.c*.3;
+ const over=mx>=g.left-m&&mx<=g.left+B+m&&my>=g.top-m&&my<=g.top+B+m;
+ stkPrevClear();D.valid=false;D.cx=D.cy=null;
+ if(over){
+  const cx=Math.round((gx-g.left)/g.c),cy=Math.round((gy-g.top)/g.c),ok=stkCanPlace(cx,cy,D.len,D.ori,D.o.ship);
+  D.cx=cx;D.cy=cy;D.valid=ok;
+  for(let i=0;i<D.len;i++){const x=cx+(D.ori==='H'?i:0),y=cy+(D.ori==='V'?i:0);if(x<0||y<0||x>9||y>9)continue;const el=document.querySelector('.stkboard[data-kind="place"] [data-k="'+x+'_'+y+'"]');if(el)el.classList.add(ok?'pvok':'pvbad')}
+  if(ok){gx=g.left+cx*g.c;gy=g.top+cy*g.c} /* „przyciąganie” do siatki */
+ }
+ D.el.style.transform='translate('+gx+'px,'+gy+'px)';
+ D.el.classList.toggle('bad',over&&!D.valid);
+ const t=document.getElementById('stktray');
+ if(t){const r=t.getBoundingClientRect();D.tray=!!D.o.ship&&!over&&D.px>=r.left&&D.px<=r.right&&D.py>=r.top&&D.py<=r.bottom;t.classList.toggle('drop',D.tray)}
+}
+function stkDragMove(e){
+ const D=STK.drag;if(!D||e.pointerId!==D.id)return;
+ if(!stkCanEdit()){stkDragFinish(D,false);return}
+ D.px=e.clientX;D.py=e.clientY;
+ if(!D.started){
+  if(Math.hypot(D.px-D.x0,D.py-D.y0)<6)return;
+  if(!stkDragBegin(D)){stkDragFinish(D,false);return}
+ }
+ stkDragPos(D);
+}
+function stkDragRot(){
+ const D=STK.drag;if(!D||!D.started||D.len<2)return;
+ D.ori=D.ori==='H'?'V':'H';if(!D.o.ship)STK.orientation=D.ori;
+ D.ox=(D.ori==='H'?D.len*D.c:D.c)/2;D.oy=(D.ori==='H'?D.c:D.len*D.c)/2;
+ stkGhost(D);stkDragPos(D);
+}
+function stkDragKey(e){
+ const D=STK.drag;if(!D)return;
+ if(e.key==='r'||e.key==='R'||e.key===' '){e.preventDefault();stkDragRot()}
+ else if(e.key==='Escape'){e.preventDefault();stkDragFinish(D,false)}
+}
+function stkDragCtx(e){if(STK.drag&&STK.drag.started){e.preventDefault();stkDragRot()}}
+function stkDragExtra(e){const D=STK.drag;if(D&&D.started&&e.pointerId!==D.id){e.preventDefault();stkDragRot()}} /* drugi palec = obrót */
+function stkDragUp(e){
+ const D=STK.drag;if(!D||e.pointerId!==D.id)return;
+ stkDragFinish(D,e.type==='pointerup');
+}
+function stkRotateShip(s){
+ if(s.len<2)return;
+ const h=s.cells[0],o=stkOri(s)==='H'?'V':'H';
+ for(let k=0;k<s.len;k++){
+  const x=h.x-(o==='H'?k:0),y=h.y-(o==='V'?k:0);
+  if(stkCanPlace(x,y,s.len,o,s)){s.cells=Array.from({length:s.len},(_,i)=>({x:x+(o==='H'?i:0),y:y+(o==='V'?i:0)}));STK.msg='';return}
+ }
+ STK.msg='Nie można obrócić statku – brak miejsca.';
+}
+function stkDragFinish(D,commit){
+ const o=D.o,ok=stkCanEdit();
+ stkDragDetach();
+ if(D.el)D.el.remove();
+ document.body.classList.remove('stkdragging');
+ stkPrevClear();
+ STK.drag=null;STK.dirty=false;STK.noClick=Date.now();
+ if(commit&&ok){
+  if(!D.started){ /* samo kliknięcie: z portu = wybór statku, ze statku na planszy = obrót */
+   if(o.ship)stkRotateShip(o.ship);else STK.sel=o.len;
+  }else if(D.valid&&D.cx!=null){
+   const cells=Array.from({length:D.len},(_,i)=>({x:D.cx+(D.ori==='H'?i:0),y:D.cy+(D.ori==='V'?i:0)}));
+   if(o.ship)o.ship.cells=cells;else{STK.ships.push({len:D.len,cells});STK.sel=D.len}
+   STK.msg='';
+  }else if(D.tray&&o.ship){ /* upuszczony na port = zdjęty z planszy */
+   const i=STK.ships.indexOf(o.ship);if(i>=0)STK.ships.splice(i,1);
+   STK.sel=o.len;STK.msg='';
+  }
+ }
+ stkRender();
+}
 
 /* ===== integracja z platformą: wejście do gry / wyjście z gry ===== */
 window.__show=function(){
-  stkProfile();if(!STK.ref){STK.status='start';STK.msg=''}stkRender();
+  stkProfile();if(!STK.ref&&!STK.bot){STK.status='start';STK.msg=''}stkRender();
 };
-window.__leave=function(){
-  
-};
+window.__leave=function(){if(STK.bot)stkBotLeave(true)};
 window.__joinFromHub=async function(c){STK.joinCode=c;await stkJoin()};
 window.__show();
 </script>
