@@ -43,7 +43,7 @@ window.addEventListener('message',e=>{
     else if(d.action==='join'){ISL.joinCode=d.code||'';islaJoin()}
     else if(d.action==='startRoom')islaHostStart();
       else if(d.action==='boardSetup'&&ISL.host===onlinePlayerId&&ISL.round===0){islaPost({cmd:'boardSetup'});}
-      else if(d.action==='boardDone'&&ISL.host===onlinePlayerId){islaPost({cmd:'lock',label:islaLockMsg(),host:true,canDraw:false});islaLobbyRefresh();}
+      else if(d.action==='boardDone'&&ISL.host===onlinePlayerId){islaPost({cmd:'boardSetupDone'});islaPost({cmd:'lock',label:islaLockMsg(),host:true,canDraw:false});islaLobbyRefresh();}
   }
   else if(d.type==='boardSeed'&&ISL.host===onlinePlayerId&&ISL.round===0){ISL.boardSeed=String(d.seed||'').slice(0,8);}
   else if(d.type==='state'){ISL.state=d.s;islaSendScore();lbIsla(d.s)}
