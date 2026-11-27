@@ -154,7 +154,7 @@ function czScreen(){
   }
   return '';
 }
-function czAccSync(){try{const a=String((typeof ACC!=='undefined'&&ACC.nick)||'').trim().slice(0,14),c=(typeof ACC!=='undefined'&&/^#[0-9a-f]{6}$/i.test(ACC.col||''))?ACC.col:'';if(a&&!CZ.nickT)CZ.nick=a;if(c&&!CZ.colT)CZ.col=c}catch(e){}}
+function czAccSync(){try{const a=String((typeof ACC!=='undefined'&&ACC.nick)||'').trim().slice(0,14),c=(typeof ACC!=='undefined'&&/^#[0-9a-f]{6}$/i.test(ACC.col||''))?ACC.col:'';if(a)CZ.nick=a;if(c)CZ.col=c}catch(e){}}
 function czPane(p){CZ.pane=CZ.pane===p?'':p;czRefresh();if(CZ.pane==='join')setTimeout(()=>{const e=document.getElementById('czjoin');if(e)e.focus()},60)}
 /* jedyny przycisk „Menu główne” w lobby (jak w Monopoly) – klik w pasek rodzica, który jest wtedy ukryty */
 function czHub(){
@@ -163,13 +163,11 @@ function czHub(){
 }
 function czStartHTML(m){czAccSync();
   const net=czNet(),cat=CZ.cmode==='cat',pn=CZ.pane||'';
-  const nick=`<label for="cznick">Twój nick</label><input id="cznick" maxlength="14" autocomplete="off" value="${lgEsc(CZ.nick||'Gracz')}" oninput="CZ.nick=this.value;CZ.nickT=1">
-    <div class="ob-opt"><span>Kolor pionka</span><input id="czcol" type="color" value="${lgEsc(CZ.col||'#2a9df4')}" oninput="CZ.col=this.value;CZ.colT=1"></div>`;
-  const create=pn==='create'?`<div class="ob-pane">${nick}
+  const create=pn==='create'?`<div class="ob-pane">
     <div class="ob-opt"><span>Tryb gry</span><div class="ob-chips">${obChip('Wszystkie hasła',!cat,"CZ.cmode='all';czRefresh(true)")}${obChip('Wybierz kategorię',cat,"CZ.cmode='cat';czRefresh(true)")}</div></div>
     <p class="ob-note">${cat?'Na początku partii host wpisze kategorię, w której wszyscy wymyślają hasła.':'Hasła mogą być dowolne.'}</p>
     ${obBtn('Stwórz pokój','🎲','czCreate()','gold',!net)}</div>`:'';
-  const join=pn==='join'?`<div class="ob-pane">${nick}<label for="czjoin">Kod pokoju od znajomego</label><input id="czjoin" class="cd" maxlength="5" placeholder="A8K2Q" autocomplete="off" value="${lgEsc(CZ.joinCode||'')}" oninput="CZ.joinCode=this.value" onkeydown="if(event.key==='Enter')czJoin()">
+  const join=pn==='join'?`<div class="ob-pane"><label for="czjoin">Kod pokoju od znajomego</label><input id="czjoin" class="cd" maxlength="5" placeholder="A8K2Q" autocomplete="off" value="${lgEsc(CZ.joinCode||'')}" oninput="CZ.joinCode=this.value" onkeydown="if(event.key==='Enter')czJoin()">
     ${obBtn('Dołącz','🚪','czJoin()','gold',!net)}</div>`:'';
   return obShell({key:'cz-start',host:'#cz',theme:'cz',words:['CZÓŁKO'],tiles:['🧠','❓','💬','🎭'],sub:'Zgadnij swoje hasło, zadając pytania.',msg:m,
   back:{label:'← Menu główne',onclick:'czHub()'},
@@ -180,6 +178,7 @@ function czStartHTML(m){czAccSync();
 }
 async function czCreate(){
   try{
+    czAccSync();
     const uid=await onlineEnsureAuth(),code=onlineCode(),ref=fbDB.ref('czRooms/'+code);
     await ref.set({host:uid,status:'lobby',cmode:CZ.cmode==='cat'?'cat':'all',board:ISL.board||'isla-petit',createdAt:firebase.database.ServerValue.TIMESTAMP,players:{[uid]:{id:uid,name:czClean(CZ.nick)||'Gracz',color:CZ.col||'#2a9df4',order:0}}});
     czAttach(ref,code);
@@ -187,6 +186,7 @@ async function czCreate(){
 }
 async function czJoin(){
   try{
+    czAccSync();
     const uid=await onlineEnsureAuth(),code=String(CZ.joinCode||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,5);
     if(code.length!==5)throw new Error('Wpisz pięcioznakowy kod pokoju.');
     const ref=fbDB.ref('czRooms/'+code),room=(await ref.once('value')).val();
