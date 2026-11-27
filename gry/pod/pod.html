@@ -23,6 +23,11 @@
     </div>
     <div id="pdBots" class="pd-pane"><h3>Ilu przeciwników?</h3>
       <div class="pd-lvl"><label for="bdiff">Poziom botów:</label><select id="bdiff" class="pd-select"><option value="0">Łatwy</option><option value="1" selected>Normalny</option><option value="2">Trudny</option><option value="3">Ekstremalny</option></select></div>
+      <div class="pd-bcols"><span class="pd-bcols-t">Kolory botów:</span>
+        <label><input type="color" id="bcol0" value="#2a7de1" aria-label="Kolor bota Alfa"><small>Alfa</small></label>
+        <label><input type="color" id="bcol1" value="#2a9d4f" aria-label="Kolor bota Beta"><small>Beta</small></label>
+        <label><input type="color" id="bcol2" value="#f0a202" aria-label="Kolor bota Gamma"><small>Gamma</small></label>
+      </div>
       <div class="pd-nums">
         <button type="button" class="pd-num" onclick="startBots(1)"><span>🤖</span><b>1</b><small>bot</small></button>
         <button type="button" class="pd-num" onclick="startBots(2)"><span>🤖</span><b>2</b><small>boty</small></button>
@@ -179,10 +184,10 @@ window.addEventListener('message',e=>{
     // Jeżeli dane konta dotrą już po uruchomieniu botów, zaktualizuj też aktywną planszę.
     if(typeof BOT!=='undefined'&&BOT.length&&N>0){
       NAMES[0]=podAccountName||'Ty';
-      const botColors=DEFAULT_COLORS.filter(c=>c.toLowerCase()!==(podAccountColor||DEFAULT_COLORS[0]).toLowerCase());
-      setPlayerColors([podAccountColor||DEFAULT_COLORS[0],...botColors].slice(0,N));
+      setPlayerColors([podAccountColor||DEFAULT_COLORS[0],...botColorsFor(N-1)]);
       render();
     }
+    syncBotColorInputs();
     return;
   }
   if(d.cmd==='start'){
@@ -200,12 +205,25 @@ window.addEventListener('load',()=>{try{parent.postMessage({podboj:1,type:'ready
 
 /* ===== TRYB OFFLINE Z BOTAMI ===== */
 let BOT=[],botTok=0,BL=1,botLog=[];
+/* Wybór kolorów botów: nieruszone pola dostają kolory domyślne (różne od koloru gracza) */
+let botPick=[null,null,null];
+function botColorDefaults(){const hc=(podAccountColor||DEFAULT_COLORS[0]).toLowerCase();return DEFAULT_COLORS.filter(c=>c!==hc)}
+function syncBotColorInputs(){const d=botColorDefaults();[0,1,2].forEach(k=>{const el=$('bcol'+k);if(el&&!el.dataset.touched)el.value=d[k]})}
+function botColorsFor(nb){
+  const hc=(podAccountColor||DEFAULT_COLORS[0]).toLowerCase(),defs=botColorDefaults(),used=[hc],out=[];
+  for(let k=0;k<nb;k++){
+    let c=String(botPick[k]||defs[k]).toLowerCase();
+    if(used.includes(c))c=defs.concat(DEFAULT_COLORS).find(x=>!used.includes(x))||c; // duplikat → wolny kolor
+    used.push(c);out.push(c);
+  }
+  return out;
+}
 function startBots(nb){
   BL=+$('bdiff').value;BOT=[false];
   NAMES=[podAccountName||'Ty','Bot Alfa','Bot Beta','Bot Gamma'].slice(0,nb+1);
+  botPick=[0,1,2].map(k=>{const el=$('bcol'+k);return el&&el.dataset.touched?el.value:null});
   const humanColor=podAccountColor||DEFAULT_COLORS[0];
-  const botColors=DEFAULT_COLORS.filter(c=>c.toLowerCase()!==humanColor.toLowerCase());
-  setPlayerColors([humanColor,...botColors].slice(0,nb+1));
+  setPlayerColors([humanColor,...botColorsFor(nb)]);
   for(let k=0;k<nb;k++)BOT.push(true);
   $('tmode').checked=false;
   start(nb+1);
@@ -917,6 +935,12 @@ function finish(){
     panes.forEach(function(o){var el=document.getElementById(o);el.style.display=(o===id&&el.style.display!=='block')?'block':'none'});
   }});
 })();
+
+document.addEventListener('DOMContentLoaded',()=>{
+  [0,1,2].forEach(k=>{const el=$('bcol'+k);if(el)el.addEventListener('input',()=>{el.dataset.touched='1'})});
+  const b=$('pdBotsBtn');if(b)b.addEventListener('click',syncBotColorInputs);
+  syncBotColorInputs();
+});
 </script>
 </body>
 </html>
