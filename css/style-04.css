@@ -137,5 +137,10 @@
 /* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
 html,body,*{scrollbar-width:none!important;-ms-overflow-style:none!important}
 html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:none!important;width:0!important;height:0!important}
+/* Wyjątek dla logów zmian — tutaj pasek przewijania ma być widoczny */
+#msgpop #logsroot, #msgpop #logsroot .lglist{scrollbar-width:thin!important;scrollbar-color:#f2c230 #10271d!important;-ms-overflow-style:auto!important}
+#msgpop #logsroot::-webkit-scrollbar,#msgpop #logsroot .lglist::-webkit-scrollbar{display:block!important;width:10px!important;height:10px!important}
+#msgpop #logsroot::-webkit-scrollbar-track,#msgpop #logsroot .lglist::-webkit-scrollbar-track{background:#10271d!important;border-radius:10px}
+#msgpop #logsroot::-webkit-scrollbar-thumb,#msgpop #logsroot .lglist::-webkit-scrollbar-thumb{background:#f2c230!important;border:2px solid #10271d!important;border-radius:10px}
 
 .gmenu.gmenu-off{display:none!important}

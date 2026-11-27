@@ -9,7 +9,12 @@
 .ideatxt{margin:0 0 12px;font-size:1.1em}#ideabox{margin:-4px 0 12px}.ideabtn{padding:4px 14px;font-size:.85em}.ideares{display:inline-flex;align-items:center;gap:8px}
 .fs-s{font-size:.8em}.fs-b{font-size:1.3em;line-height:1.15}.fs-h{font-size:1.7em;line-height:1.1}
 .rtbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0}.rtbar .lgbtn{padding:4px 14px;min-width:42px}.rtbar select{font:inherit;padding:5px 8px;border-radius:6px;border:2px solid #52715d;background:#07150f;color:#fff}
-.logbox{width:min(100%,760px)!important;background:linear-gradient(180deg,#183c2b,#10271d 220px)!important;margin-top:0!important;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto;overscroll-behavior:contain}
+/* Logi zmian: stały nagłówek i przewijana wyłącznie lista wpisów */
+#msgpop{align-items:center!important;padding:12px!important}
+#msgpop #logsroot.logbox{display:flex!important;flex-direction:column!important;width:min(100%,760px)!important;height:calc(100dvh - 24px)!important;max-height:calc(100dvh - 24px)!important;min-height:0!important;margin:0!important;overflow:hidden!important;overscroll-behavior:contain;background:linear-gradient(180deg,#183c2b,#10271d 220px)!important}
+#msgpop #logsroot.logbox>.lghead{flex:0 0 auto;position:relative;top:auto;margin:-16px -18px 8px;padding:14px 18px 10px;background:#183c2b;border-bottom:1px solid #ffffff33;border-radius:8px 8px 0 0}
+#msgpop #logsroot.logbox>.lglist{display:block;flex:1 1 auto;min-height:0!important;max-height:none!important;overflow-x:hidden!important;overflow-y:scroll!important;overscroll-behavior:contain;padding:2px 8px 12px 2px;scrollbar-gutter:stable; -webkit-overflow-scrolling:touch}
+#msgpop #logsroot.logbox>.lglist>*{max-width:100%}
 .logbox .lghead{position:sticky;top:0;z-index:5;margin:-16px -18px 8px;padding:14px 18px 10px;background:#183c2b;border-bottom:1px solid #ffffff33;border-radius:8px 8px 0 0}
 .logbox .lgsave{position:sticky;bottom:0;z-index:4;margin:10px -12px -12px;padding:10px 12px;background:#14301f;border-top:1px solid #ffffff33;border-radius:0 0 8px 8px}
 .lghead{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px}.lghead h2{margin:0!important}
