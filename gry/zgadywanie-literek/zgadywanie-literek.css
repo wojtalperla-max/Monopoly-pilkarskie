@@ -270,3 +270,8 @@ body:has(.ob[data-t="lg"]) #obBg{background:radial-gradient(circle at 50% 18%,#b
 .ob .ob-mode{flex:1 1 0;min-width:0;grid-template-columns:1fr!important;justify-items:center;row-gap:8px;text-align:center!important;padding:18px 10px!important}
 .ob-mode .ob-mode-ic{grid-row:auto!important;font-size:40px}
 .ob-mode b{font-size:clamp(17px,4.4vw,22px)}
+
+
+/* Ekran tworzenia pokoju: wyśrodkowany wybór rodzaju haseł */
+#lg .ob-word-types{justify-content:center!important;margin-left:auto;margin-right:auto}
+#lg .ob-word-types .ob-chips{width:100%;justify-content:center!important}

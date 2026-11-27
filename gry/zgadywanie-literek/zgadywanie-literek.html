@@ -430,8 +430,8 @@ function lgHostStart(){
     lgAccSync();
     const online=typeof fbDB!=='undefined'&&fbDB&&typeof onlineEnsureAuth==='function',cat=LG.cmode==='cat',pn=LG.pane;
     const d=k=>`style="display:${pn===k?'block':'none'}"`;
-    const create=`<div class="ob-subdrop" id="lgpCreate" ${d('create')}><label>Jaką grę tworzysz?</label>
-        <div class="ob-opt" style="margin-top:12px"><span>Hasła</span><div class="ob-chips">${obChip('Dowolne',!cat,"lgSetCmode('all')").replace('class="ob-chip','id="lgcAll" class="ob-chip')}${obChip('Kategoria',cat,"lgSetCmode('cat')").replace('class="ob-chip','id="lgcCat" class="ob-chip')}</div></div>
+    const create=`<div class="ob-subdrop" id="lgpCreate" ${d('create')}><label>RODZAJ HASEŁ</label>
+        <div class="ob-opt ob-word-types" style="margin-top:12px"><div class="ob-chips">${obChip('Dowolne',!cat,"lgSetCmode('all')").replace('class="ob-chip','id="lgcAll" class="ob-chip')}${obChip('Kategoria',cat,"lgSetCmode('cat')").replace('class="ob-chip','id="lgcCat" class="ob-chip')}</div></div>
         <p class="ob-note" id="lgcNote" style="margin-top:0">${cat?'Host wybierze kategorię dla wszystkich graczy.':'Każdy może wpisać dowolne hasło.'}</p>
         <div class="ob-modes">${lgModeCards('lgCreate(%)')}</div></div>`;
     const join=`<div class="ob-subdrop" id="lgpJoin" ${d('join')}><label for="lgjoin">Kod pokoju od znajomego</label><input id="lgjoin" class="cd" maxlength="5" placeholder="KOD" autocomplete="off" value="${lgEsc(LG.joinCode||'')}" oninput="LG.joinCode=this.value" onkeydown="if(event.key==='Enter')lgJoin()">
