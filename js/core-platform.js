@@ -15,7 +15,7 @@ const LG_COLS=['#e63946','#2a9df4','#f2c230','#3a9b62','#b04fe0','#ff8c42'];
 const lgEsc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function lgDot(c){return `<i class="lgd" style="background:${/^#[0-9a-f]{6}$/i.test(c)?c:'#888'}"></i>`}
 /* ===== ISLA PETIT (osadzona gra w ramce + pokoje online) ===== */
-let ISL={ref:null,listener:null,code:'',host:null,room:null,players:[],round:0,drawSeq:0,localDrawPending:false,ready:false,pendingSeed:null,state:null,sendT:null,claimSent:{},msg:'',nick:'',col:'#2a9df4',joinCode:'',board:'isla-petit'};
+let ISL={ref:null,listener:null,code:'',host:null,room:null,players:[],round:0,drawSeq:0,localDrawPending:false,ready:false,pendingSeed:null,state:null,sendT:null,claimSent:{},msg:'',nick:'',col:'#2a9df4',joinCode:'',board:'isla-petit',boardSeed:null};
 const islaFrame=()=>document.getElementById('islaFrame');
 const islaNet=()=>typeof fbDB!=='undefined'&&!!fbDB&&typeof onlineEnsureAuth==='function';
 function islaPost(o){const f=islaFrame();if(f&&f.contentWindow){try{f.contentWindow.postMessage(Object.assign({islaCmd:1},o),'*')}catch(e){}}}
@@ -42,7 +42,10 @@ window.addEventListener('message',e=>{
     if(d.action==='create'){ISL.board=d.variant==='grande'?'isla-grande':'isla-petit';islaCreate()}
     else if(d.action==='join'){ISL.joinCode=d.code||'';islaJoin()}
     else if(d.action==='startRoom')islaHostStart();
+      else if(d.action==='boardSetup'&&ISL.host===onlinePlayerId&&ISL.round===0){islaPost({cmd:'boardSetup'});}
+      else if(d.action==='boardDone'&&ISL.host===onlinePlayerId){islaPost({cmd:'lock',label:islaLockMsg(),host:true,canDraw:false});islaLobbyRefresh();}
   }
+  else if(d.type==='boardSeed'&&ISL.host===onlinePlayerId&&ISL.round===0){ISL.boardSeed=String(d.seed||'').slice(0,8);}
   else if(d.type==='state'){ISL.state=d.s;islaSendScore();lbIsla(d.s)}
   else if(d.type==='draw'&&ISL.ref&&ISL.host===onlinePlayerId){
     ISL.localDrawPending=true;
@@ -107,7 +110,7 @@ async function islaJoin(){
     if(code.length!==5)throw new Error('Wpisz pięcioznakowy kod pokoju.');
     const ref=fbDB.ref('islaRooms/'+code),room=(await ref.once('value')).val();
     if(!room)throw new Error('Nie znaleziono pokoju o takim kodzie.');
-    ISL.board=room.board||'isla-petit';
+    ISL.board=room.board||'isla-petit';ISL.boardSeed=room.boardSeed||null;
     const players=Object.values(room.players||{});
     if(!(room.players&&room.players[uid])){
       if(players.length>=6)throw new Error('Pokój jest pełny (maksymalnie 6 osób).');
@@ -118,7 +121,7 @@ async function islaJoin(){
 }
 function islaDetach(){try{if(ISL.ref&&ISL.listener)ISL.ref.off('value',ISL.listener)}catch(e){}ISL.ref=null;ISL.listener=null}
 function islaAttach(ref,code){
-  islaDetach();ISL.ref=ref;ISL.code=code;ISL.round=0;ISL.msg='';ISL.pendingSeed=null;
+  islaDetach();ISL.ref=ref;ISL.code=code;ISL.round=0;ISL.msg='';ISL.pendingSeed=null;ISL.boardSeed=null;
   ISL.listener=ref.on('value',snap=>islaOnRoom(snap.val()),err=>{ISL.msg='Błąd połączenia: '+err.message;islaLobby()});
   islaPost({cmd:'lock',label:islaLockMsg()});
   islaRender();islaLobby();
@@ -141,13 +144,13 @@ function islaOnRoom(room){
 }
 function islaHostStart(){
   if(!ISL.ref||ISL.host!==onlinePlayerId||ISL.players.length<1)return;
-  const seed=Math.random().toString(36).slice(2,8).toUpperCase(),r=ISL.ref,rd=((ISL.room&&ISL.room.game&&Number(ISL.room.game.round))||0)+1;
+  const seed=ISL.boardSeed||Math.random().toString(36).slice(2,8).toUpperCase(),r=ISL.ref,rd=((ISL.room&&ISL.room.game&&Number(ISL.room.game.round))||0)+1;
   r.child('scores').remove().then(()=>r.child('cardClaims').remove()).then(()=>r.child('game').set({seed,round:rd,drawSeq:0})).then(()=>r.child('status').set('play')).catch(e=>{ISL.msg='Nie udało się rozpocząć: '+e.message;islaLobby()});
 }
 function islaLeave(silent){
   try{if(!silent&&ISL.ref&&onlinePlayerId){ISL.ref.child('players/'+onlinePlayerId).remove();ISL.ref.child('scores/'+onlinePlayerId).remove()}}catch(e){}
   islaDetach();ISL.room=null;ISL.players=[];ISL.round=0;ISL.drawSeq=0;ISL.localDrawPending=false;ISL.state=null;ISL.claimSent={};
-  islaPost({cmd:'unlock'});islaCloseLobby();islaRender();
+  ISL.boardSeed=null;islaPost({cmd:'unlock'});islaCloseLobby();islaRender();
 }
 function islaScores(){const sc={};const raw=(ISL.room&&ISL.room.scores)||{};Object.keys(raw).forEach(k=>{try{sc[k]=JSON.parse(raw[k])}catch(e){}});return sc}
 function islaRender(){
