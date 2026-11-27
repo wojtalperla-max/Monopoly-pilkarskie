@@ -625,7 +625,7 @@ async function frRemove(id){
   frRender();
 }
 /* ===== STATYSTYKI (zapisywane na koncie) ===== */
-const ST_GAMES={monopoly:'Monopoly piłkarskie',litery:'Zgadywanie literek',kod:'Łamanie kodu',czolko:'Czółko',isla:'Tukan',panstwa:'Państwa Miasta',podboj:'Podbój',kj:'Kim jestem?',ttt:'Kółko i krzyżyk',kulki:'Kulki',snl:'Węże i drabiny',dobble:'Dobble',grzyb:'Grzybobranie',wisielec:'Wisielec',gofish:'Go Fish',kropki:'Kropki i Kwadraty',uno:'UNO',bierze:'6 bierze!',chinczyk:'Chińczyk',holearena:'Hole Arena',postaw:'Postaw na milion',szept:'Szept',guessr:'GuessR',darksweep:'Dark Sweep',krzyzowka:'Krzyżówka',tabu:'Tabu',podboj:'Podbój',statki:'Statki'};
+const ST_GAMES={monopoly:'Monopoly piłkarskie',litery:'Zgadywanie literek',isla:'Tukan',czolko:'Czółko',panstwa:'Państwa Miasta',podboj:'Podbój',statki:'Statki',kod:'Łamanie kodu',imperia:'Imperia',kj:'Kim jestem?',ttt:'Kółko i krzyżyk',kulki:'Kulki',snl:'Węże i drabiny',dobble:'Dobble',grzyb:'Grzybobranie',wisielec:'Wisielec',gofish:'Go Fish',kropki:'Kropki i Kwadraty',uno:'UNO',bierze:'6 bierze!',chinczyk:'Chińczyk',holearena:'Hole Arena',postaw:'Postaw na milion',szept:'Szept',guessr:'GuessR',darksweep:'Dark Sweep',krzyzowka:'Krzyżówka',tabu:'Tabu'};
 let STS={done:new Set(),data:null,ref:null,listener:null,game:'all',sel:new Set(),msg:''};
 /* ===== GRA TESTOWA (admin): wyniki takiej gry nie wchodzą do statystyk ani do najlepszych wyników ===== */
 function tgBox(refExpr,isTest){
