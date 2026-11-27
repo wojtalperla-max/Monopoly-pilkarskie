@@ -105,11 +105,10 @@ const STK_FLEET=[4,3,3,2,2,2,1,1,1],STK_N=STK_FLEET.length,STK_CELLS=STK_FLEET.r
 let STK={ref:null,code:'',host:'',uid:'',listener:null,reqListener:null,resListener:null,room:null,players:[],status:'start',msg:'',joinCode:'',pane:'',nick:'Gracz',color:'#2a9df4',ships:[],orientation:'H',ready:false,privateRef:null,pending:false,processed:new Set(),requestsRef:null,responsesRef:null,shots:{},turn:'',winner:null};
 function stkMe(){return STK.uid||onlinePlayerId}
 function stkProfile(){const u=(typeof ACC!=='undefined'&&ACC.user)?ACC.user:null;
- /* nick i kolor z konta tylko dopóki gracz sam ich nie zmienił na ekranie startowym */
- if(!STK.nickT)STK.nick=String((typeof ACC!=='undefined'&&ACC.nick)||u?.displayName||(u?.email?u.email.split('@')[0]:'Gracz'));
- if(!STK.colT)STK.color=(typeof ACC!=='undefined'&&/^#[0-9a-f]{6}$/i.test(ACC.col||''))?ACC.col:'#2a9df4';
- STK.nick=String(STK.nick||'').replace(/[<>&]/g,'').replace(/\s+/g,' ').trim().slice(0,18)||'Gracz';
- if(!/^#[0-9a-f]{6}$/i.test(STK.color||''))STK.color='#2a9df4'}
+ /* nick i kolor zawsze pobierane automatycznie z konta gracza */
+ STK.nick=String((typeof ACC!=='undefined'&&ACC.nick)||u?.displayName||(u?.email?u.email.split('@')[0]:'Gracz'));
+ STK.color=(typeof ACC!=='undefined'&&/^#[0-9a-f]{6}$/i.test(ACC.col||''))?ACC.col:'#2a9df4';
+ STK.nick=STK.nick.replace(/[<>&]/g,'').replace(/\s+/g,' ').trim().slice(0,18)||'Gracz'}
 function stkDetach(){try{if(STK.ref&&STK.listener)STK.ref.off('value',STK.listener);if(STK.requestsRef&&STK.reqListener)STK.requestsRef.off('child_added',STK.reqListener);if(STK.responsesRef&&STK.resListener)STK.responsesRef.off('child_added',STK.resListener)}catch(e){}STK.ref=null;STK.listener=null;STK.reqListener=null;STK.resListener=null;STK.requestsRef=null;STK.responsesRef=null;STK.privateRef=null;STK.processed=new Set();STK.pending=false}
 async function stkLeave(){const ref=STK.ref,uid=stkMe(),host=STK.host,status=STK.status,privateRef=STK.privateRef;try{if(ref&&status==='lobby'&&uid){if(host===uid)await ref.remove();else{await ref.child('players/'+uid).remove();if(privateRef)await privateRef.remove()}}else if(ref&&status==='play'&&uid){const other=STK.players.find(p=>p.id!==uid);if(other)await ref.update({status:'end',winner:other.id})}}catch(e){console.warn('Statki leave:',e)}stkDetach();Object.assign(STK,{code:'',host:'',room:null,players:[],status:'start',msg:'',ships:[],ready:false,shots:{},turn:'',winner:null});stkRender()}
 function stkPane(p){STK.pane=STK.pane===p?'':p;stkRender();if(STK.pane==='join')setTimeout(()=>{const e=document.getElementById('stkjoincode');if(e)e.focus()},60)}
@@ -129,12 +128,10 @@ function stkPaint(el,h){
 }
 function stkRender(){const el=document.getElementById('stkcontent');if(!el)return;if(STK.bot)return stkBotRender(el);let h='';if(STK.msg)h+=`<div class="stktoast" role="status">${lgEsc(STK.msg)}</div>`;
  if(!STK.ref){const net=podNet(),pn=STK.pane||'';
-  const nick=`<label for="stknick">Twój nick</label><input id="stknick" maxlength="18" autocomplete="off" value="${lgEsc(STK.nick||'Gracz')}" oninput="STK.nick=this.value;STK.nickT=1">
-    <div class="ob-opt"><span>Kolor gracza</span><input id="stkcol" type="color" value="${lgEsc(STK.color||'#2a9df4')}" oninput="STK.color=this.value;STK.colT=1"></div>`;
   const lv=STK.botLvl==null?1:STK.botLvl;
   const bot=pn==='bot'?`<div class="ob-pane"><label>Poziom bota</label><div class="ob-chips">${['Łatwy','Normalny','Trudny'].map((t,i)=>obChip(t,lv===i,`STK.botLvl=${i};stkRender()`)).join('')}</div><p class="ob-note">${['Bot strzela losowo.','Bot dobija trafione statki.','Bot liczy prawdopodobieństwo – trudny przeciwnik.'][lv]}</p>${obBtn('Rozpocznij grę','⚓','stkBotStart()','gold')}</div>`:'';
-  const create=pn==='create'?`<div class="ob-pane">${nick}${obBtn('Stwórz pokój','🎲','stkCreate()','gold',!net)}</div>`:'';
-  const join=pn==='join'?`<div class="ob-pane">${nick}<label for="stkjoincode">Kod pokoju od znajomego</label><input id="stkjoincode" class="cd" maxlength="5" placeholder="A8K2Q" autocomplete="off" value="${lgEsc(STK.joinCode)}" oninput="STK.joinCode=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')stkJoin()">${obBtn('Dołącz','🚪','stkJoin()','gold',!net)}</div>`:'';
+  const create=pn==='create'?`<div class="ob-pane">${obBtn('Stwórz pokój','🎲','stkCreate()','gold',!net)}</div>`:'';
+  const join=pn==='join'?`<div class="ob-pane"><label for="stkjoincode">Kod pokoju od znajomego</label><input id="stkjoincode" class="cd" maxlength="5" placeholder="A8K2Q" autocomplete="off" value="${lgEsc(STK.joinCode)}" oninput="STK.joinCode=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')stkJoin()">${obBtn('Dołącz','🚪','stkJoin()','gold',!net)}</div>`:'';
   el.innerHTML=obShell({key:'stk-start',host:'#stk',theme:'stk',words:['STATKI'],tiles:['⚓','🚢','💥','🌊'],sub:'Bitwa morska dla dwóch graczy.',msg:STK.msg?`<div class="ob-err">${lgEsc(STK.msg)}</div>`:'',
   back:{label:'← Menu główne',onclick:'stkHub()'},
   body:`${obBtn('Graj z botem (offline)','🤖',"stkPane('bot')",'gold')}${bot}${obBtn('Utwórz pokój','🏠',"stkPane('create')",'white')}${obBtn('Dołącz do znajomego','🚪',"stkPane('join')",'white')}
