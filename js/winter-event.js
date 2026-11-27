@@ -71,7 +71,7 @@
   let nextFlight=0, flightEnd=0, lastRoute=-1;
   const monthFormat=new Intl.DateTimeFormat('pl-PL',{timeZone:'Europe/Warsaw',month:'numeric'});
   function updateChristmas(){
-    const active=new URLSearchParams(window.location.search).get('christmas')==='test' || Number(monthFormat.format(new Date()))===12;
+    const active=Number(monthFormat.format(new Date()))===12;
     const now=Date.now();
     if(active!==christmas){christmas=active;hub.classList.toggle('christmas-active',active);nextFlight=now+6000;nextMeteor=now+1800;meteorEnd=0;meteor.classList.remove('shooting');if(!active){sleigh.classList.remove('flying');santaBubble.hidden=true;reindeerBubble.hidden=true;santaBubble.classList.remove('show');reindeerBubble.classList.remove('show');if(!enabled){elapsed=0;hub.style.removeProperty('--winter-cap');}}}
     if(!christmas||!visible(hub)||document.hidden){sleigh.classList.remove('flying');flightEnd=0;meteor.classList.remove('shooting');meteorEnd=0;santaBubble.hidden=true;reindeerBubble.hidden=true;santaBubble.classList.remove('show');reindeerBubble.classList.remove('show');return;}
