@@ -44,7 +44,7 @@
       <div class="tk-rcode" id="tkRCode">·····</div>
       <p class="tk-rinfo" id="tkRInfo">Tworzę pokój…</p>
       <ul class="tk-plist" id="tkRList"></ul>
-      <button id="tkRStart" class="tk-btn tk-gold tk-rstart">Rozpocznij grę</button>
+      <button id="tkBoardSetup" class="tk-btn tk-white tk-rstart" style="display:none">🗺️ Ustaw planszę</button><button id="tkRStart" class="tk-btn tk-gold tk-rstart">Rozpocznij grę</button>
       <p class="tk-rwait" id="tkRWait" style="display:none">Czekamy, aż host rozpocznie grę…</p>
       <button id="tkRCopy" class="tk-rcopy">📋 Kopiuj kod pokoju</button>
     </div>
@@ -287,17 +287,20 @@ function startGame(code){
 }
 for(let i=0;i<6;i++)document.getElementById('s'+i).addEventListener('click',()=>{const L=claimOrder[i];if(!L)return;forfeit.add(L);refreshAuto();msg('Odjęto punkty za kartę '+(L==='X'?'symbolu':L+L)+'. Kliknij tę kartę, aby je przywrócić.')});
 document.getElementById('rcards').addEventListener('click',e=>{const c=e.target.closest('.card'),L=c&&c.dataset.l;if(L&&forfeit.has(L)){forfeit.delete(L);refreshAuto();msg('Przywrócono punkty za kartę '+(L==='X'?'symbolu':L+L)+'.')}});
+let boardSetupMode=false;
+function setupShuffle(){const seed=randCode();startGame(seed);postBoardSeed(seed);}
+function postBoardSeed(seed){try{parent.postMessage({isla:1,type:'boardSeed',seed:seed},'*')}catch(e){}}
 document.getElementById('dr').onclick=drawCards;
 document.getElementById('nw').onclick=()=>startGame(curCode||randCode());
 document.getElementById("b").onclick=shuffle;
 document.getElementById("rs").onclick=randSym;
 document.getElementById("rr").onclick=()=>{symat={...origSym};refreshAuto();draw()};
 const un=f=>()=>{unseed();f()};
-document.getElementById('b').onclick=un(shuffle);
-document.getElementById('rs').onclick=un(randSym);
-document.getElementById('rl').onclick=un(randLetters);
-document.getElementById('rr').onclick=()=>{unseed();symat={...origSym};refreshAuto();draw()};
-document.getElementById('vsel').onchange=function(){unseed();setVariant(this.value);startGame(randCode())};
+document.getElementById('b').onclick=()=>{if(boardSetupMode)setupShuffle();else un(shuffle)()};
+document.getElementById('rs').onclick=()=>{if(boardSetupMode)setupShuffle();else un(randSym)()};
+document.getElementById('rl').onclick=()=>{if(boardSetupMode)setupShuffle();else un(randLetters)()};
+document.getElementById('rr').onclick=()=>{if(boardSetupMode)setupShuffle();else{unseed();symat={...origSym};refreshAuto();draw()}};
+document.getElementById('vsel').onchange=function(){setVariant(this.value);if(boardSetupMode)setupShuffle();else{unseed();startGame(randCode())}};
 document.getElementById('cj').onclick=()=>{const v=document.getElementById('ci').value.trim();if(!v){msg('Wpisz kod partii.');return}startGame(v)};
 document.getElementById('cnew').onclick=()=>startGame(randCode());
 startGame(randCode());
@@ -330,11 +333,23 @@ startGame(randCode());
   addEventListener('message',e=>{
     if(e.source!==parent)return;
     const d=e.data;if(!d||!d.islaCmd)return;
-    if(d.cmd==='start'){setVariant(d.variant||window.__tkVariant||'petit');startGame(String(d.seed||'').toUpperCase());last='';}
+    if(d.cmd==='start'){boardSetupMode=false;const done=document.getElementById('tkBoardSetupDone');if(done)done.remove();setVariant(d.variant||window.__tkVariant||'petit');startGame(String(d.seed||'').toUpperCase());last='';}
     else if(d.cmd==='draw'){drawCards();last='';}
     else if(d.cmd==='lock')lock(true,d.label,d.host,d.canDraw);
+    else if(d.cmd==='boardSetup'){
+      boardSetupMode=true;
+      if(!window.__tkBoardSetupBtn){
+        const b=document.createElement('button');b.id='tkBoardSetupDone';b.textContent='✓ Zapisz planszę i wróć do pokoju';
+        b.style.cssText='position:fixed;z-index:9999;top:10px;left:50%;transform:translateX(-50%);background:#176b45;color:#fff;border:2px solid #fff;border-radius:999px;padding:10px 18px;font-weight:800;box-shadow:0 3px 12px #0006';
+        b.onclick=()=>{b.remove();window.__tkBoardSetupBtn=null;post({type:'lobby',action:'boardDone'});};
+        document.body.appendChild(b);window.__tkBoardSetupBtn=b;
+      }
+      lock(false,'',true,true);
+      if(!curCode||!/^[0-9]{4}$/.test(curCode))setupShuffle();else postBoardSeed(curCode);
+      if(window.tukanStartHide)window.tukanStartHide();
+    }
     else if(d.cmd==='claims'){globalClaims=d.claims||{};refreshAuto();renderHand();draw();}
-    else if(d.cmd==='unlock'){lock(false);globalClaims={};blockedCards.clear();mineKept.clear();refreshAuto();draw();}
+    else if(d.cmd==='unlock'){boardSetupMode=false;const done=document.getElementById('tkBoardSetupDone');if(done)done.remove();lock(false);globalClaims={};blockedCards.clear();mineKept.clear();refreshAuto();draw();}
   });
   post({type:'ready'});
 })();
@@ -387,10 +402,12 @@ startGame(randCode());
       var n=String(p.name||'Gracz').replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]});
       var col=/^#[0-9a-f]{6}$/i.test(p.color||'')?p.color:'#ffd84a';
       return '<li><i style="background:'+col+';box-shadow:0 0 0 2px #ffffffaa"></i>'+(i+1)+'. '+n+(p.host?' <em>(host)</em>':'')+(p.me?' <em>(Ty)</em>':'')+'</li>'}).join('');
-    var s=$('tkRStart');s.style.display=d.host?'flex':'none';s.disabled=ps.length<min;
+    var s=$('tkRStart');s.style.display=d.host?'flex':'none';s.disabled=ps.length<min;var bs=$('tkBoardSetup');if(bs)bs.style.display=(d.host&&!d.round)?'flex':'none';
     $('tkRWait').style.display=d.host?'none':'block';
   }
+  window.tukanStartShowRoom=function(){st.style.display='';st.classList.remove('out');st.classList.add('inroom');room.style.display='block';post({action:'boardDone'});};
   $('tkRStart').onclick=function(){post({action:'startRoom'})};
+  $('tkBoardSetup').onclick=function(){post({action:'boardSetup'})};
   $('tkRCopy').onclick=function(){
     var c=$('tkRCode').textContent,b=this,old='📋 Kopiuj kod pokoju';
     function ok(){b.textContent='✅ Skopiowano';setTimeout(function(){b.textContent=old},1500)}
