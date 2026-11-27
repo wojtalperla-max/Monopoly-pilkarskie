@@ -114,6 +114,10 @@ body:has(#setup:not(.hide)) > h1{display:none}
 #setup .pd-select:focus{border-color:#ffd84a;box-shadow:0 0 0 4px #ffd84a44}
 .pd-test{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:17px;color:#ffffffd9;border-bottom:2px dashed #ffffff77;padding:6px;cursor:pointer;animation:pdUp .7s 1.5s both}
 .pd-test input{width:20px;height:20px;accent-color:#ffd84a}
+.pd-bcols{display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;margin-bottom:14px;font-weight:600;font-size:18px}
+.pd-bcols label{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer}
+.pd-bcols input[type=color]{width:52px;height:42px;padding:0;border:3px solid #fff;border-radius:12px;background:none;cursor:pointer}
+.pd-bcols small{font-size:13px;opacity:.85;font-weight:500}
 @media(prefers-reduced-motion:reduce){#setup *,#setup::before{animation:none!important}}
 
 /* ===== brak widocznych pasków przewijania (przewijanie nadal działa) ===== */
