@@ -15,3 +15,84 @@
 .winter-gift-grid span{display:grid;place-items:center;min-height:40px;border:1px solid #59748a;border-radius:8px;background:#152835;color:#8da6ba;font-size:22px}
 .winter-gift-grid .found{background:#244b60;color:white;border-color:#bde6ff}
 @media(prefers-reduced-motion:reduce){.winter-flake{animation:none;display:none}.winter-hidden-gift:hover{transform:none}}
+
+/* Grudniowy motyw świąteczny, nakładany na motyw zimowy. */
+#hub.christmas-active{background:radial-gradient(ellipse at top,#214b70 0%,#102b46 45%,#071522 100%)!important}
+#hub.christmas-active .winter-snow{display:block}
+#hub.christmas-active h1{color:#e1f3ff;text-shadow:0 0 20px #8ed7ff88}
+#hub:is(.winter-active,.christmas-active) button,#hub:is(.winter-active,.christmas-active) #hubsubg button{box-shadow:inset 0 var(--winter-cap,0px) 0 #edf7ff,4px 5px 0 #000a!important}
+.christmas-decor,.christmas-hat{display:none;pointer-events:none}
+#hub.christmas-active .christmas-decor{display:block;position:fixed;inset:0;overflow:hidden;z-index:35}
+#hub.christmas-active>h1{position:relative;overflow:visible}
+#hub.christmas-active .christmas-hat{display:block;position:absolute;left:-.33em;top:-.12em;width:1.4em;transform:rotate(-18deg);z-index:2}
+.christmas-hat svg{display:block;width:100%;height:auto;overflow:visible}
+.christmas-lights{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-around;align-items:flex-start;height:32px;border-top:3px solid #244c37;padding:0 4px}
+.christmas-bulb{position:relative;flex:none;width:clamp(5px,1.1vw,13px);height:clamp(10px,2vw,23px);margin-top:5px;background:var(--bulb);border-radius:45% 45% 50% 50%;box-shadow:0 0 9px 3px var(--bulb),inset 2px 2px 3px #fff9;animation:christmas-twinkle var(--blink) var(--offset) ease-in-out infinite alternate}
+.christmas-bulb:before{content:'';position:absolute;left:20%;width:60%;height:6px;top:-5px;background:#28513c;border-radius:2px}
+.christmas-bulb:nth-child(even){transform:rotate(17deg);margin-top:8px}.christmas-bulb:nth-child(odd){transform:rotate(-17deg)}
+.christmas-top-star,.christmas-falling-star{position:absolute;color:#ffe39a;text-shadow:0 0 8px #ffda70,0 0 16px #ffbb43;font-style:normal}
+.christmas-top-star{animation:christmas-twinkle var(--blink) var(--offset) ease-in-out infinite alternate}
+.christmas-falling-star{top:-30px;animation:winter-fall var(--fall) var(--delay) linear infinite;opacity:.75}
+@keyframes christmas-twinkle{from{opacity:.35}to{opacity:1}}
+.christmas-sleigh{display:none;position:absolute;left:0;transform:translateX(-115%);white-space:nowrap;align-items:center;line-height:1.2;filter:drop-shadow(0 6px 10px #0009) drop-shadow(0 0 10px #ffd77866);will-change:transform;pointer-events:auto}
+.christmas-sleigh.flying{display:flex;animation:christmas-flight 14s linear both}
+.christmas-sleigh-svg{display:block;width:clamp(230px,34vw,500px);height:auto;overflow:visible}.christmas-team{transform-origin:center;animation:christmas-sleigh-bob 2.3s ease-in-out infinite}.christmas-santa-target,.christmas-reindeer-target{cursor:pointer;pointer-events:auto}.christmas-santa-target:hover,.christmas-reindeer-target:hover{filter:brightness(1.08)}.christmas-trail{position:absolute;right:88%;top:56%;width:clamp(80px,12vw,180px);height:14px;transform:translateY(-50%)}.christmas-trail::before,.christmas-trail::after{content:'';position:absolute;inset:0;border-radius:999px;background:linear-gradient(90deg,transparent 0%,#fff0aa22 28%,#ffe7a5bb 72%,#fffdf1 100%)}.christmas-trail::after{filter:blur(7px);opacity:.9;transform:scaleY(1.9)}.christmas-santa-bubble,.christmas-reindeer-bubble{position:absolute;z-index:2;opacity:0;transform:translateY(10px) scale(.92);transition:opacity .22s ease,transform .22s ease;filter:drop-shadow(0 4px 10px #0007)}.christmas-santa-bubble.show,.christmas-reindeer-bubble.show{opacity:1;transform:translateY(0) scale(1)}.christmas-santa-bubble{left:64%;top:-16%;padding:10px 14px;border-radius:18px;background:linear-gradient(180deg,#fffef8,#f8fbff);color:#af0f22;border:2px solid #fff3d0;font-weight:800;font-size:clamp(12px,1.25vw,18px);text-align:center;white-space:nowrap}.christmas-santa-bubble::after{content:"";position:absolute;left:18px;bottom:-10px;border:10px solid transparent;border-top-color:#fffef8;filter:drop-shadow(0 2px 0 #fff3d0)}.christmas-reindeer-bubble{left:8%;top:-14%;width:58px;height:58px;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 35% 30%,#fff4cb,#ffe38e 68%,#f0c558);font-size:28px;border:2px solid #fff6d3;box-shadow:0 0 12px #ffd46b88}.christmas-reindeer-bubble::after{content:"";position:absolute;left:22px;bottom:-8px;border:8px solid transparent;border-top-color:#ffe38e}
+@keyframes christmas-flight{0%{transform:translate(-115%,8px) scale(.92)}18%{transform:translate(calc(18vw - 82%),-18px) scale(.96)}40%{transform:translate(calc(40vw - 58%),calc(-36px + var(--flight-drift, 0px))) scale(1)}65%{transform:translate(calc(65vw - 28%),calc(6px + var(--flight-drift, 0px))) scale(1.02)}84%{transform:translate(calc(84vw - 10%),-20px) scale(.99)}100%{transform:translate(108vw,14px) scale(.95)}}@keyframes christmas-sleigh-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}@keyframes christmas-reindeer-gallop{0%{transform:translateY(0) rotate(0deg)}100%{transform:translateY(-3px) rotate(-1.2deg)}}
+@media(max-width:600px){.christmas-bulb:nth-child(2n){display:none}#hub.christmas-active .christmas-hat{left:0;top:0;width:1.2em}}
+@media(prefers-reduced-motion:reduce){.christmas-bulb,.christmas-top-star{animation:none}.christmas-falling-star,.christmas-sleigh.flying{display:none}}
+
+.christmas-tree{position:absolute;right:72px;bottom:10px;width:150px;height:205px;pointer-events:none;filter:drop-shadow(0 6px 10px #0007)}.christmas-tree::before{content:"";position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:24px;height:44px;border-radius:4px;background:linear-gradient(180deg,#82562f,#5c371a)}.christmas-tree::after{content:"";position:absolute;left:50%;bottom:24px;transform:translateX(-50%);width:0;height:0;border-left:68px solid transparent;border-right:68px solid transparent;border-bottom:138px solid #184f38;filter:drop-shadow(0 -30px 0 #206848) drop-shadow(0 -60px 0 #2b7d58)}.christmas-tree{background:radial-gradient(circle at 50% 12%,#ffe680 0 7px,transparent 8px),radial-gradient(circle at 40% 38%,#ff6767 0 5px,transparent 6px),radial-gradient(circle at 61% 45%,#7fc8ff 0 5px,transparent 6px),radial-gradient(circle at 36% 61%,#ffd56f 0 5px,transparent 6px),radial-gradient(circle at 62% 67%,#ff8bea 0 5px,transparent 6px),radial-gradient(circle at 49% 78%,#9af0c4 0 5px,transparent 6px);background-repeat:no-repeat}.christmas-tree .dummy{display:none}.christmas-package-group.right{right:24px;bottom:8px}.christmas-package-group.right .christmas-parcel:nth-child(1){margin-right:44px}.christmas-package-group.right .christmas-parcel:nth-child(2){margin-right:-6px;margin-bottom:8px}.christmas-package-group.right .christmas-parcel:nth-child(3){margin-right:8px;margin-bottom:2px}/* Meteory: jasne jądro i stopniowo zanikający ogon, bez symboli gwiazd. */
+.christmas-meteor{position:absolute;width:8px;height:8px;opacity:0;pointer-events:none;filter:drop-shadow(0 0 7px #b9e4ff) drop-shadow(0 0 16px #8accff);}
+.christmas-meteor::before{content:'';position:absolute;right:1px;top:1px;width:clamp(140px,18vw,340px);height:4px;background:linear-gradient(90deg,transparent 0%,#9ec8ff11 18%,#b6daff66 42%,#e4f3ffcc 76%,white 100%);border-radius:100%;transform-origin:right center;transform:rotate(var(--angle,25deg));}
+.christmas-meteor::after{content:'';position:absolute;inset:-2px;background:#fff;border-radius:50%;box-shadow:0 0 10px 4px #d6edff,0 0 20px 8px #92cfff;}
+.christmas-meteor.shooting{animation:christmas-meteor-flight 1.35s linear both;}
+@keyframes christmas-meteor-flight{0%{opacity:0;transform:translate(0,0)}12%{opacity:1}60%{opacity:.9}100%{opacity:0;transform:translate(var(--mx),var(--my))}}
+/* Wyłącznie dekoracje; nie są elementami systemu zbierania prezentów. */
+.christmas-packages{position:absolute;inset:0;pointer-events:none;}
+.christmas-package-group{position:absolute;bottom:12px;display:flex;align-items:flex-end;gap:0;filter:drop-shadow(0 4px 4px #0008);}
+.christmas-package-group.left{left:12px;bottom:96px}.christmas-package-group.right{right:12px;flex-direction:row-reverse;}
+.christmas-parcel{position:relative;display:block;width:var(--w);height:var(--h);border-radius:3px;background:linear-gradient(110deg,#ffffff26,transparent 55%,#0003),var(--wrap);border:1px solid #ffffff22;transform:rotate(var(--tilt));margin:0 -3px;box-shadow:inset 0 3px 0 #fff2;}
+.christmas-parcel::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent 40%,var(--ribbon) 40% 57%,transparent 57%),linear-gradient(0deg,transparent 45%,var(--ribbon) 45% 60%,transparent 60%);}
+.christmas-bow{position:absolute;top:-10px;left:50%;width:5px;height:10px;border-radius:3px;background:var(--ribbon);transform:translateX(-50%);}
+.christmas-bow::before,.christmas-bow::after{content:'';position:absolute;width:14px;height:9px;border:3px solid var(--ribbon);border-radius:70% 70% 20% 70%;bottom:1px;right:2px;transform:rotate(22deg);}
+.christmas-bow::after{left:2px;right:auto;transform:scaleX(-1) rotate(22deg);}
+@media(max-width:600px){.christmas-sleigh-svg{width:min(78vw,320px)}.christmas-tree{right:28px;bottom:2px;transform:scale(.72);transform-origin:bottom right}.christmas-package-group.left{transform:scale(.55);transform-origin:bottom left;left:4px;bottom:68px}.christmas-package-group.right{transform:scale(.55);transform-origin:bottom right;right:4px;bottom:4px}}
+@media(prefers-reduced-motion:reduce){.christmas-meteor.shooting{animation:none;display:none}}
+
+/* Corrected decoration layout and flight. */
+.christmas-tree{right:12px;bottom:5px;width:clamp(205px,23vw,330px);height:auto;background:none;z-index:0;transform:none}.christmas-tree::before,.christmas-tree::after{content:none}.christmas-tree svg{display:block;width:100%;height:auto;overflow:visible}.tree-light,.tree-star{animation:christmas-twinkle 1.8s ease-in-out infinite alternate;filter:drop-shadow(0 0 5px #ffdf8b)}
+.christmas-packages{z-index:1}.christmas-package-group.right{right:22px;bottom:9px;flex-direction:row;gap:3px}.christmas-package-group.right .christmas-parcel:nth-child(n){margin:0 -3px}.christmas-package-group.right .christmas-parcel:nth-child(2){margin-bottom:7px}.christmas-package-group.right .christmas-parcel:nth-child(3){margin-bottom:2px}
+.christmas-sleigh{pointer-events:none;z-index:2}.christmas-sleigh-svg{width:clamp(300px,48vw,680px);pointer-events:none}.christmas-team{transform-box:fill-box;transform-origin:center}.deer-motion{transform-box:fill-box;transform-origin:center;animation:deer-float .85s ease-in-out infinite alternate}.christmas-reindeer-target>g:nth-child(even) .deer-motion{animation-delay:-.4s}.deer-legs{transform-box:fill-box;transform-origin:50% 0%;animation:deer-legs .43s ease-in-out infinite alternate}.christmas-reindeer-target>g:nth-child(even) .deer-legs{animation-delay:-.22s}@keyframes deer-float{to{transform:translateY(-5px)}}@keyframes deer-legs{from{transform:rotate(-9deg)}to{transform:rotate(10deg)}}
+.christmas-santa-bubble{left:15%;top:-20%;transform:translate(-50%,10px) scale(.92);pointer-events:none}.christmas-santa-bubble.show{transform:translate(-50%,0) scale(1)}.christmas-santa-bubble::after{left:calc(50% - 10px)}.christmas-reindeer-bubble{left:68%;top:-17%;pointer-events:none}.christmas-santa-bubble[hidden],.christmas-reindeer-bubble[hidden]{display:none!important}.christmas-santa-target,.christmas-reindeer-target{pointer-events:auto;cursor:pointer}.christmas-trail{right:98%;pointer-events:none}
+@media(max-width:600px){.christmas-tree{right:3px;bottom:2px;width:135px;transform:none}.christmas-package-group.right{right:5px;bottom:3px}.christmas-sleigh-svg{width:min(88vw,420px)}.christmas-reindeer-bubble{width:36px;height:36px;font-size:20px}.christmas-reindeer-bubble::after{left:10px}.christmas-santa-bubble{padding:5px 8px}}
+@media(prefers-reduced-motion:reduce){.tree-light,.tree-star,.deer-motion,.deer-legs{animation:none}}
+
+/* Articulated gallop and variable flight angle. */
+.deer-limb,.deer-shin{transform-box:view-box;transform-origin:0 0;animation-duration:.84s;animation-delay:var(--phase);animation-iteration-count:infinite;animation-timing-function:ease-in-out}
+.deer-limb.front{animation-name:deer-front-stride}.deer-limb.hind{animation-name:deer-hind-stride}.deer-shin{animation-name:deer-knee}
+.christmas-reindeer-target>g:nth-child(2n) .deer-limb,.christmas-reindeer-target>g:nth-child(2n) .deer-shin{animation-delay:calc(var(--phase) - .21s)}
+@keyframes deer-front-stride{0%,100%{transform:rotate(-42deg)}35%{transform:rotate(28deg)}65%{transform:rotate(48deg)}85%{transform:rotate(-12deg)}}
+@keyframes deer-hind-stride{0%,100%{transform:rotate(34deg)}35%{transform:rotate(-33deg)}65%{transform:rotate(-46deg)}85%{transform:rotate(9deg)}}
+@keyframes deer-knee{0%,100%{transform:rotate(8deg)}35%{transform:rotate(48deg)}65%{transform:rotate(62deg)}85%{transform:rotate(15deg)}}
+@keyframes christmas-flight{0%{transform:translate(-115%,0) rotate(var(--flight-angle,0deg))}25%{transform:translate(calc(25vw - 85%),calc(var(--flight-rise,0px)*.25 - 9px)) rotate(var(--flight-angle,0deg))}50%{transform:translate(calc(50vw - 55%),calc(var(--flight-rise,0px)*.5)) rotate(var(--flight-angle,0deg))}75%{transform:translate(calc(75vw - 25%),calc(var(--flight-rise,0px)*.75 + 9px)) rotate(var(--flight-angle,0deg))}100%{transform:translate(115vw,var(--flight-rise,0px)) rotate(var(--flight-angle,0deg))}}
+@media(prefers-reduced-motion:reduce){.deer-limb,.deer-shin{animation:none}}
+
+/* Flights enter and leave through different screen edges. Keep bubbles unmirrored. */
+.christmas-sleigh.flying{animation:christmas-multi-flight 14s linear both;transform-origin:center center}
+@keyframes christmas-multi-flight{
+  0%{transform:translate(var(--route-x0),var(--route-y0)) translate(-50%,-50%) rotate(var(--route-angle))}
+  50%{transform:translate(var(--route-xm),var(--route-ym)) translate(-50%,-50%) rotate(var(--route-angle))}
+  100%{transform:translate(var(--route-x1),var(--route-y1)) translate(-50%,-50%) rotate(var(--route-angle))}
+}
+.christmas-sleigh.reverse-flight .christmas-sleigh-svg{transform:scaleX(-1)}
+.christmas-sleigh.reverse-flight .christmas-trail{right:auto;left:98%;transform:translateY(-50%) scaleX(-1)}
+.christmas-sleigh.reverse-flight .christmas-santa-bubble{left:85%}
+.christmas-sleigh.reverse-flight .christmas-reindeer-bubble{left:22%}
+.christmas-santa-bubble.show,.christmas-reindeer-bubble.show{rotate:calc(-1 * var(--route-angle,0deg))}
+
+/* Bez obramowania po kliknięciu zaprzęgu; zachowaj obsługę klawiatury. */
+.christmas-sleigh svg :focus:not(:focus-visible),
+.christmas-sleigh svg:focus:not(:focus-visible),
+.christmas-santa-target:focus:not(:focus-visible),
+.christmas-reindeer-target:focus:not(:focus-visible){outline:none!important;}
+.christmas-sleigh,.christmas-sleigh svg,.christmas-santa-target,.christmas-reindeer-target{-webkit-tap-highlight-color:transparent;}
