@@ -730,9 +730,17 @@ async function podAddBot(){
   try{const tx=await POD.ref.child('players').transaction(curr=>{
     curr=curr||{};const vals=Object.values(curr);if(vals.length>=4)return;
     const used=vals.map(p=>Number(p.seat??p.order));const seat=[0,1,2,3].find(x=>!used.includes(x));if(seat==null)return;
-    curr['bot'+seat]={id:'bot'+seat,name:['Bot Alfa','Bot Beta','Bot Gamma','Bot Delta'][seat],seat,order:seat,color:podColors[seat],bot:true};return curr;
+    const taken=vals.map(p=>String(p.color||'').toLowerCase());
+    curr['bot'+seat]={id:'bot'+seat,name:['Bot Alfa','Bot Beta','Bot Gamma','Bot Delta'][seat],seat,order:seat,color:podColors.find(c=>!taken.includes(c))||podColors[seat],bot:true};return curr;
   });if(!tx.committed)throw new Error('Brak wolnego miejsca.');POD.msg='Dodano bota.';
   }catch(e){POD.msg='Nie udało się dodać bota: '+e.message}podRender();
+}
+async function podSetBotColor(id,col){
+  if(!POD.ref||POD.host!==onlinePlayerId||POD.status!=='lobby')return;
+  if(!/^#[0-9a-f]{6}$/i.test(col||''))return;
+  const bot=POD.players.find(p=>p.id===id&&p.bot);if(!bot)return;
+  try{await POD.ref.child('players/'+id+'/color').set(col);POD.msg=''}
+  catch(e){POD.msg='Nie udało się zmienić koloru bota: '+e.message;podRender()}
 }
 async function podRemoveBot(){
   if(!POD.ref||POD.host!==onlinePlayerId||POD.status!=='lobby')return;
@@ -766,7 +774,7 @@ function podRender(){const el=document.getElementById('podroom'),f=podFrame();if
   const list=POD.players.map((p,i)=>`<span class="podchip"><i class="podcolor" style="background:${/^#[0-9a-f]{6}$/i.test(p.color||'')?p.color:'#888'}"></i>${lgEsc(p.name||'Gracz')} · kolor konta${p.id===POD.host?' (host)':''}${p.id===onlinePlayerId?' (Ty)':''}</span>`).join('');
   const lobby=POD.status==='lobby';if(f)f.hidden=lobby;
   if(lobby){
-    const pl=POD.players.map((q,i)=>`<div><i class="podcolor" style="background:${/^#[0-9a-f]{6}$/i.test(q.color||'')?q.color:'#888'}"></i>${i+1}. ${lgEsc(q.name||'Gracz')}${q.bot?' 🤖':''}${q.id===POD.host?' <b class="pg-host">(host)</b>':''}${q.id===onlinePlayerId?' <b>(Ty)</b>':''}</div>`).join('');
+    const pl=POD.players.map((q,i)=>`<div><i class="podcolor" style="background:${/^#[0-9a-f]{6}$/i.test(q.color||'')?q.color:'#888'}"></i>${i+1}. ${lgEsc(q.name||'Gracz')}${q.bot?' 🤖':''}${q.bot&&POD.host===onlinePlayerId?`<input type="color" value="${/^#[0-9a-f]{6}$/i.test(q.color||'')?q.color:'#888888'}" title="Zmień kolor bota" aria-label="Kolor bota" style="width:34px;height:26px;padding:0;margin-left:8px;border:2px solid #fff;border-radius:8px;background:none;cursor:pointer;vertical-align:middle" onchange="podSetBotColor('${lgEsc(q.id)}',this.value)">`:''}${q.id===POD.host?' <b class="pg-host">(host)</b>':''}${q.id===onlinePlayerId?' <b>(Ty)</b>':''}</div>`).join('');
     const isHost=POD.host===onlinePlayerId;
     el.innerHTML=`<div id="podGate" class="pg inlobby"><div class="og-bg" aria-hidden="true">${podFloat()}</div>
     <button class="og-back" onclick="podExit()">← Wyjdź z pokoju</button>
