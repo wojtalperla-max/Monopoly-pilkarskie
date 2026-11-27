@@ -224,7 +224,7 @@
       if (!this.teams.includes(team) || (!isBot && (!this.canJoin(team) || this.humans().length >= C.MAX_HUMANS))) return null;
       const id = this.nextId++;
       // czerwone boty nie mają nicków
-      const nm = String(name || 'Gracz').slice(0, 12);
+      const nm = String(name || 'Gracz').replace(/[<>&]/g,'').trim().slice(0, 14);
       const p = {
         id, name: nm, isBot: !!isBot, team,
         x: 0, y: 0, ang: team === 0 ? 0 : Math.PI, hp: C.MAXHP, alive: false, resp: 0, prot: 0,

@@ -191,8 +191,38 @@
 
   // ---------- UI / menu ----------
   const status = t => { $('status').textContent = t || ''; };
-  const nick = () => ($('name').value.trim() || 'Gracz' + Math.floor(Math.random() * 900 + 100));
-  try { $('name').value = localStorage.getItem('ds-name') || ''; } catch (_) { }
+  const cleanNick = n => String(n || '').replace(/[<>&]/g, '').trim().slice(0,14);
+  function platform() { try { return window.parent !== window ? window.parent.PLATFORM_BRIDGE : null; } catch (_) { return null; } }
+  let resolvingName = false;
+  async function nick(online) {
+    const B = platform();
+    if (!B) { if (online) { status('Otwórz Dark Sweep ze strony głównej i zaloguj się na konto.'); return null; } return 'Gość'; }
+    try {
+      const auth = B.fbAuth;
+      if (!auth) throw new Error('Firebase niedostępny');
+      const user = await new Promise((resolve,reject) => {
+        let unsub; const timer=setTimeout(()=>{if(unsub)unsub();reject(new Error('Timeout'));},5000);
+        unsub=auth.onAuthStateChanged(u=>{clearTimeout(timer);if(unsub)unsub();resolve(u);},e=>{clearTimeout(timer);if(unsub)unsub();reject(e);});
+      });
+      if (!user || user.isAnonymous) { if(online){status('Zaloguj się na stronie głównej, aby grać online.');return null;} return 'Gość'; }
+      let name='';
+      try { const snap=await Promise.race([B.fbDB.ref('users/'+user.uid).once('value'),new Promise((_,reject)=>setTimeout(()=>reject(new Error('Timeout')),5000))]); name=cleanNick(snap.val()?.nick); } catch (_) {}
+      if (auth.currentUser?.uid !== user.uid) { status('Konto zostało zmienione. Spróbuj ponownie.'); return null; }
+      name=name||cleanNick(B.ACC?.user?.uid===user.uid ? B.ACC.nick : '')||cleanNick(user.displayName);
+      if (!name) { status('Nie udało się pobrać nicku z profilu Firebase. Spróbuj ponownie.'); return null; }
+      return name;
+    } catch (_) { status('Nie udało się odczytać konta Firebase. Spróbuj ponownie.'); return null; }
+  }
+  function refreshProfile() {
+    const B=platform(), n=cleanNick(B?.ACC?.nick || B?.ACC?.user?.displayName);
+    $('name').value=n; $('profileName').textContent=n?'Grasz jako: '+n:'Zaloguj się na stronie głównej, aby grać online.';
+  }
+  window.__darksweepRefresh=refreshProfile;
+  refreshProfile();
+  try { platform()?.fbAuth?.onAuthStateChanged(()=>refreshProfile()); } catch (_) {}
+  function invitationLink() {
+    const url=new URL('../../index.html',location.href);url.searchParams.set('darksweepRoom',net.code);return url.href;
+  }
   const qs = new URLSearchParams(location.search); if (qs.get('room')) $('code').value = qs.get('room').toUpperCase().slice(0, 5);
 
   function resetClientState() {
@@ -201,7 +231,7 @@
     clearInput();
   }
   function enterGame() {
-    $('arenaInfo').textContent = `V29 · Mapa ${C.MW*C.TILE} × ${C.MH*C.TILE}`;
+    $('arenaInfo').textContent = `V30 · Mapa ${C.MW*C.TILE} × ${C.MH*C.TILE}`;
     setMusicLevel(0.15);
     $('shopBtn').hidden=net.rule!=='ricochet'; $('menu').style.display = 'none'; $('hud').style.display = 'flex'; $('controls').style.display = 'block'; wakeAudio();
     touchDevice=matchMedia('(pointer:coarse)').matches; mobileUI(touchDevice); $('heavyPunch').hidden=net.rule!=='fight'; for(const id of ['reload','swap','knife']) $(id).style.display=net.rule==='fight'?'none':'';
@@ -222,18 +252,19 @@
   addEventListener('beforeunload', () => { try { if (net.conn) net.conn.close(); } catch (_) { } });
   $('roomBtn').onclick = () => {
     if (!net.code) return;
-    const link = location.origin + location.pathname + '?room=' + net.code;
+    const link = invitationLink();
     (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(() => { $('roomBtn').textContent = 'Skopiowano link!'; setTimeout(roomLabel, 1500); }, () => prompt('Link zaproszenia:', link));
   };
   function roomLabel() { $('roomBtn').textContent = net.code ? 'Pokój: ' + net.code + ' (kopiuj link)' : 'Tryb offline'; }
 
   const peerOK = () => typeof window.Peer === 'function';
-  function saveName(n) { try { localStorage.setItem('ds-name', n); } catch (_) { } }
+
 
   // ---------- HOST ----------
-  function startHost(online) {
-    resetClientState();
-    const name = nick(); saveName(name);
+  async function startHost(online) {
+    if(resolvingName || net.mode)return; resolvingName=true; status("Pobieranie nicku…");
+    let name; try { name=await nick(online); } finally { resolvingName=false; }
+    if(!name)return; $("profileName").textContent="Grasz jako: "+name; status(""); resetClientState();
     setColors([$('colorA').value, $('colorB').value, ...($('gameRule').value==='ffa'?[$('colorC').value]:[])]);
     if (new Set(TEAM_COL).size!==TEAM_COL.length) { status('Wybierz różne kolory drużyn.'); return; }
     net.mode = 'host'; net.sim = new S.HostSim({ teamSize: +$('matchMode').value, botsPerTeam: +$('bots').value, difficulty: $('difficulty').value, rule: $('gameRule').value, target: +$('roundTarget').value, roundTarget:+$('matchRounds').value });
@@ -306,11 +337,12 @@
   }
 
   // ---------- KLIENT ----------
-  function startJoin() {
+  async function startJoin() {
+    if(resolvingName || net.mode)return;
     const code = $('code').value.trim().toUpperCase();
     if (code.length < 5) { status('Wpisz 5-znakowy kod pokoju.'); return; }
     if (!peerOK()) { status('Nie udało się załadować PeerJS (brak dostępu do unpkg.com?).'); return; }
-    resetClientState(); const name = nick(); saveName(name); status('Łączenie…');
+    resolvingName=true; status('Pobieranie nicku…'); let name; try { name=await nick(true); } finally { resolvingName=false; } if(!name)return; $('profileName').textContent='Grasz jako: '+name; resetClientState(); status('Łączenie…');
     net.mode = 'client'; net.code = code;
     const peer = new Peer(); net.peer = peer; let done = false;
     const fail = m => { if (done) return; done = true; leave(); status(m); };
@@ -348,7 +380,7 @@
   function teamPalette(team) { const edge = TEAM_COL[team] || TEAM_COL[0]; const shade = k => '#' + edge.slice(1).match(/../g).map(v => Math.round(parseInt(v,16)*k).toString(16).padStart(2,'0')).join(''); return {edge,body:shade(.8),dark:shade(.45),helm:shade(.65)}; }
   function requestTeam(team) { if (net.mode === 'host' && !net.started) { net.sim.changeTeam(net.localId,team); lobbyRefresh(); } else if (net.mode === 'client' && !net.entered && net.conn?.open) net.conn.send({t:'team',team}); }
   $('lbTeamA').onclick = () => requestTeam(0); $('lbTeamB').onclick = () => requestTeam(1); $('lbTeamC').onclick=()=>requestTeam(2);
-  $('matchMode').onchange = () => { $('botsLabel').style.display = +$('matchMode').value ? 'none' : ''; const size = $('gameRule').value==='ffa'?2:(+$('matchMode').value || 4); const {w,h,name} = S.ARENAS[size]; $('mapSizeInfo').textContent = `Mapa: ${name} · ${w*32} × ${h*32} · V29`;  }; $('gameRule').onchange=()=>{const ffa=$('gameRule').value==='ffa', duel=ffa||$('gameRule').value==='duel'; $('matchRoundsLabel').hidden=!duel; $('colorCLabel').hidden=!ffa; $('teamC').hidden=!ffa; $('teamC').disabled=!ffa; if(!ffa && $('team').value==='2') $('team').value='0'; $('roundTargetLabel').hidden=!duel; if(duel) $('matchMode').value='1'; $('matchMode').disabled=duel; $('matchMode').onchange();}; $('gameRule').onchange();
+  $('matchMode').onchange = () => { $('botsLabel').style.display = +$('matchMode').value ? 'none' : ''; const size = $('gameRule').value==='ffa'?2:(+$('matchMode').value || 4); const {w,h,name} = S.ARENAS[size]; $('mapSizeInfo').textContent = `Mapa: ${name} · ${w*32} × ${h*32} · V30`;  }; $('gameRule').onchange=()=>{const ffa=$('gameRule').value==='ffa', duel=ffa||$('gameRule').value==='duel'; $('matchRoundsLabel').hidden=!duel; $('colorCLabel').hidden=!ffa; $('teamC').hidden=!ffa; $('teamC').disabled=!ffa; if(!ffa && $('team').value==='2') $('team').value='0'; $('roundTargetLabel').hidden=!duel; if(duel) $('matchMode').value='1'; $('matchMode').disabled=duel; $('matchMode').onchange();}; $('gameRule').onchange();
   function lobbyStatus(t) { $('lbStatus').textContent = t || ''; }
   function lobbyShow(isHost) {
     $('menu').classList.add('in-lobby');
@@ -384,7 +416,7 @@
   $('lbLeave').onclick = leave;
   $('lbCopy').onclick = () => {
     if (!net.code) return;
-    const link = location.origin + location.pathname + '?room=' + net.code, b = $('lbCopy');
+    const link = invitationLink(), b = $('lbCopy');
     (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(() => { b.lastChild.textContent = 'Skopiowano!'; setTimeout(() => { b.lastChild.textContent = 'Kopiuj link zaproszenia'; }, 1500); }, () => prompt('Link zaproszenia:', link));
   };
 
