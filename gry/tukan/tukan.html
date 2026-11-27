@@ -349,6 +349,7 @@ startGame(randCode());
       if(window.tukanStartHide)window.tukanStartHide();
     }
     else if(d.cmd==='claims'){globalClaims=d.claims||{};refreshAuto();renderHand();draw();}
+    else if(d.cmd==='boardSetupDone'){boardSetupMode=false;const done=document.getElementById('tkBoardSetupDone');if(done)done.remove();window.__tkBoardSetupBtn=null;}
     else if(d.cmd==='unlock'){boardSetupMode=false;const done=document.getElementById('tkBoardSetupDone');if(done)done.remove();lock(false);globalClaims={};blockedCards.clear();mineKept.clear();refreshAuto();draw();}
   });
   post({type:'ready'});
@@ -414,7 +415,8 @@ startGame(randCode());
     try{navigator.clipboard.writeText(c).then(ok,ok)}catch(x){ok()}
   };
   addEventListener('message',function(e){if(e.source!==parent)return;var d=e.data;if(!d||!d.islaCmd)return;
-    if(d.cmd==='room'){if(d.variant)window.__tkVariant=d.variant;if(!st.classList.contains('inroom'))showRoom();renderRoom(d)}
+    if(d.cmd==='boardSetupDone'){st.style.display='';st.classList.remove('out');st.classList.add('inroom');kind.style.display='none';ja.style.display='none';room.style.display='block';}
+    else if(d.cmd==='room'){if(d.variant)window.__tkVariant=d.variant;if(!st.classList.contains('inroom'))showRoom();renderRoom(d)}
     else if(d.cmd==='roomError')resetMenu(d.msg||'Nie udało się.');
     else if(d.cmd==='unlock')resetMenu('');
   });
