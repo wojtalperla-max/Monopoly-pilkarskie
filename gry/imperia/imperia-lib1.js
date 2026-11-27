@@ -969,8 +969,23 @@ function renderAct(mi){
   if(key!==_actKey){_actKey=key;ACT.classList.remove('pop');void ACT.offsetWidth;ACT.classList.add('pop')}
 }
 document.addEventListener('keydown',e=>{if(e.key!=='Escape'||FZ||document.getElementById('nmdlg')||!sel||!S||(e.target&&/INPUT|SELECT|TEXTAREA/.test(e.target.tagName)&&e.target.type!=='range'))return;closeAct()});
+let _impStatsRecorded='';
+function recordImperiaResult(){
+  if(local||!S||S.over<0||!code||_impStatsRecorded===code)return;
+  try{
+    const P=window.parent;
+    if(!P||P===window||typeof P.statsRecord!=='function')return;
+    const players=(S.pl||[]).filter(p=>p&&p.id&&!p.ai).map(p=>({uid:p.id,name:p.name||p.kingdom||'Gracz'}));
+    if(players.length<2)return;
+    const winner=S.pl[S.over];if(!winner)return;
+    const me=players.find(p=>p.uid===myId);if(!me)return;
+    const result=winner.id===myId?'w':'l';
+    P.statsRecord('imperia_'+code,'imperia',result,players,false);
+    _impStatsRecorded=code;
+  }catch(e){console.warn('Imperia – zapis statystyk:',e)}
+}
 function render(){
-  if(quiet)return;const inRoom=!!ref;$('lobby').style.display=inRoom?'none':'';
+  if(quiet)return;if(S&&S.over>=0)recordImperiaResult();const inRoom=!!ref;$('lobby').style.display=inRoom?'none':'';
   if(!inRoom)return;
   if(!S||meIdx()<0){$('game').style.display='none';$('room').style.display='';
     roomSet(RD.started&&!S?roomMsg('Ładowanie…'):RD.started?roomMsg('Gra już trwa bez Ciebie.'):lobbyView());return}
