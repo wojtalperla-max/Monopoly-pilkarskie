@@ -288,6 +288,29 @@ function startGame(code){
 for(let i=0;i<6;i++)document.getElementById('s'+i).addEventListener('click',()=>{const L=claimOrder[i];if(!L)return;forfeit.add(L);refreshAuto();msg('Odjęto punkty za kartę '+(L==='X'?'symbolu':L+L)+'. Kliknij tę kartę, aby je przywrócić.')});
 document.getElementById('rcards').addEventListener('click',e=>{const c=e.target.closest('.card'),L=c&&c.dataset.l;if(L&&forfeit.has(L)){forfeit.delete(L);refreshAuto();msg('Przywrócono punkty za kartę '+(L==='X'?'symbolu':L+L)+'.')}});
 let boardSetupMode=false;
+function setOnlineBoardControls(setup){
+  const ids=['b','rs','rr','rl','vsel'];
+  ids.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.style.display='none';
+  });
+  let one=document.getElementById('tkShuffleMap');
+  if(setup){
+    if(!one){
+      one=document.createElement('button');
+      one.id='tkShuffleMap';
+      one.type='button';
+      one.textContent='🔀 Wymieszaj mapę';
+      one.style.cssText='margin:8px auto;padding:11px 22px;border:0;border-radius:10px;background:#176b45;color:#fff;font-weight:800;font-size:16px;cursor:pointer;box-shadow:0 3px 12px #0004';
+      const anchor=document.getElementById('b');
+      (anchor&&anchor.parentElement?anchor.parentElement:document.body).appendChild(one);
+      one.onclick=()=>{if(boardSetupMode)setupShuffle()};
+    }
+    one.style.display='inline-block';
+  }else if(one){
+    one.style.display='none';
+  }
+}
 function setupShuffle(){const seed=randCode();startGame(seed);postBoardSeed(seed);}
 function postBoardSeed(seed){try{parent.postMessage({isla:1,type:'boardSeed',seed:seed},'*')}catch(e){}}
 document.getElementById('dr').onclick=drawCards;
@@ -333,11 +356,12 @@ startGame(randCode());
   addEventListener('message',e=>{
     if(e.source!==parent)return;
     const d=e.data;if(!d||!d.islaCmd)return;
-    if(d.cmd==='start'){boardSetupMode=false;const done=document.getElementById('tkBoardSetupDone');if(done)done.remove();setVariant(d.variant||window.__tkVariant||'petit');startGame(String(d.seed||'').toUpperCase());last='';}
+    if(d.cmd==='start'){boardSetupMode=false;setOnlineBoardControls(false);const done=document.getElementById('tkBoardSetupDone');if(done)done.remove();setVariant(d.variant||window.__tkVariant||'petit');startGame(String(d.seed||'').toUpperCase());last='';}
     else if(d.cmd==='draw'){drawCards();last='';}
     else if(d.cmd==='lock')lock(true,d.label,d.host,d.canDraw);
     else if(d.cmd==='boardSetup'){
       boardSetupMode=true;
+      setOnlineBoardControls(true);
       if(!window.__tkBoardSetupBtn){
         const b=document.createElement('button');b.id='tkBoardSetupDone';b.textContent='✓ Zapisz planszę i wróć do pokoju';
         b.style.cssText='position:fixed;z-index:9999;top:10px;left:50%;transform:translateX(-50%);background:#176b45;color:#fff;border:2px solid #fff;border-radius:999px;padding:10px 18px;font-weight:800;box-shadow:0 3px 12px #0006';
@@ -349,8 +373,8 @@ startGame(randCode());
       if(window.tukanStartHide)window.tukanStartHide();
     }
     else if(d.cmd==='claims'){globalClaims=d.claims||{};refreshAuto();renderHand();draw();}
-    else if(d.cmd==='boardSetupDone'){boardSetupMode=false;const done=document.getElementById('tkBoardSetupDone');if(done)done.remove();window.__tkBoardSetupBtn=null;}
-    else if(d.cmd==='unlock'){boardSetupMode=false;const done=document.getElementById('tkBoardSetupDone');if(done)done.remove();lock(false);globalClaims={};blockedCards.clear();mineKept.clear();refreshAuto();draw();}
+    else if(d.cmd==='boardSetupDone'){boardSetupMode=false;setOnlineBoardControls(false);const done=document.getElementById('tkBoardSetupDone');if(done)done.remove();window.__tkBoardSetupBtn=null;}
+    else if(d.cmd==='unlock'){boardSetupMode=false;setOnlineBoardControls(false);const done=document.getElementById('tkBoardSetupDone');if(done)done.remove();lock(false);globalClaims={};blockedCards.clear();mineKept.clear();refreshAuto();draw();}
   });
   post({type:'ready'});
 })();
