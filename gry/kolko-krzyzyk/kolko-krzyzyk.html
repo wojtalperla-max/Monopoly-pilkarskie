@@ -35,13 +35,17 @@
   <div class="ms-wrap">
     <div class="ms-xo" aria-hidden="true"><i class="x">✕</i><i class="o">○</i><i class="x">✕</i></div>
     <div class="ms-logo" role="img" aria-label="Kółko i krzyżyk"><div class="ms-l1" data-t="KÓŁKO"></div><div class="ms-l2" data-t="I KRZYŻYK"></div></div>
-    <p class="ms-sub">Trzy w rzędzie. Zero litości.</p>
+    <p class="ms-sub">Rzędy, kolumny, ukosy. Zero litości.</p>
     <div class="ms-main">
       <button class="ms-btn ms-gold" id="mk" disabled><span class="ms-ic">🏠</span><span>Utwórz pokój</span></button>
       <button class="ms-btn ms-white" id="msJoinBtn" type="button"><span class="ms-ic">🚪</span><span>Dołącz do znajomego</span></button>
     </div>
     <div id="msCreatePane" class="ms-pane" style="text-align:center"><h3 style="margin:0 0 12px;font-size:20px">Jaką planszę tworzysz?</h3>
-      <div class="chips" id="sz"><button class="chip on" data-s="3">Normalna<small>3 × 3</small></button><button class="chip" data-s="8">Większa<small>8 × 8</small></button><button class="chip" data-s="12">Ogromna<small>12 × 12</small></button></div></div>
+      <div class="chips" id="sz"><button class="chip on" data-s="3">Normalna<small>3 × 3</small></button><button class="chip" data-s="8">Większa<small>8 × 8</small></button><button class="chip" data-s="12">Ogromna<small>12 × 12</small></button></div>
+      <h3 style="margin:16px 0 4px;font-size:20px">Ile w rzędzie wygrywa?</h3>
+      <p class="ms-hint">W poziomie, w pionie lub na ukos</p>
+      <div class="chips" id="wn"><button class="chip on" data-k="3">3<small>w rzędzie</small></button><button class="chip" data-k="4">4<small>w rzędzie</small></button><button class="chip" data-k="5">5<small>w rzędzie</small></button></div>
+      <button class="ms-btn ms-green ms-create" id="mkGo" type="button" disabled><span class="ms-ic">🚀</span><span>Utwórz</span></button></div>
     <div id="msJoinPane" class="ms-pane"><label for="jc" style="text-align:center">Kod pokoju od znajomego</label>
       <div class="ms-join"><input id="jc" maxlength="5" placeholder="KOD" autocomplete="off" style="text-transform:uppercase"><button class="ms-btn ms-green" id="jn" disabled>Dołącz</button></div></div>
     <button class="ms-local" id="loc" type="button">🎲 Gra lokalnie na jednym urządzeniu</button>
@@ -106,13 +110,13 @@ window.claude={use:async function(){
 <script>
 (function(){
 const $=s=>document.querySelector(s);
-let R=null,room=null,S=null,isHost=false,mode='',size=3,code='',name='',gone=false,unsubs=[],timer=null,winKey='',lastSt='';
+let R=null,room=null,S=null,isHost=false,mode='',size=3,wl=3,code='',name='',gone=false,unsubs=[],timer=null,winKey='',lastSt='';
 /* ---------- logika ---------- */
-function newState(n,st){return{size:n,b:'.'.repeat(n*n),turn:st||'X',win:null,line:[],X:null,O:null,nX:'',nO:'',sc:{X:0,O:0},starter:st||'X',rd:0}}
-function check(b,n,i){const c=b[i],r=Math.floor(i/n),k=i%n;for(const[dr,dc]of[[0,1],[1,0],[1,1],[1,-1]]){const L=[i];for(const s of[1,-1]){let y=r+dr*s,x=k+dc*s;while(y>=0&&y<n&&x>=0&&x<n&&b[y*n+x]===c){L.push(y*n+x);y+=dr*s;x+=dc*s}}if(L.length>=3)return L}return null}
-function applyMove(st,i,sym){if(st.win||st.turn!==sym||i<0||i>=st.b.length||st.b[i]!=='.')return false;st.b=st.b.slice(0,i)+sym+st.b.slice(i+1);const L=check(st.b,st.size,i);if(L){st.win=sym;st.line=L;st.sc[sym]++}else if(!st.b.includes('.'))st.win='D';else st.turn=sym==='X'?'O':'X';return true}
+function newState(n,st,k){return{size:n,k:k||3,b:'.'.repeat(n*n),turn:st||'X',win:null,line:[],X:null,O:null,nX:'',nO:'',sc:{X:0,O:0},starter:st||'X',rd:0}}
+function check(b,n,i,K){K=K||3;const c=b[i],r=Math.floor(i/n),k=i%n;for(const[dr,dc]of[[0,1],[1,0],[1,1],[1,-1]]){const L=[i];for(const s of[1,-1]){let y=r+dr*s,x=k+dc*s;while(y>=0&&y<n&&x>=0&&x<n&&b[y*n+x]===c){L.push(y*n+x);y+=dr*s;x+=dc*s}}if(L.length>=K)return L}return null}
+function applyMove(st,i,sym){if(st.win||st.turn!==sym||i<0||i>=st.b.length||st.b[i]!=='.')return false;st.b=st.b.slice(0,i)+sym+st.b.slice(i+1);const L=check(st.b,st.size,i,st.k);if(L){st.win=sym;st.line=L;st.sc[sym]++}else if(!st.b.includes('.'))st.win='D';else st.turn=sym==='X'?'O':'X';return true}
 function reset(st){st.rd=(st.rd||0)+1;st.starter=st.starter==='X'?'O':'X';st.b='.'.repeat(st.size*st.size);st.turn=st.starter;st.win=null;st.line=[]}
-function wins(b,n,i,c){return!!check(b.slice(0,i)+c+b.slice(i+1),n,i)}
+function wins(b,n,i,c){return!!check(b.slice(0,i)+c+b.slice(i+1),n,i,S.k)}
 function botMove(){if(!S||S.win||S.turn!=='O'||mode!=='bot')return;const n=S.size,b=S.b;let best=-1,bs=-1e9;
  for(let i=0;i<b.length;i++){if(b[i]!=='.')continue;let s=Math.random();
   if(wins(b,n,i,'O'))s+=1000;else if(wins(b,n,i,'X'))s+=500;else{const r=(i/n)|0,c=i%n;for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){const y=r+dr,x=c+dc;if((dr||dc)&&y>=0&&y<n&&x>=0&&x<n&&b[y*n+x]!=='.')s+=3}s-=(Math.abs(r-(n-1)/2)+Math.abs(c-(n-1)/2))*.3}
@@ -147,7 +151,7 @@ function render(){
  if(t!==lastSt){const e=$('#st');e.textContent=t;e.style.animation='none';void e.offsetWidth;e.style.animation='';lastSt=t}
  $('#again').classList.toggle('hidden',!S.win||gone||(mode==='online'&&!ms));
  if(mode==='online'&&S.win&&ms&&S.X&&S.O){try{window.__tttStats(code,S,ms)}catch(e){}}
- $('#tag').innerHTML=(mode==='online'?'Pokój <b></b> · ':'')+n+'×'+n;if(mode==='online')$('#tag b').textContent=code.toUpperCase();
+ $('#tag').innerHTML=(mode==='online'?'Pokój <b></b> · ':'')+n+'×'+n+' · '+(S.k||3)+' w rzędzie';if(mode==='online')$('#tag b').textContent=code.toUpperCase();
  const k=S.win&&S.win!=='D'?S.line.join():'';
  if(k!==winKey){winKey=k;if(k){drawLine();burst(S.win)}else{const w=$('#wl');if(w)w.remove()}}
 }
@@ -177,10 +181,10 @@ function loop(){fr++;if(fr%90===1)cols();cx.clearRect(0,0,W,H);
  cx.globalAlpha=1;requestAnimationFrame(loop)}
 if(!matchMedia('(prefers-reduced-motion:reduce)').matches){cols();loop()}
 /* ---------- tryby ---------- */
-function startLocal(m){cleanup();getName();mode=m;S=newState(size);S.nX=name;S.nO=m==='bot'?'Komputer 🤖':'Gracz 2';lastSt='';show('game');render()}
+function startLocal(m){cleanup();getName();mode=m;S=newState(size,'X',m==='local'?3:wl);S.nX=name;S.nO=m==='bot'?'Komputer 🤖':'Gracz 2';lastSt='';show('game');render()}
 async function create(){if(!R)return;err('');cleanup();getName();code=genCode();
  try{room=await R.join('kk-'+code)}catch(e){err('Nie udało się utworzyć pokoju.');return}
- mode='online';isHost=true;S=newState(size);S.X=me();S.nX=name;
+ mode='online';isHost=true;S=newState(size,'X',wl);S.X=me();S.nX=name;
  unsubs.push(room.on('hello',m=>{if(m.isMe)return;const nm=clean(m.data&&m.data.name)||'Gracz';if(!S.O&&m.peer!==S.X){S.O=m.peer;S.nO=nm;S.sc={X:0,O:0};if(!$('#lobby').classList.contains('hidden'))show('game')}emitState()}));
  unsubs.push(room.on('move',m=>{if(m.isMe||!S.O)return;const i=m.data&&m.data.i;if(Number.isInteger(i)&&m.peer===S[S.turn]&&applyMove(S,i,S.turn))emitState()}));
  unsubs.push(room.on('rematch',m=>{if(m.isMe||!S.win)return;if(m.peer===S.X||m.peer===S.O){reset(S);emitState()}}));
@@ -190,12 +194,15 @@ async function join(){if(!R)return;err('');const c=($('#jc').value||'').trim().t
  cleanup();getName();code=c;$('#jn').disabled=true;
  try{room=await R.join('kk-'+c)}catch(e){err('Nie udało się dołączyć.');$('#jn').disabled=false;return}
  mode='online';let got=0,tries=0;
- unsubs.push(room.on('state',m=>{if(m.isMe)return;const d=m.data;if(!d||typeof d.b!=='string'||!d.size||d.b.length!==d.size*d.size||d.X!==m.peer)return;if(S&&S.X!==m.peer)return;if(!got){got=1;clearInterval(timer);show('game')}S=d;S.line=Array.isArray(d.line)?d.line:[];render()}));
+ unsubs.push(room.on('state',m=>{if(m.isMe)return;const d=m.data;if(!d||typeof d.b!=='string'||!d.size||d.b.length!==d.size*d.size||d.X!==m.peer)return;if(!(d.k>=3&&d.k<=5&&d.k<=d.size))d.k=3;if(S&&S.X!==m.peer)return;if(!got){got=1;clearInterval(timer);show('game')}S=d;S.line=Array.isArray(d.line)?d.line:[];render()}));
  unsubs.push(room.onPeers(c=>{if(got&&S&&c.left.some(p=>p.peer===S.X)){gone=true;render()}}));
  const hi=()=>room&&room.emit('hello',{name}).catch(()=>{});hi();
  timer=setInterval(()=>{if(got)return;if(++tries>=5){clearInterval(timer);cleanup();err('Nie znaleziono pokoju o tym kodzie.');$('#jn').disabled=false;return}hi()},1800)}
 function leave(){cleanup();show('menu');$('#jn').disabled=!R;err('')}
-$('#sz').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;size=+b.dataset.s;[...$('#sz').children].forEach(x=>x.classList.toggle('on',x===b));create()};
+function syncWn(){[...$('#wn').children].forEach(x=>{const k=+x.dataset.k,bad=k>size;x.disabled=bad;x.classList.toggle('dis',bad)});if(wl>size)wl=size>=3?3:size;[...$('#wn').children].forEach(x=>x.classList.toggle('on',+x.dataset.k===wl))}
+$('#sz').onclick=e=>{const b=e.target.closest('.chip');if(!b)return;size=+b.dataset.s;[...$('#sz').children].forEach(x=>x.classList.toggle('on',x===b));syncWn()};
+$('#wn').onclick=e=>{const b=e.target.closest('.chip');if(!b||b.disabled)return;wl=+b.dataset.k;syncWn()};
+$('#mkGo').onclick=create;syncWn();
 $('#mk').onclick=()=>{const p=$('#msCreatePane'),on=p.style.display!=='block';$('#msJoinPane').style.display='none';p.style.display=on?'block':'none';err('')};$('#jn').onclick=join;$('#loc').onclick=()=>{size=3;startLocal('local')};$('#lv').onclick=leave;$('#gl').onclick=leave;
 $('#jc').addEventListener('keydown',e=>{if(e.key==='Enter')join()});
 $('#cb').onclick=()=>{try{navigator.clipboard.writeText(code.toUpperCase()).then(()=>{$('#cp').textContent='Skopiowano! ✓'},()=>{})}catch(e){}};
@@ -206,7 +213,7 @@ $('#bd').addEventListener('click',e=>{const el=e.target.closest('.c');if(!el||!S
  if(!S.O)return;const ms=mySym();if(!ms||ms!==S.turn)return;
  if(isHost){if(applyMove(S,i,ms))emitState()}else room.emit('move',{i}).catch(()=>{})});
 (async()=>{try{R=window.claude&&claude.use?await claude.use('room'):null}catch(e){R=null}
- if(R){$('#mk').disabled=false;$('#jn').disabled=false;$('#mpn').textContent='Gra online: utwórz pokój i podaj kod znajomemu. Wyniki zapisują się w statystykach zalogowanego konta.'}else $('#mpn').textContent='Tryb online niedostępny (brak połączenia z Firebase). Tryby z komputerem i lokalny działają.';
+ if(R){$('#mk').disabled=false;$('#mkGo').disabled=false;$('#jn').disabled=false;$('#mpn').textContent='Gra online: utwórz pokój i podaj kod znajomemu. Wyniki zapisują się w statystykach zalogowanego konta.'}else $('#mpn').textContent='Tryb online niedostępny (brak połączenia z Firebase). Tryby z komputerem i lokalny działają.';
  })();
 window.__tttLeave=leave;
 })();
