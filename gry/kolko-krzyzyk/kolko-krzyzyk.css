@@ -154,3 +154,8 @@ html::-webkit-scrollbar,body::-webkit-scrollbar,*::-webkit-scrollbar{display:non
 /* przyciski trybów lokalnych – półprzezroczysta ramka jak w Monopoly */
 .ms-local{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;font:inherit;font-weight:600;font-size:clamp(14px,3.2vw,17px);background:#ffffff26;color:#fff;border:1px solid #ffffff59;border-radius:14px;box-shadow:none;padding:12px 16px;margin:0;cursor:pointer;transition:background .15s,transform .15s;animation:msUp .7s 1.45s both}
 .ms-local:hover{background:#ffffff3a;transform:translateY(-2px)}
+
+.ms-hint{margin:0 0 10px;font-size:13px;opacity:.8}
+.ms .chip:disabled,.ms .chip.dis{opacity:.35;cursor:not-allowed;transform:none;box-shadow:none}
+.ms .chip:disabled:hover{transform:none;background:#ffffff1c;border-color:#ffffff55}
+.ms-create{width:100%;margin-top:16px;flex:none;padding:14px 24px}
