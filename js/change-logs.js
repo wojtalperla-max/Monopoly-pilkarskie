@@ -70,9 +70,9 @@ function logsRender(){
     if(LOGS.edit&&LOGS.edit.id===p.id)return logsEditorHtml();
     return `<article class="lgpost"><div><span class="lgtag">Aktualizacja</span>${p.date?`<span class="lgwhen">Zamieszczono ${lgEsc(p.date)}</span>`:''}</div>${p.title?`<h3 class="lgtitle">${lgEsc(p.title)}</h3>`:''}${logsFmt(p.text)}${adm?`<div class="lgrow lgadm"><button class="lgbtn" onclick="logsEditId('${lgEsc(p.id)}')">Edytuj</button></div>`:''}</article>`;
   }).join('');
-  d.innerHTML=`<div id="logsroot" class="accbox logbox"><div class="lghead"><h2>Logi zmian</h2><div class="lgrow" style="margin:0">${adm&&!LOGS.edit?'<button class="lgbtn go" onclick="logsNew()">+ Nowy wpis</button>':''}<button class="lgbtn" onclick="msgClose()">Zamknij</button></div></div>${note}
+  d.innerHTML=`<div id="logsroot" class="accbox logbox" style="height:calc(100dvh - 32px);max-height:calc(100dvh - 32px);min-height:0;overflow-y:auto;overflow-x:hidden;display:block;box-sizing:border-box;overscroll-behavior:contain"><div class="lghead" style="position:sticky;top:0;z-index:5;flex:0 0 auto"><h2>Logi zmian</h2><div class="lgrow" style="margin:0">${adm&&!LOGS.edit?'<button class="lgbtn go" onclick="logsNew()">+ Nowy wpis</button>':''}<button class="lgbtn" onclick="msgClose()">Zamknij</button></div></div>${note}
   ${LOGS.msg?`<div class="lgmsg" role="alert">${lgEsc(LOGS.msg)}</div>`:''}${LOGS.ok?`<div class="lgnote">${lgEsc(LOGS.ok)}</div>`:''}
-  ${LOGS.edit&&!LOGS.edit.id?logsEditorHtml():''}${posts||(LOGS.edit?'':'<div class="lgempty">Brak wpisów.</div>')}</div>`;
+  ${LOGS.edit&&!LOGS.edit.id?logsEditorHtml():''}<div class="lglist" style="overflow:visible;max-height:none;height:auto;box-sizing:border-box">${posts||(LOGS.edit?'':'<div class="lgempty">Brak wpisów.</div>')}</div></div>`;
 }
 async function logsWrite(id,obj){
   if(LOGS.local){if(obj){LOGS.data[id]=Object.assign({ts:Date.now(),by:''},obj)}else delete LOGS.data[id];logsLocalSave();return}
