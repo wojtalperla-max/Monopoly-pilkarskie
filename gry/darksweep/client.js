@@ -35,6 +35,7 @@
   music.loop = true; music.preload = 'auto'; music.volume = 0.5;
   let musicGain = null, musicSource = null, musicLevel = 0.5;
   let musicMuted = false;
+  let platformActive = true;
   try { musicMuted = localStorage.getItem("ds-music-muted") === "1"; } catch (_) {}
   music.muted = musicMuted;
   function refreshMusicButtons() {
@@ -61,6 +62,7 @@
     else music.volume = level;
   }
   function startMusic() {
+    if (!platformActive) return;
     // Web Audio zapewnia regulację także na iOS; przy plikach lokalnych użyj zwykłego audio.
     const a = audio();
     if (a && !musicSource && /^https?:$/.test(location.protocol)) {
@@ -77,6 +79,9 @@
   for (const event of ['pointerdown', 'touchend', 'click', 'keydown'])
     document.addEventListener(event, startMusic, {capture:true, passive:true});
   music.play().catch(() => {});
+  function stopPlatformMusic() { platformActive = false; music.pause(); }
+  addEventListener("pagehide", stopPlatformMusic);
+  addEventListener("pageshow", () => { if (window.parent === window) { platformActive = true; startMusic(); } });
   function noise(dur, freq, vol) {
     const a = audio(); if (!a || vol < 0.01) return;
     const n = Math.floor(a.sampleRate * dur), b = a.createBuffer(1, n, a.sampleRate), d = b.getChannelData(0);
@@ -217,7 +222,7 @@
     const B=platform(), n=cleanNick(B?.ACC?.nick || B?.ACC?.user?.displayName);
     $('name').value=n; $('profileName').textContent=n?'Grasz jako: '+n:'Zaloguj się na stronie głównej, aby grać online.';
   }
-  window.__darksweepRefresh=refreshProfile;
+  window.__darksweepRefresh = () => { platformActive = true; refreshProfile(); startMusic(); };
   refreshProfile();
   try { platform()?.fbAuth?.onAuthStateChanged(()=>refreshProfile()); } catch (_) {}
   function invitationLink() {
@@ -231,7 +236,7 @@
     clearInput();
   }
   function enterGame() {
-    $('arenaInfo').textContent = `V30 · Mapa ${C.MW*C.TILE} × ${C.MH*C.TILE}`;
+    $('arenaInfo').textContent = `V32 · Mapa ${C.MW*C.TILE} × ${C.MH*C.TILE}`;
     setMusicLevel(0.15);
     $('shopBtn').hidden=net.rule!=='ricochet'; $('menu').style.display = 'none'; $('hud').style.display = 'flex'; $('controls').style.display = 'block'; wakeAudio();
     touchDevice=matchMedia('(pointer:coarse)').matches; mobileUI(touchDevice); $('heavyPunch').hidden=net.rule!=='fight'; for(const id of ['reload','swap','knife']) $(id).style.display=net.rule==='fight'?'none':'';
@@ -248,6 +253,7 @@
     resetClientState(); hideLobby();
     $('menu').style.display = 'flex'; $('hud').style.display = 'none'; $('controls').style.display = 'none'; document.body.classList.remove('mobile-play');
   }
+  window.__darksweepLeave = () => { stopPlatformMusic(); leave(); };
   $('leave').onclick = leave;
   addEventListener('beforeunload', () => { try { if (net.conn) net.conn.close(); } catch (_) { } });
   $('roomBtn').onclick = () => {
@@ -380,7 +386,7 @@
   function teamPalette(team) { const edge = TEAM_COL[team] || TEAM_COL[0]; const shade = k => '#' + edge.slice(1).match(/../g).map(v => Math.round(parseInt(v,16)*k).toString(16).padStart(2,'0')).join(''); return {edge,body:shade(.8),dark:shade(.45),helm:shade(.65)}; }
   function requestTeam(team) { if (net.mode === 'host' && !net.started) { net.sim.changeTeam(net.localId,team); lobbyRefresh(); } else if (net.mode === 'client' && !net.entered && net.conn?.open) net.conn.send({t:'team',team}); }
   $('lbTeamA').onclick = () => requestTeam(0); $('lbTeamB').onclick = () => requestTeam(1); $('lbTeamC').onclick=()=>requestTeam(2);
-  $('matchMode').onchange = () => { $('botsLabel').style.display = +$('matchMode').value ? 'none' : ''; const size = $('gameRule').value==='ffa'?2:(+$('matchMode').value || 4); const {w,h,name} = S.ARENAS[size]; $('mapSizeInfo').textContent = `Mapa: ${name} · ${w*32} × ${h*32} · V30`;  }; $('gameRule').onchange=()=>{const ffa=$('gameRule').value==='ffa', duel=ffa||$('gameRule').value==='duel'; $('matchRoundsLabel').hidden=!duel; $('colorCLabel').hidden=!ffa; $('teamC').hidden=!ffa; $('teamC').disabled=!ffa; if(!ffa && $('team').value==='2') $('team').value='0'; $('roundTargetLabel').hidden=!duel; if(duel) $('matchMode').value='1'; $('matchMode').disabled=duel; $('matchMode').onchange();}; $('gameRule').onchange();
+  $('matchMode').onchange = () => { $('botsLabel').style.display = +$('matchMode').value ? 'none' : ''; const size = $('gameRule').value==='ffa'?2:(+$('matchMode').value || 4); const {w,h,name} = S.ARENAS[size]; $('mapSizeInfo').textContent = `Mapa: ${name} · ${w*32} × ${h*32} · V32`;  }; $('gameRule').onchange=()=>{const ffa=$('gameRule').value==='ffa', duel=ffa||$('gameRule').value==='duel'; $('matchRoundsLabel').hidden=!duel; $('colorCLabel').hidden=!ffa; $('teamC').hidden=!ffa; $('teamC').disabled=!ffa; if(!ffa && $('team').value==='2') $('team').value='0'; $('roundTargetLabel').hidden=!duel; if(duel) $('matchMode').value='1'; $('matchMode').disabled=duel; $('matchMode').onchange();}; $('gameRule').onchange();
   function lobbyStatus(t) { $('lbStatus').textContent = t || ''; }
   function lobbyShow(isHost) {
     $('menu').classList.add('in-lobby');
