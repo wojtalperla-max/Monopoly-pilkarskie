@@ -500,7 +500,61 @@ function frSeen(id){
 setInterval(()=>{if(document.getElementById('frbox'))frRender()},60000);
 function frRow(id,nick,color,actions,seen,avatar){
   const online=!!(PRES.map[id]&&PRES.map[id].state==='online');
-  return `<div class="lghist frrow"><i class="fronline ${online?'on':''}" title="${online?'Online':'Offline'}"></i>${accAvatarOk(avatar||(FR.names[id]||{}).avatar)?accAvatarHTML(avatar||(FR.names[id]||{}).avatar,color,26):lgDot(color||'#888')}<button class="frprofilelink" style="border:0;background:transparent;color:inherit;font:inherit;font-weight:700;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:3px" onclick="frProfile('${id}')" title="Zobacz profil gracza">${lgEsc(nick)}</button> <small>${lgEsc(frTag(id))}</small><span class="frb">${actions}</span>${seen?`<span class="frseen">${lgEsc(frSeen(id))}</span>`:''}</div>`;
+  return `<div class="lghist frrow"><i class="fronline ${online?'on':''}" title="${online?'Online':'Offline'}"></i>${accAvatarOk(avatar||(FR.names[id]||{}).avatar)?accAvatarHTML(avatar||(FR.names[id]||{}).avatar,color,26):lgDot(color||'#888')}<span class="frprofilelink" role="button" tabindex="0" onclick="frProfile('${id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();frProfile('${id}')}" title="Zobacz profil gracza">${lgEsc(nick)}</span> <small>${lgEsc(frTag(id))}</small><span class="frb">${actions}</span>${seen?`<span class="frseen">${lgEsc(frSeen(id))}</span>`:''}</div>`;
+}
+async function frProfile(id){
+  id=String(id||'');
+  if(!/^[A-Za-z0-9_-]{1,128}$/.test(id)||typeof fbDB==='undefined'||!fbDB)return;
+  const old=document.getElementById('frprofile');if(old)old.remove();
+  const d=document.createElement('div');d.id='frprofile';d.className='frprofile-overlay';
+  d.innerHTML='<section class="accbox frprofile-card" role="dialog" aria-modal="true" aria-labelledby="frprofiletitle">'
+    +'<header class="frprofile-head"><div><small class="frprofile-eyebrow">KARTA GRACZA</small><h2 id="frprofiletitle">👤 Profil gracza</h2></div>'
+    +'<button type="button" class="lgbtn frprofile-close" id="frprofileclose" aria-label="Zamknij profil">✕</button></header>'
+    +'<div id="frprofilecontent" class="frprofile-content"><p class="lgnote">Ładowanie profilu…</p></div></section>';
+  d.addEventListener('click',e=>{if(e.target===d)d.remove()});
+  document.body.appendChild(d);
+  d.querySelector('#frprofileclose').addEventListener('click',()=>d.remove());
+  const onKey=e=>{if(e.key==='Escape'&&document.getElementById('frprofile')){d.remove();document.removeEventListener('keydown',onKey)}};
+  document.addEventListener('keydown',onKey);
+  const content=d.querySelector('#frprofilecontent');
+  try{
+    const [userSnap,statsSnap]=await Promise.all([
+      fbDB.ref('publicUsers/'+id).once('value'),
+      fbDB.ref('stats/'+id).once('value').catch(()=>null)
+    ]);
+    if(!document.getElementById('frprofile'))return;
+    const u=userSnap.val()||{},raw=statsSnap&&statsSnap.val()||{};
+    const games=Object.values(raw).filter(x=>x&&typeof x==='object'&&['w','l','d'].includes(x.r));
+    const wins=games.filter(x=>x.r==='w').length;
+    const losses=games.filter(x=>x.r==='l').length;
+    const draws=games.filter(x=>x.r==='d').length;
+    const total=games.length,pct=total?Math.round(wins/total*100):0;
+    const nick=lgEsc(u.nick||((FR.names[id]||{}).nick)||'Gracz');
+    const color=/^#[0-9a-f]{6}$/i.test(u.color||'')?u.color:'#888888';
+    const avatar=accAvatarHTML(accAvatarOk(u.avatar),color,90,u.nick||'Gracz');
+    const byGame=Object.keys(ST_GAMES).map(key=>{
+      const list=games.filter(x=>x.g===key);if(!list.length)return '';
+      const w=list.filter(x=>x.r==='w').length,l=list.filter(x=>x.r==='l').length,dr=list.filter(x=>x.r==='d').length;
+      const gameTotal=w+l+dr;
+      return '<div class="frprofile-game"><div class="frprofile-game-head"><b>'+lgEsc(ST_GAMES[key])+'</b><span>'+gameTotal+' meczów</span></div>'
+        +'<div class="frprofile-bar frprofile-game-bar" role="img" aria-label="'+lgEsc(ST_GAMES[key])+': wygrane '+w+', remisy '+dr+', przegrane '+l+'">'
+        +(w?'<i class="win" style="width:'+(w/gameTotal*100)+'%"></i>':'')+(dr?'<i class="draw" style="width:'+(dr/gameTotal*100)+'%"></i>':'')+(l?'<i class="loss" style="width:'+(l/gameTotal*100)+'%"></i>':'')
+        +'</div><div class="frprofile-legend frprofile-game-legend"><span><i class="win-dot"></i><b>'+w+'</b> wygrane</span><span><i class="draw-dot"></i><b>'+dr+'</b> remisy</span><span><i class="loss-dot"></i><b>'+l+'</b> przegrane</span></div></div>';
+    }).join('');
+    content.innerHTML='<div class="frprofile-hero"><div class="frprofile-avatar">'+avatar+'</div>'
+      +'<h2 class="frprofile-name" style="--player-color:'+color+'">'+nick+'</h2>'
+      +'<p class="frprofile-id">Gracz <b>'+lgEsc(frTag(id))+'</b></p></div>'
+      +'<div class="frprofile-section-title"><span>📊</span> Podsumowanie</div>'
+      +'<div class="stbx frprofile-stats"><div><b>'+total+'</b><span>rozegrane</span></div><div><b>'+wins+'</b><span>wygrane</span></div><div><b>'+losses+'</b><span>przegrane</span></div><div><b>'+draws+'</b><span>remisy</span></div><div><b>'+pct+'%</b><span>skuteczność</span></div></div>'
+      +'<div class="frprofile-breakdown" aria-label="Podział wyników"><div class="frprofile-breakdown-head"><b>Bilans wyników</b><span>'+total+' meczów</span></div><div class="frprofile-bar" role="img" aria-label="Wygrane '+wins+', remisy '+draws+', przegrane '+losses+'">'
+      +(total?((wins?'<i class="win" style="width:'+(wins/total*100)+'%"></i>':'')+(draws?'<i class="draw" style="width:'+(draws/total*100)+'%"></i>':'')+(losses?'<i class="loss" style="width:'+(losses/total*100)+'%"></i>':'')):'<i class="empty"></i>')
+      +'</div><div class="frprofile-legend"><span><i class="win-dot"></i><b>'+wins+'</b> wygrane</span><span><i class="draw-dot"></i><b>'+draws+'</b> remisy</span><span><i class="loss-dot"></i><b>'+losses+'</b> przegrane</span></div></div>'
+      +'<div class="frprofile-section-title"><span>🎮</span> Statystyki gier</div>'
+      +'<div class="frprofile-games">'+(byGame||'<p class="lgnote frprofile-empty">Brak dostępnych statystyk gier.</p>')+'</div>';
+  }catch(e){
+    if(document.getElementById('frprofilecontent'))content.innerHTML='<p class="lgmsg">Nie udało się załadować profilu gracza.</p>';
+    console.warn('Profil gracza:',e);
+  }
 }
 function frRender(){
   const box=document.getElementById('frbox');if(!box)return;
