@@ -219,6 +219,48 @@ function accAvatarHTML(src,color,size,name){
     +'.accavbox .accav{border:2px solid #ffffff55;box-shadow:0 2px 8px #0004}'
     +'.accavbtns{display:flex;flex-wrap:wrap;gap:8px}'
     +'#accbar .accav{margin-right:6px}.frrow .accav{margin-right:6px}';
+  st.textContent+='#accbar .acc-actions{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;flex:none}'
+    +'#accbar .acc-actions>.lgbtn{white-space:nowrap}'
+    +'.ach-launch{width:38px;height:38px;display:grid;place-items:center;padding:0;border:2px solid #ffe6a0;border-radius:50%;background:radial-gradient(circle at 35% 25%,#fff0b0,#f0bd45 48%,#a86a19 100%);color:#593712;cursor:pointer;box-shadow:inset 0 1px 3px #fff9,0 3px 0 #100b1c,0 5px 12px #0008;transition:transform .18s,filter .18s}'
+    +'.ach-launch:hover{transform:translateY(-2px) scale(1.06);filter:brightness(1.12)}'
+    +'.ach-launch:active{transform:scale(.94)}'
+    +'.ach-launch svg{width:22px;height:22px;fill:#593712;filter:drop-shadow(0 1px 0 #fff6)}'
+    +'#achievements.frprofile-overlay{position:fixed;inset:0;z-index:21030;display:flex;align-items:center;justify-content:center;padding:16px;background:#08031dcc;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:frpFade .22s ease-out both;color:#fff;font-family:var(--ff,"Fredoka","Trebuchet MS",system-ui,sans-serif)}'
+    +'#achievements .frprofile-card{width:min(94vw,700px);min-height:300px;max-height:min(90dvh,820px);overflow:auto;padding:0!important;background:linear-gradient(155deg,#30205c,#1a1033 68%)!important;border:3px solid var(--acc,#ffd23f)!important;border-radius:24px!important;box-shadow:9px 10px 0 #0009,0 24px 70px #0009!important;animation:frpIn .32s cubic-bezier(.2,.9,.25,1.12) both}'
+    +'#achievements .frprofile-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;background:#150a30;border-bottom:2px solid #ffffff20;position:sticky;top:0;z-index:2}'
+    +'#achievements .frprofile-head h2{margin:2px 0 0!important;color:var(--mint,#5ee6c8);font-size:clamp(22px,4vw,30px);text-shadow:2px 2px 0 #0008}'
+    +'#achievements .frprofile-eyebrow{font-size:11px;letter-spacing:.16em;font-weight:800;color:var(--acc,#ffd23f);opacity:.9}'
+    +'#achievements .frprofile-close{width:40px;height:40px;padding:0!important;display:grid;place-items:center;border-radius:50%!important;font-size:19px;background:var(--pink,#ff5fa2)!important;color:#241034!important;border:2px solid #fff5!important;flex:none}'
+    +'#achievements .frprofile-content{padding:18px clamp(14px,3vw,24px) 24px;min-height:220px}'
+    +'#achievements .ach-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;margin:0 0 16px;border:1px solid #ffffff22;border-radius:15px;background:linear-gradient(120deg,#ffffff13,#ffffff06)}'
+    +'#achievements .ach-total{font-size:clamp(25px,5vw,36px);font-weight:900;color:#ffe7a0;text-shadow:0 3px 0 #0006}'
+    +'#achievements .ach-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}'
+    +'#achievements .ach-item{position:relative;display:flex;align-items:center;gap:12px;min-width:0;padding:13px;border-radius:17px;border:1px solid var(--ach-edge);background:linear-gradient(145deg,var(--ach-bg),#160d2b 82%);box-shadow:inset 0 1px #ffffff18,0 5px 14px #0003;overflow:hidden}'
+    +'#achievements .ach-item.earned{border-color:var(--ach-edge);box-shadow:inset 0 1px #ffffff28,0 0 18px var(--ach-glow),0 5px 14px #0003}'
+    +'#achievements .ach-statue{width:94px;height:108px;flex:none;display:grid;place-items:center;filter:drop-shadow(0 7px 5px #0007)}'
+    +'#achievements .ach-statue svg{width:100%;height:100%;overflow:visible}'
+    +'#achievements .ach-info{min-width:0;flex:1}'
+    +'#achievements .ach-name{font-weight:900;font-size:16px;color:#fff;line-height:1.2}'
+    +'#achievements .ach-threshold{font-size:12px;color:#e8ddff;margin-top:4px}'
+    +'#achievements .ach-status{font-size:11px;font-weight:800;letter-spacing:.04em;margin-top:8px;color:var(--ach-edge)}'
+    +'#achievements .ach-progress{height:7px;margin-top:8px;border-radius:99px;background:#ffffff1c;overflow:hidden}'
+    +'#achievements .ach-progress i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--ach-edge),#fff);box-shadow:0 0 8px var(--ach-glow)}'
+    +'#achievements .ach-item.locked .ach-statue{filter:grayscale(.72) brightness(.65) drop-shadow(0 5px 4px #0008)}'
+    +'@media(max-width:520px){#accbar .ach-launch{width:35px;height:35px}#achievements.frprofile-overlay{padding:8px}#achievements .frprofile-card{width:100%;max-height:94dvh;border-radius:19px!important}#achievements .ach-grid{grid-template-columns:1fr}#achievements .ach-statue{width:82px;height:96px}}'
+    +'#frprofile .frprofile-tabs{display:flex;gap:8px;padding:12px 16px 0;background:#150a30;border-bottom:1px solid #ffffff20}'
+    +'#frprofile .frprofile-tab{border:1px solid #ffffff25;border-bottom:0;border-radius:12px 12px 0 0;padding:10px 15px;background:#ffffff0b;color:#e8ddff;font:inherit;font-weight:800;font-size:13px;cursor:pointer;transition:background .16s,color .16s}'
+    +'#frprofile .frprofile-tab.active{background:linear-gradient(145deg,#4b347c,#30205c);color:#ffe7a0;border-color:#d6b66b88;box-shadow:inset 0 2px #ffe7a055}'
+    +'#frprofile .frprofile-tab span{display:inline-grid;place-items:center;min-width:19px;height:19px;margin-left:4px;padding:0 5px;border-radius:99px;background:#ffffff20;font-size:11px}'
+    +'#frprofile .frprofile-tabpanel[hidden]{display:none!important}'
+    +'#frprofile .ach-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;margin:0 0 16px;border:1px solid #ffffff22;border-radius:15px;background:linear-gradient(120deg,#ffffff13,#ffffff06)}'
+    +'#frprofile .ach-total{font-size:clamp(25px,5vw,36px);font-weight:900;color:#ffe7a0;text-shadow:0 3px 0 #0006}'
+    +'#frprofile .ach-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}'
+    +'#frprofile .ach-item{position:relative;display:flex;align-items:center;gap:12px;min-width:0;padding:13px;border-radius:17px;border:1px solid var(--ach-edge);background:linear-gradient(145deg,var(--ach-bg),#160d2b 82%);box-shadow:inset 0 1px #ffffff18,0 5px 14px #0003;overflow:hidden}'
+    +'#frprofile .ach-item.earned{box-shadow:inset 0 1px #ffffff28,0 0 18px var(--ach-glow),0 5px 14px #0003}'
+    +'#frprofile .ach-statue{width:94px;height:108px;flex:none;display:grid;place-items:center;filter:drop-shadow(0 7px 5px #0007)}#frprofile .ach-statue svg{width:100%;height:100%;overflow:visible}'
+    +'#frprofile .ach-info{min-width:0;flex:1}#frprofile .ach-name{font-weight:900;font-size:16px;color:#fff;line-height:1.2}#frprofile .ach-threshold{font-size:12px;color:#e8ddff;margin-top:4px}#frprofile .ach-status{font-size:11px;font-weight:800;letter-spacing:.04em;margin-top:8px;color:var(--ach-edge)}'
+    +'#frtrophies.frprofile-overlay{position:fixed;inset:0;z-index:21040;display:flex;align-items:center;justify-content:center;padding:16px;background:#08031ddd;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);color:#fff;font-family:var(--ff,\"Fredoka\",\"Trebuchet MS\",system-ui,sans-serif)}'    +'#frtrophies .frprofile-card{display:block;width:min(94vw,700px);max-height:min(90dvh,820px);overflow:auto;padding:0!important;background:linear-gradient(155deg,#30205c,#1a1033 68%)!important;border:3px solid var(--acc,#ffd23f)!important;border-radius:24px!important;box-shadow:9px 10px 0 #0009,0 24px 70px #0009!important}'    +'#frtrophies .frprofile-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;background:#150a30;border-bottom:2px solid #ffffff20;position:sticky;top:0;z-index:2}'    +'#frtrophies .frprofile-head h2{margin:2px 0 0!important;color:var(--mint,#5ee6c8);font-size:clamp(22px,4vw,30px)}'    +'#frtrophies .frprofile-eyebrow{font-size:11px;letter-spacing:.16em;font-weight:800;color:var(--acc,#ffd23f)}'    +'#frtrophies .frprofile-close{width:40px;height:40px;padding:0!important;display:grid;place-items:center;border-radius:50%!important;font-size:19px;background:var(--pink,#ff5fa2)!important;color:#241034!important;border:2px solid #fff5!important;flex:none}'    +'#frtrophies .frprofile-content{padding:18px clamp(14px,3vw,24px) 24px;min-height:180px}'    +'#frtrophies .ach-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;margin:0 0 16px;border:1px solid #ffffff22;border-radius:15px;background:linear-gradient(120deg,#ffffff13,#ffffff06)}'    +'#frtrophies .ach-total{font-size:clamp(25px,5vw,36px);font-weight:900;color:#ffe7a0}'    +'#frtrophies .ach-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}#frtrophies .ach-statue{width:94px;height:108px;flex:none;display:grid;place-items:center;filter:drop-shadow(0 7px 5px #0007)}#frtrophies .ach-statue svg{width:100%;height:100%;overflow:visible}#frtrophies .ach-item{display:flex;align-items:center;gap:12px;padding:12px;border:1px solid var(--ach-edge);border-radius:16px;background:linear-gradient(135deg,var(--ach-bg),#120b25)}#frtrophies .ach-name{font-weight:800;color:#fff}#frtrophies .ach-threshold{font-size:12px;color:#d9d0eb}#frtrophies .ach-status{font-size:11px;font-weight:900;color:#9cf2c1;margin-top:5px}@media(max-width:520px){#frtrophies .ach-grid{grid-template-columns:1fr}#frtrophies .ach-statue{width:82px;height:96px}}'
+    +'@media(max-width:520px){#frprofile .ach-grid{grid-template-columns:1fr}#frprofile .ach-statue{width:82px;height:96px}#frprofile .frprofile-tab{flex:1;padding:10px 8px}}';
   document.head.appendChild(st);
 })();
 function accAvatarResize(file){
@@ -276,8 +318,58 @@ function accBar(){
   const el=document.getElementById('accbar');if(!el)return;
   if(!accNet()){el.innerHTML='<span class="lgnote">Gość (konta po wgraniu na hosting)</span>';return}
   el.innerHTML=ACC.user
-    ?`${accAvatarHTML(ACC.avatar,ACC.col,24,ACC.nick||ACC.user.displayName||ACC.user.email)}<span>Zalogowany: <b>${lgEsc(ACC.nick||ACC.user.displayName||ACC.user.email||'konto')}</b></span><button class="lgbtn" onclick="accOpen()">Konto</button>`
+    ?`${accAvatarHTML(ACC.avatar,ACC.col,24,ACC.nick||ACC.user.displayName||ACC.user.email)}<span>Zalogowany: <b>${lgEsc(ACC.nick||ACC.user.displayName||ACC.user.email||'konto')}</b></span><div class="acc-actions"><button class="lgbtn" type="button" onclick="accOpen()">Konto</button><button class="ach-launch" id="achLaunch" type="button" aria-label="Osiągnięcia" title="Osiągnięcia"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v3h3v3a5 5 0 0 1-5 5h-.3A4.5 4.5 0 0 1 13 16.7V19h4v2H7v-2h4v-2.3A4.5 4.5 0 0 1 9.3 14H9a5 5 0 0 1-5-5V6h3V3Zm2 2v5a3 3 0 0 0 6 0V5H9ZM7 8H6v1a3 3 0 0 0 2 2.83A5 5 0 0 1 7 9V8Zm11 0v1a5 5 0 0 1-1 2.83A3 3 0 0 0 19 9V8h-1Z"/></svg></button></div>`
     :`<span class="lgnote">Gość</span><button class="lgbtn go" onclick="accOpen('login')">Zaloguj się</button><button class="lgbtn" onclick="accOpen('register')">Utwórz konto</button>`;
+  const achBtn=document.getElementById('achLaunch');if(achBtn)achBtn.addEventListener('click',achOpen);
+}
+/* ===== OSIĄGNIĘCIA: kolekcja statuetek za rozegrane partie ===== */
+const ACH_LEVELS=[
+  {n:5,name:'Drewniana statuetka',short:'Drewno',metal:'#b77a43',light:'#f2c58a',dark:'#633719',edge:'#d49a60',glow:'#b77a4355'},
+  {n:25,name:'Brązowa statuetka',short:'Brąz',metal:'#b96d42',light:'#f4b184',dark:'#5b2b1d',edge:'#d98c60',glow:'#b96d4255'},
+  {n:50,name:'Srebrna statuetka',short:'Srebro',metal:'#aebdce',light:'#ffffff',dark:'#526174',edge:'#d9e5f3',glow:'#c5d6e855'},
+  {n:100,name:'Złota statuetka',short:'Złoto',metal:'#e5ad32',light:'#fff0a1',dark:'#805014',edge:'#ffe080',glow:'#f5c34b66'},
+  {n:250,name:'Fioletowa statuetka',short:'Fiolet',metal:'#9c69e8',light:'#e6c9ff',dark:'#45216f',edge:'#c69aff',glow:'#a56bea66'},
+  {n:500,name:'Szmaragdowa statuetka',short:'Szmaragd',metal:'#19a982',light:'#a8ffe0',dark:'#075443',edge:'#54e4b7',glow:'#20c99b66'},
+  {n:1000,name:'Diamentowa statuetka',short:'Diament',metal:'#8eddf2',light:'#ffffff',dark:'#367caa',edge:'#b8f1ff',glow:'#8ce8ff88',diamond:true}
+];
+function achStatueSVG(level,i){
+  const id='achgrad'+i, m=level.metal,l=level.light,d=level.dark;
+  const figure=level.diamond
+    ? '<path d="M50 8 69 27 62 57 50 72 38 57 31 27Z" fill="url(#'+id+')" stroke="'+l+'" stroke-width="2.2"/><path d="M31 27h38L50 72Z" fill="#fff" opacity=".18"/><path d="m50 8 0 64M31 27l19 8 19-8M38 57l12-22 12 22" fill="none" stroke="#fff" stroke-width="1.7" opacity=".8"/>'
+    : '<circle cx="50" cy="21" r="12" fill="url(#'+id+')" stroke="'+l+'" stroke-width="2"/><path d="M39 36Q50 30 61 36L69 68Q50 78 31 68Z" fill="url(#'+id+')" stroke="'+l+'" stroke-width="2"/><path d="M38 42 23 61M62 42 77 61" stroke="url(#'+id+')" stroke-width="9" stroke-linecap="round"/><path d="M50 39v27m-9-13 9 8 9-8" fill="none" stroke="'+l+'" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>';
+  const wood=level.short==='Drewno' ? '<path d="M36 43q10-6 19 0t10 0M35 55q12-6 28 1M38 65q10-4 22 0" fill="none" stroke="#5b351d" stroke-width="1.7" opacity=".55"/>' : '';
+  return '<svg viewBox="0 0 100 116" role="img" aria-label="'+level.name+'"><defs><linearGradient id="'+id+'" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="'+l+'"/><stop offset=".42" stop-color="'+m+'"/><stop offset="1" stop-color="'+d+'"/></linearGradient><linearGradient id="base'+i+'" x1="0" y1="0" x2="0" y2="1"><stop stop-color="'+l+'"/><stop offset="1" stop-color="'+d+'"/></linearGradient></defs>'+figure+wood+'<path d="M31 79h38l7 13H24Z" fill="url(#base'+i+')" stroke="'+l+'" stroke-width="1.5"/><path d="M20 92h60v12H20Z" fill="'+d+'" stroke="'+l+'" stroke-width="1.5"/><path d="M28 96h44M28 100h44" stroke="'+l+'" stroke-width="1.5" opacity=".65"/></svg>';
+}
+function achOpen(){
+  const old=document.getElementById('achievements');if(old)old.remove();
+  const d=document.createElement('div');d.id='achievements';d.className='frprofile-overlay';
+  d.innerHTML='<section class="accbox frprofile-card ach-card" role="dialog" aria-modal="true" aria-labelledby="ach-title">'
+    +'<header class="frprofile-head"><div><small class="frprofile-eyebrow">TWOJA KOLEKCJA</small><h2 id="ach-title">🏆 Osiągnięcia</h2></div>'
+    +'<button type="button" class="lgbtn frprofile-close" aria-label="Zamknij osiągnięcia">✕</button></header>'
+    +'<div class="frprofile-content ach-content"><p class="lgnote">Ładowanie osiągnięć…</p></div></section>';
+  d.addEventListener('click',e=>{if(e.target===d)d.remove()});
+  document.body.appendChild(d);
+  d.querySelector('.frprofile-close').addEventListener('click',()=>d.remove());
+  const onKey=e=>{if(e.key==='Escape'&&document.getElementById('achievements')){d.remove();document.removeEventListener('keydown',onKey)}};
+  document.addEventListener('keydown',onKey);
+  const content=d.querySelector('.ach-content');
+  const render=count=>{
+    if(!document.getElementById('achievements'))return;
+    const earned=ACH_LEVELS.filter(x=>count>=x.n).length;
+    content.innerHTML='<div class="ach-summary"><div><div class="frprofile-eyebrow">ROZEGRANE GRY</div><div class="ach-total">'+count+'</div><div class="ach-threshold">'+earned+' z 7 statuetek zdobytych</div></div><div style="font-size:38px" aria-hidden="true">🏆</div></div>'
+      +'<div class="ach-grid">'+ACH_LEVELS.map((x,i)=>{
+        const done=count>=x.n,prev=i?ACH_LEVELS[i-1].n:0,progress=done?100:Math.max(0,Math.min(100,(count-prev)/(x.n-prev)*100));
+        return '<article class="ach-item '+(done?'earned':'locked')+'" style="--ach-bg:'+x.dark+'55;--ach-edge:'+x.edge+';--ach-glow:'+x.glow+'">'
+          +'<div class="ach-statue">'+achStatueSVG(x,i)+'</div><div class="ach-info"><div class="ach-name">'+x.name+'</div><div class="ach-threshold">'+x.n+' rozegranych gier</div>'
+          +'<div class="ach-status">'+(done?'✓ ZDOBYTA':('🔒 '+Math.min(count,x.n)+' / '+x.n))+'</div><div class="ach-progress"><i style="width:'+progress+'%"></i></div></div></article>';
+      }).join('')+'</div>';
+  };
+  if(!ACC.user||!fbDB){content.innerHTML='<p class="lgnote">Zaloguj się, aby zobaczyć swoje osiągnięcia.</p>';return}
+  fbDB.ref('stats/'+ACC.user.uid).once('value').then(snap=>{
+    const raw=snap.val()||{};
+    const count=Object.values(raw).filter(x=>x&&typeof x==='object'&&['w','l','d'].includes(x.r)).length;
+    render(count);
+  }).catch(e=>{content.innerHTML='<p class="lgnote">Nie udało się wczytać osiągnięć: '+lgEsc(e.message||'błąd')+'</p>'});
 }
 const accGenderOk=g=>g==='f'||g==='m'?g:'';
 const accGenderSel=(val,handler)=>`<label>Płeć <select id="accgender" onchange="${handler}"><option value=""${val?'':' selected'} disabled>Wybierz…</option><option value="f"${val==='f'?' selected':''}>Kobieta</option><option value="m"${val==='m'?' selected':''}>Mężczyzna</option></select></label>`;
@@ -502,6 +594,21 @@ function frRow(id,nick,color,actions,seen,avatar){
   const online=!!(PRES.map[id]&&PRES.map[id].state==='online');
   return `<div class="lghist frrow"><i class="fronline ${online?'on':''}" title="${online?'Online':'Offline'}"></i>${accAvatarOk(avatar||(FR.names[id]||{}).avatar)?accAvatarHTML(avatar||(FR.names[id]||{}).avatar,color,26):lgDot(color||'#888')}<span class="frprofilelink" role="button" tabindex="0" onclick="frProfile('${id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();frProfile('${id}')}" title="Zobacz profil gracza">${lgEsc(nick)}</span> <small>${lgEsc(frTag(id))}</small><span class="frb">${actions}</span>${seen?`<span class="frseen">${lgEsc(frSeen(id))}</span>`:''}</div>`;
 }
+function frTrophiesOpen(id,nick,total){
+  const old=document.getElementById('frtrophies');if(old)old.remove();
+  const earned=ACH_LEVELS.filter(x=>total>=x.n);
+  const best=earned.length?earned[earned.length-1]:null;
+  const d=document.createElement('div');d.id='frtrophies';d.className='frprofile-overlay';
+  d.innerHTML='<section class="accbox frprofile-card ach-card" role="dialog" aria-modal="true" aria-labelledby="frtrophies-title">'
+    +'<header class="frprofile-head"><div><small class="frprofile-eyebrow">KOLEKCJA GRACZA</small><h2 id="frtrophies-title">🏆 Trofea · '+nick+'</h2></div>'
+    +'<button type="button" class="lgbtn frprofile-close" aria-label="Zamknij trofea">✕</button></header>'
+    +'<div class="frprofile-content"><div class="ach-summary"><div><div class="frprofile-eyebrow">NAJWYŻSZY ZDOBYTY POZIOM</div><div class="ach-total">'+(best?best.name:'Brak statuetki')+'</div><div class="ach-threshold">'+total+' rozegranych gier</div></div><div style="font-size:38px" aria-hidden="true">🏆</div></div>'
+    +(best?'<div class="ach-grid" style="grid-template-columns:1fr"><article class="ach-item earned" style="--ach-bg:'+best.dark+'55;--ach-edge:'+best.edge+';--ach-glow:'+best.glow+'"><div class="ach-statue">'+achStatueSVG(best,ACH_LEVELS.indexOf(best))+'</div><div class="ach-info"><div class="ach-name">'+best.name+'</div><div class="ach-threshold">'+best.n+' rozegranych gier</div><div class="ach-status">✓ NAJWYŻSZY POZIOM</div></div></article></div>':'<p class="lgnote frprofile-empty">Ten gracz nie zdobył jeszcze żadnej statuetki.</p>')+'</div></section>';
+  d.addEventListener('click',e=>{if(e.target===d)d.remove()});document.body.appendChild(d);
+  d.querySelector('.frprofile-close').addEventListener('click',()=>d.remove());
+  const key=e=>{if(e.key==='Escape'&&document.getElementById('frtrophies')){d.remove();document.removeEventListener('keydown',key)}};
+  document.addEventListener('keydown',key);
+}
 async function frProfile(id){
   id=String(id||'');
   if(!/^[A-Za-z0-9_-]{1,128}$/.test(id)||typeof fbDB==='undefined'||!fbDB)return;
@@ -541,7 +648,7 @@ async function frProfile(id){
         +(w?'<i class="win" style="width:'+(w/gameTotal*100)+'%"></i>':'')+(dr?'<i class="draw" style="width:'+(dr/gameTotal*100)+'%"></i>':'')+(l?'<i class="loss" style="width:'+(l/gameTotal*100)+'%"></i>':'')
         +'</div><div class="frprofile-legend frprofile-game-legend"><span><i class="win-dot"></i><b>'+w+'</b> wygrane</span><span><i class="draw-dot"></i><b>'+dr+'</b> remisy</span><span><i class="loss-dot"></i><b>'+l+'</b> przegrane</span></div></div>';
     }).join('');
-    content.innerHTML='<div class="frprofile-hero"><div class="frprofile-avatar">'+avatar+'</div>'
+    content.innerHTML='<div class="frprofile-hero"><div style="display:flex;align-items:center;justify-content:center;gap:14px"><div class="frprofile-avatar">'+avatar+'</div><button type="button" class="ach-launch" id="frTrophiesLaunch" aria-label="Trofea gracza" title="Trofea"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h10v3h3v3a5 5 0 0 1-5 5h-.3A4.5 4.5 0 0 1 13 16.7V19h4v2H7v-2h4v-2.3A4.5 4.5 0 0 1 9.3 14H9a5 5 0 0 1-5-5V6h3V3Zm2 2v5a3 3 0 0 0 6 0V5H9ZM7 8H6v1a3 3 0 0 0 2 2.83A5 5 0 0 1 7 9V8Zm11 0v1a5 5 0 0 1-1 2.83A3 3 0 0 0 19 9V8h-1Z"/></svg></button></div>'
       +'<h2 class="frprofile-name" style="--player-color:'+color+'">'+nick+'</h2>'
       +'<p class="frprofile-id">Gracz <b>'+lgEsc(frTag(id))+'</b></p></div>'
       +'<div class="frprofile-section-title"><span>📊</span> Podsumowanie</div>'
@@ -551,6 +658,13 @@ async function frProfile(id){
       +'</div><div class="frprofile-legend"><span><i class="win-dot"></i><b>'+wins+'</b> wygrane</span><span><i class="draw-dot"></i><b>'+draws+'</b> remisy</span><span><i class="loss-dot"></i><b>'+losses+'</b> przegrane</span></div></div>'
       +'<div class="frprofile-section-title"><span>🎮</span> Statystyki gier</div>'
       +'<div class="frprofile-games">'+(byGame||'<p class="lgnote frprofile-empty">Brak dostępnych statystyk gier.</p>')+'</div>';
+    content.addEventListener('click',e=>{
+      const trophyBtn=e.target.closest('#frTrophiesLaunch');
+      if(!trophyBtn)return;
+      e.preventDefault();e.stopPropagation();
+      try{frTrophiesOpen(id,nick,total)}
+      catch(err){console.error('Nie udało się otworzyć trofeów gracza:',err);alert('Nie udało się otworzyć trofeów. Odśwież stronę i spróbuj ponownie.')}
+    });
   }catch(e){
     if(document.getElementById('frprofilecontent'))content.innerHTML='<p class="lgmsg">Nie udało się załadować profilu gracza.</p>';
     console.warn('Profil gracza:',e);
